@@ -1,0 +1,8 @@
+/* NativeWind entry stylesheet.
+   These three directives pull in Tailwind's base styles, component classes, and
+   utility classes. Metro (see metro.config.js) compiles this file so that
+   className="flex-1 bg-white ..." works on React Native components.
+   This file is imported once, at the top of app/_layout.tsx. */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
