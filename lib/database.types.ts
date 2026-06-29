@@ -1,12 +1,9 @@
-// lib/database.types.ts — PLACEHOLDER (auto-generated file).
+// lib/database.types.ts — typed shape of the database, used by lib/supabase.ts
+// so queries like supabase.from("profiles") are fully type-checked.
 //
-// Once your Supabase project exists and has tables, regenerate this file with:
-//     npm run db:types
-// which runs `supabase gen types typescript --linked` and overwrites this file
-// with the real, fully-typed schema. Until then, this minimal stub keeps
-// `createClient<Database>()` in lib/supabase.ts type-correct.
-//
-// Do not hand-edit beyond this placeholder — it is meant to be regenerated.
+// This mirrors what `npm run db:types` generates once the Supabase CLI is linked.
+// Until then we maintain it by hand, one table per migration. After V1's
+// 0001_profiles.sql is applied, regenerating will produce an equivalent file.
 
 export type Json =
   | string
@@ -18,7 +15,44 @@ export type Json =
 
 export type Database = {
   public: {
-    Tables: Record<string, never>;
+    Tables: {
+      profiles: {
+        Row: {
+          id: string;
+          role: "trainer" | "client";
+          display_name: string;
+          locale: string;
+          avatar_url: string | null;
+          accepted_terms_at: string | null;
+          accepted_health_disclaimer_at: string | null;
+          created_at: string;
+        };
+        // Insert: what's required vs optional when creating a row. Columns with a
+        // DB default (locale, created_at) or that are nullable are optional here.
+        Insert: {
+          id: string;
+          role: "trainer" | "client";
+          display_name: string;
+          locale?: string;
+          avatar_url?: string | null;
+          accepted_terms_at?: string | null;
+          accepted_health_disclaimer_at?: string | null;
+          created_at?: string;
+        };
+        // Update: every column optional (you patch only what changes).
+        Update: {
+          id?: string;
+          role?: "trainer" | "client";
+          display_name?: string;
+          locale?: string;
+          avatar_url?: string | null;
+          accepted_terms_at?: string | null;
+          accepted_health_disclaimer_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+    };
     Views: Record<string, never>;
     Functions: Record<string, never>;
     Enums: Record<string, never>;

@@ -52,8 +52,10 @@ submission.
   with `className="..."`.
 - **Reanimated 4** is configured via `react-native-worklets`; `babel-preset-expo`
   auto-adds the worklets Babel plugin — do not add it manually.
-- **`.npmrc` sets `legacy-peer-deps=true`** to absorb React 19 / Expo 56 peer
+- **`.npmrc` sets `legacy-peer-deps=true`** to absorb React 19 / Expo SDK peer
   range lag. Keep it until the ecosystem tightens its ranges.
+- **Expo SDK 54** (pinned to match the test phone's Expo Go, which caps at SDK
+  54). Don't bump the SDK without checking the device's Expo Go still supports it.
 
 ### Supabase tooling (run after creating the project)
 
