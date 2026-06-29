@@ -1,8 +1,8 @@
 // app/(tabs)/schedule/new.tsx — assign a template to a client on a date.
 //
-// Trainer picks: a client (from the roster), a template, a date (DateChips), and
-// an optional note for that workout. Submitting creates a scheduled_workout with
-// status 'scheduled'. All dates go through lib/dates.ts (Asia/Jerusalem).
+// The client picker lists BOTH app clients and offline (managed) clients. On
+// submit we set client_id for an app client, or managed_client_id for an offline
+// one (the DB enforces exactly one). All dates via lib/dates.ts (Asia/Jerusalem).
 
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
@@ -12,6 +12,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { useRosterClients, type RosterClient } from "@/lib/useRoster";
 import { addDays, todayISO } from "@/lib/dates";
 import { DateChips } from "@/components/DateChips";
 
@@ -20,7 +21,7 @@ export default function NewScheduleScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const [clientId, setClientId] = useState<string | null>(null);
+  const [selected, setSelected] = useState<RosterClient | null>(null);
   const [templateId, setTemplateId] = useState<string | null>(null);
   const [date, setDate] = useState<string>(addDays(todayISO(), 1)); // default: tomorrow
   const [note, setNote] = useState("");
@@ -29,27 +30,8 @@ export default function NewScheduleScreen() {
   if (profile && profile.role !== "trainer") return <Redirect href="/" />;
   const trainerId = session!.user.id;
 
-  // Roster (clients to choose from).
-  const roster = useQuery({
-    queryKey: ["roster"],
-    queryFn: async () => {
-      const { data: tc, error } = await supabase
-        .from("trainer_clients")
-        .select("*")
-        .eq("trainer_id", trainerId)
-        .order("created_at");
-      if (error) throw error;
-      const ids = tc.map((r) => r.client_id);
-      const names = new Map<string, string>();
-      if (ids.length > 0) {
-        const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", ids);
-        profs?.forEach((p) => names.set(p.id, p.display_name));
-      }
-      return tc.map((r) => ({ client_id: r.client_id, name: names.get(r.client_id) ?? "Client" }));
-    },
-  });
+  const roster = useRosterClients(trainerId);
 
-  // Templates to assign.
   const templates = useQuery({
     queryKey: ["templates"],
     queryFn: async () => {
@@ -66,7 +48,8 @@ export default function NewScheduleScreen() {
     mutationFn: async () => {
       const { error } = await supabase.from("scheduled_workouts").insert({
         trainer_id: trainerId,
-        client_id: clientId!,
+        client_id: selected!.kind === "app" ? selected!.refId : null,
+        managed_client_id: selected!.kind === "managed" ? selected!.refId : null,
         template_id: templateId,
         scheduled_date: date,
         notes: note.trim().length > 0 ? note.trim() : null,
@@ -81,7 +64,7 @@ export default function NewScheduleScreen() {
   });
 
   function handleSubmit() {
-    if (!clientId) return setValidationError("Pick a client.");
+    if (!selected) return setValidationError("Pick a client.");
     if (!templateId) return setValidationError("Pick a template.");
     setValidationError(null);
     mutation.mutate();
@@ -98,10 +81,11 @@ export default function NewScheduleScreen() {
             <View className="gap-2">
               {roster.data.map((c) => (
                 <SelectRow
-                  key={c.client_id}
+                  key={`${c.kind}-${c.refId}`}
                   label={c.name}
-                  selected={clientId === c.client_id}
-                  onPress={() => setClientId(c.client_id)}
+                  tag={c.kind === "managed" ? "offline" : undefined}
+                  selected={selected?.kind === c.kind && selected?.refId === c.refId}
+                  onPress={() => setSelected(c)}
                 />
               ))}
             </View>
@@ -185,10 +169,12 @@ function Section({ label, children }: { label: string; children: React.ReactNode
 
 function SelectRow({
   label,
+  tag,
   selected,
   onPress,
 }: {
   label: string;
+  tag?: string;
   selected: boolean;
   onPress: () => void;
 }) {
@@ -199,7 +185,14 @@ function SelectRow({
         selected ? "border-slate-900 bg-slate-50" : "border-slate-200 bg-white"
       }`}
     >
-      <Text className="text-base font-medium text-slate-900">{label}</Text>
+      <View className="flex-row items-center gap-2">
+        <Text className="text-base font-medium text-slate-900">{label}</Text>
+        {tag ? (
+          <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+            {tag}
+          </Text>
+        ) : null}
+      </View>
       {selected ? <Text className="text-base font-bold text-slate-900">✓</Text> : null}
     </Pressable>
   );

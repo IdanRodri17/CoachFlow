@@ -180,7 +180,9 @@ export type Database = {
         Row: {
           id: string;
           trainer_id: string;
-          client_id: string;
+          // Exactly one of client_id (app client) / managed_client_id (offline).
+          client_id: string | null;
+          managed_client_id: string | null;
           template_id: string | null;
           scheduled_date: string;
           status: "scheduled" | "completed";
@@ -190,7 +192,8 @@ export type Database = {
         Insert: {
           id?: string;
           trainer_id: string;
-          client_id: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
           template_id?: string | null;
           scheduled_date: string;
           status?: "scheduled" | "completed";
@@ -200,11 +203,37 @@ export type Database = {
         Update: {
           id?: string;
           trainer_id?: string;
-          client_id?: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
           template_id?: string | null;
           scheduled_date?: string;
           status?: "scheduled" | "completed";
           notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      // --- V4b: 0004b_managed_clients.sql ---
+      managed_clients: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          name: string;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          name: string;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          name?: string;
+          note?: string | null;
           created_at?: string;
         };
         Relationships: [];

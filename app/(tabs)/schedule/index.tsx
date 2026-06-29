@@ -1,10 +1,10 @@
 // app/(tabs)/schedule/index.tsx — the trainer's roster + scheduling hub.
 //
-// Sections:
-//   1. Add a client to the roster by email (uses the add_client_by_email RPC).
-//   2. The current roster.
-//   3. A button to schedule a workout.
-//   4. Upcoming scheduled workouts (so the trainer sees what they've assigned).
+// Roster has two kinds of client:
+//   - app clients: added by email (must have signed up) via add_client_by_email
+//   - offline clients: added by name only (managed_clients) — won't use the app
+// Both can be scheduled. Sections: add app client, add offline client, roster,
+// schedule button, upcoming.
 
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
@@ -14,6 +14,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { useRosterClients } from "@/lib/useRoster";
 import { formatDisplayDate, todayISO } from "@/lib/dates";
 
 export default function ScheduleHomeScreen() {
@@ -21,35 +22,14 @@ export default function ScheduleHomeScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
   const [email, setEmail] = useState("");
+  const [offlineName, setOfflineName] = useState("");
 
   if (profile && profile.role !== "trainer") return <Redirect href="/" />;
   const trainerId = session!.user.id;
 
-  // --- roster ---
-  const roster = useQuery({
-    queryKey: ["roster"],
-    queryFn: async () => {
-      const { data: tc, error } = await supabase
-        .from("trainer_clients")
-        .select("*")
-        .eq("trainer_id", trainerId)
-        .order("created_at");
-      if (error) throw error;
-      const ids = tc.map((r) => r.client_id);
-      const names = new Map<string, string>();
-      if (ids.length > 0) {
-        const { data: profs, error: pErr } = await supabase
-          .from("profiles")
-          .select("id, display_name")
-          .in("id", ids);
-        if (pErr) throw pErr;
-        profs.forEach((p) => names.set(p.id, p.display_name));
-      }
-      return tc.map((r) => ({ ...r, name: names.get(r.client_id) ?? "Client" }));
-    },
-  });
+  const roster = useRosterClients(trainerId);
 
-  // --- upcoming (trainer view) ---
+  // Upcoming (trainer view), resolving names for app + managed clients.
   const upcoming = useQuery({
     queryKey: ["scheduled-trainer"],
     queryFn: async () => {
@@ -61,13 +41,19 @@ export default function ScheduleHomeScreen() {
         .order("scheduled_date");
       if (error) throw error;
 
-      const clientIds = [...new Set(sws.map((s) => s.client_id))];
+      const clientIds = [...new Set(sws.map((s) => s.client_id).filter(Boolean) as string[])];
+      const managedIds = [...new Set(sws.map((s) => s.managed_client_id).filter(Boolean) as string[])];
       const tplIds = [...new Set(sws.map((s) => s.template_id).filter(Boolean) as string[])];
       const cNames = new Map<string, string>();
+      const mNames = new Map<string, string>();
       const tNames = new Map<string, string>();
       if (clientIds.length > 0) {
         const { data } = await supabase.from("profiles").select("id, display_name").in("id", clientIds);
         data?.forEach((p) => cNames.set(p.id, p.display_name));
+      }
+      if (managedIds.length > 0) {
+        const { data } = await supabase.from("managed_clients").select("id, name").in("id", managedIds);
+        data?.forEach((m) => mNames.set(m.id, m.name));
       }
       if (tplIds.length > 0) {
         const { data } = await supabase.from("workout_templates").select("id, name").in("id", tplIds);
@@ -75,62 +61,74 @@ export default function ScheduleHomeScreen() {
       }
       return sws.map((s) => ({
         ...s,
-        client_name: cNames.get(s.client_id) ?? "Client",
+        client_name: s.client_id
+          ? cNames.get(s.client_id) ?? "Client"
+          : s.managed_client_id
+            ? mNames.get(s.managed_client_id) ?? "Client"
+            : "Client",
         template_name: s.template_id ? tNames.get(s.template_id) ?? "Workout" : "Workout",
       }));
     },
   });
 
-  const addClient = useMutation({
+  const addAppClient = useMutation({
     mutationFn: async (rawEmail: string) => {
       const { error } = await supabase.rpc("add_client_by_email", { p_email: rawEmail });
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["roster"] });
+      queryClient.invalidateQueries({ queryKey: ["roster-clients"] });
       setEmail("");
+    },
+  });
+
+  const addOfflineClient = useMutation({
+    mutationFn: async (name: string) => {
+      const { error } = await supabase.from("managed_clients").insert({ trainer_id: trainerId, name });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["roster-clients"] });
+      setOfflineName("");
     },
   });
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
-        {/* 1. Add a client */}
+        {/* Add an app client */}
         <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Add a client
+          Add a client (uses the app)
         </Text>
-        <View className="flex-row gap-2">
-          <TextInput
-            className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
-            placeholder="client@email.com"
-            placeholderTextColor="#94a3b8"
-            autoCapitalize="none"
-            autoCorrect={false}
-            keyboardType="email-address"
-            value={email}
-            onChangeText={setEmail}
-            editable={!addClient.isPending}
-          />
-          <Pressable
-            className="items-center justify-center rounded-xl bg-slate-900 px-4 active:opacity-80"
-            disabled={addClient.isPending || email.trim().length === 0}
-            onPress={() => addClient.mutate(email.trim())}
-          >
-            {addClient.isPending ? (
-              <ActivityIndicator color="#ffffff" />
-            ) : (
-              <Text className="text-base font-semibold text-white">Add</Text>
-            )}
-          </Pressable>
-        </View>
-        {addClient.error ? (
-          <Text className="mt-2 text-sm text-red-600">{(addClient.error as Error).message}</Text>
+        <AddRow
+          value={email}
+          onChangeText={setEmail}
+          placeholder="client@email.com"
+          keyboardType="email-address"
+          busy={addAppClient.isPending}
+          onAdd={() => addAppClient.mutate(email.trim())}
+        />
+        {addAppClient.error ? (
+          <Text className="mt-2 text-sm text-red-600">{(addAppClient.error as Error).message}</Text>
         ) : null}
-        <Text className="mt-2 text-xs text-slate-400">
-          The client must have signed up in the app first.
-        </Text>
+        <Text className="mt-2 text-xs text-slate-400">They must have signed up in the app first.</Text>
 
-        {/* 2. Roster */}
+        {/* Add an offline client */}
+        <Text className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          Add an offline client (no app)
+        </Text>
+        <AddRow
+          value={offlineName}
+          onChangeText={setOfflineName}
+          placeholder="Client name"
+          busy={addOfflineClient.isPending}
+          onAdd={() => addOfflineClient.mutate(offlineName.trim())}
+        />
+        {addOfflineClient.error ? (
+          <Text className="mt-2 text-sm text-red-600">{(addOfflineClient.error as Error).message}</Text>
+        ) : null}
+
+        {/* Roster */}
         <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
           Your clients ({roster.data?.length ?? 0})
         </Text>
@@ -139,8 +137,16 @@ export default function ScheduleHomeScreen() {
         ) : roster.data && roster.data.length > 0 ? (
           <View className="gap-2">
             {roster.data.map((c) => (
-              <View key={c.id} className="rounded-xl border border-slate-200 px-4 py-3">
+              <View
+                key={`${c.kind}-${c.refId}`}
+                className="flex-row items-center justify-between rounded-xl border border-slate-200 px-4 py-3"
+              >
                 <Text className="text-base font-medium text-slate-900">{c.name}</Text>
+                {c.kind === "managed" ? (
+                  <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                    offline
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>
@@ -148,7 +154,7 @@ export default function ScheduleHomeScreen() {
           <Text className="text-sm text-slate-400">No clients yet — add one above.</Text>
         )}
 
-        {/* 3. Schedule a workout */}
+        {/* Schedule a workout */}
         <Pressable
           className="mt-7 items-center rounded-xl bg-slate-900 px-4 py-3 active:opacity-80"
           onPress={() => router.push("/schedule/new")}
@@ -156,7 +162,7 @@ export default function ScheduleHomeScreen() {
           <Text className="text-base font-semibold text-white">Schedule a workout</Text>
         </Pressable>
 
-        {/* 4. Upcoming */}
+        {/* Upcoming */}
         <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
           Upcoming
         </Text>
@@ -179,5 +185,49 @@ export default function ScheduleHomeScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+// An input + Add button row.
+function AddRow({
+  value,
+  onChangeText,
+  placeholder,
+  keyboardType,
+  busy,
+  onAdd,
+}: {
+  value: string;
+  onChangeText: (v: string) => void;
+  placeholder: string;
+  keyboardType?: "email-address" | "default";
+  busy: boolean;
+  onAdd: () => void;
+}) {
+  return (
+    <View className="flex-row gap-2">
+      <TextInput
+        className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
+        placeholder={placeholder}
+        placeholderTextColor="#94a3b8"
+        autoCapitalize={keyboardType === "email-address" ? "none" : "words"}
+        autoCorrect={false}
+        keyboardType={keyboardType ?? "default"}
+        value={value}
+        onChangeText={onChangeText}
+        editable={!busy}
+      />
+      <Pressable
+        className="items-center justify-center rounded-xl bg-slate-900 px-4 active:opacity-80"
+        disabled={busy || value.trim().length === 0}
+        onPress={onAdd}
+      >
+        {busy ? (
+          <ActivityIndicator color="#ffffff" />
+        ) : (
+          <Text className="text-base font-semibold text-white">Add</Text>
+        )}
+      </Pressable>
+    </View>
   );
 }
