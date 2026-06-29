@@ -25,7 +25,8 @@ export default function HomeScreen() {
         .select("*")
         .eq("client_id", session!.user.id)
         .gte("scheduled_date", todayISO())
-        .order("scheduled_date");
+        .order("scheduled_date")
+        .order("scheduled_time", { ascending: true, nullsFirst: false });
       if (error) throw error;
 
       const tplIds = [...new Set(sws.map((s) => s.template_id).filter(Boolean) as string[])];
@@ -78,6 +79,7 @@ export default function HomeScreen() {
                 </View>
                 <Text className="mt-0.5 text-sm text-slate-500">
                   {formatDisplayDate(s.scheduled_date)}
+                  {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
                 </Text>
                 {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
               </View>

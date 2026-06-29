@@ -9,7 +9,7 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Redirect, useRouter } from "expo-router";
+import { Link, Redirect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
@@ -38,7 +38,8 @@ export default function ScheduleHomeScreen() {
         .select("*")
         .eq("trainer_id", trainerId)
         .gte("scheduled_date", todayISO())
-        .order("scheduled_date");
+        .order("scheduled_date")
+        .order("scheduled_time", { ascending: true, nullsFirst: false });
       if (error) throw error;
 
       const clientIds = [...new Set(sws.map((s) => s.client_id).filter(Boolean) as string[])];
@@ -171,13 +172,16 @@ export default function ScheduleHomeScreen() {
         ) : upcoming.data && upcoming.data.length > 0 ? (
           <View className="gap-2">
             {upcoming.data.map((s) => (
-              <View key={s.id} className="rounded-xl border border-slate-200 px-4 py-3">
-                <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
-                <Text className="mt-0.5 text-sm text-slate-500">
-                  {s.client_name} · {formatDisplayDate(s.scheduled_date)}
-                </Text>
-                {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
-              </View>
+              <Link key={s.id} href={`/schedule/${s.id}`} asChild>
+                <Pressable className="rounded-xl border border-slate-200 px-4 py-3 active:bg-slate-50">
+                  <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
+                  <Text className="mt-0.5 text-sm text-slate-500">
+                    {s.client_name} · {formatDisplayDate(s.scheduled_date)}
+                    {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
+                  </Text>
+                  {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
+                </Pressable>
+              </Link>
             ))}
           </View>
         ) : (

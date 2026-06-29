@@ -185,6 +185,7 @@ export type Database = {
           managed_client_id: string | null;
           template_id: string | null;
           scheduled_date: string;
+          scheduled_time: string | null;
           status: "scheduled" | "completed";
           notes: string | null;
           created_at: string;
@@ -196,6 +197,7 @@ export type Database = {
           managed_client_id?: string | null;
           template_id?: string | null;
           scheduled_date: string;
+          scheduled_time?: string | null;
           status?: "scheduled" | "completed";
           notes?: string | null;
           created_at?: string;
@@ -207,6 +209,7 @@ export type Database = {
           managed_client_id?: string | null;
           template_id?: string | null;
           scheduled_date?: string;
+          scheduled_time?: string | null;
           status?: "scheduled" | "completed";
           notes?: string | null;
           created_at?: string;
