@@ -38,6 +38,9 @@ yarn-error.*
 supabase/.branches
 supabase/.temp
 
+# dev-only seed helper (kept local, not committed)
+supabase/seed_dev_workout.sql
+
 # typescript
 *.tsbuildinfo
 

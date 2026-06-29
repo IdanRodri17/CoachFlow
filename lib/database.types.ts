@@ -241,6 +241,73 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V5: 0005_logging.sql ---
+      workout_logs: {
+        Row: {
+          id: string;
+          scheduled_workout_id: string;
+          client_id: string;
+          completed_at: string;
+          effort_rating: number | null;
+          client_note: string | null;
+          duration_seconds: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          scheduled_workout_id: string;
+          client_id: string;
+          completed_at?: string;
+          effort_rating?: number | null;
+          client_note?: string | null;
+          duration_seconds?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          scheduled_workout_id?: string;
+          client_id?: string;
+          completed_at?: string;
+          effort_rating?: number | null;
+          client_note?: string | null;
+          duration_seconds?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      set_logs: {
+        Row: {
+          id: string;
+          workout_log_id: string;
+          exercise_id: string;
+          set_index: number;
+          reps: number | null;
+          weight: number | null;
+          is_pr: boolean;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workout_log_id: string;
+          exercise_id: string;
+          set_index: number;
+          reps?: number | null;
+          weight?: number | null;
+          is_pr?: boolean;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workout_log_id?: string;
+          exercise_id?: string;
+          set_index?: number;
+          reps?: number | null;
+          weight?: number | null;
+          is_pr?: boolean;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

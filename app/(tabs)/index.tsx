@@ -3,8 +3,9 @@
 // Client: a greeting + their UPCOMING scheduled workouts (date + template name).
 // Trainer: a greeting + a pointer to the Schedule tab (their real dashboard is V8).
 
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { Link } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
@@ -68,21 +69,27 @@ export default function HomeScreen() {
         ) : upcoming.data && upcoming.data.length > 0 ? (
           <View className="mt-6 gap-3 pb-6">
             {upcoming.data.map((s) => (
-              <View key={s.id} className="rounded-xl border border-slate-200 px-4 py-3">
-                <View className="flex-row items-center justify-between">
-                  <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
-                  {isToday(s.scheduled_date) ? (
-                    <Text className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
-                      Today
-                    </Text>
-                  ) : null}
-                </View>
-                <Text className="mt-0.5 text-sm text-slate-500">
-                  {formatDisplayDate(s.scheduled_date)}
-                  {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
-                </Text>
-                {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
-              </View>
+              <Link key={s.id} href={`/workout/${s.id}`} asChild>
+                <Pressable className="rounded-xl border border-slate-200 px-4 py-3 active:bg-slate-50">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
+                    {s.status === "completed" ? (
+                      <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                        Done ✓
+                      </Text>
+                    ) : isToday(s.scheduled_date) ? (
+                      <Text className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
+                        Today
+                      </Text>
+                    ) : null}
+                  </View>
+                  <Text className="mt-0.5 text-sm text-slate-500">
+                    {formatDisplayDate(s.scheduled_date)}
+                    {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
+                  </Text>
+                  {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
+                </Pressable>
+              </Link>
             ))}
           </View>
         ) : (
