@@ -28,12 +28,19 @@ export default function TabsLayout() {
   if (!session) return <Redirect href="/(auth)/sign-in" />;
   if (!profileComplete(profile)) return <Redirect href="/(auth)/onboarding" />;
 
+  const isTrainer = profile?.role === "trainer";
+
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: "#0f172a" }}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
-      {/* "exercises" is a folder with its own Stack, so hide the tab header
-          (the inner stack provides headers). */}
+      {/* "exercises"/"templates" are folders with their own Stack, so hide the
+          tab header (the inner stack provides headers). */}
       <Tabs.Screen name="exercises" options={{ title: "Exercises", headerShown: false }} />
+      {/* Templates is trainer-only: href:null removes the tab for clients. */}
+      <Tabs.Screen
+        name="templates"
+        options={{ title: "Templates", headerShown: false, href: isTrainer ? undefined : null }}
+      />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );

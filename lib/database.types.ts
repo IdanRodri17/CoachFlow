@@ -1,8 +1,6 @@
 // lib/database.types.ts — typed shape of the database, used by lib/supabase.ts
-// so queries like supabase.from("profiles") / .from("exercises") are type-checked.
-//
-// This mirrors what `npm run db:types` generates once the Supabase CLI is linked.
-// Until then we maintain it by hand, one table per migration.
+// so queries are type-checked. Mirrors what `npm run db:types` would generate;
+// maintained by hand, one table per migration.
 
 export type Json =
   | string
@@ -85,6 +83,70 @@ export type Database = {
           thumbnail_url?: string | null;
           default_sets?: number | null;
           default_reps?: number | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      // --- V3: 0003_templates.sql ---
+      workout_templates: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          name: string;
+          description: string | null;
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          name: string;
+          description?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          name?: string;
+          description?: string | null;
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      template_exercises: {
+        Row: {
+          id: string;
+          template_id: string;
+          exercise_id: string;
+          position: number;
+          target_sets: number | null;
+          target_reps: number | null;
+          target_weight: number | null;
+          rest_seconds: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          template_id: string;
+          exercise_id: string;
+          position?: number;
+          target_sets?: number | null;
+          target_reps?: number | null;
+          target_weight?: number | null;
+          rest_seconds?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          template_id?: string;
+          exercise_id?: string;
+          position?: number;
+          target_sets?: number | null;
+          target_reps?: number | null;
+          target_weight?: number | null;
+          rest_seconds?: number | null;
           created_at?: string;
         };
         Relationships: [];
