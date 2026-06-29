@@ -8,6 +8,7 @@ import { Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 
 import { useAuth } from "@/lib/auth";
+import { DevPanel } from "@/components/DevPanel";
 
 export default function ProfileScreen() {
   const { profile, session, signOut } = useAuth();
@@ -32,6 +33,9 @@ export default function ProfileScreen() {
         >
           <Text className="text-base font-semibold text-red-600">Sign out</Text>
         </Pressable>
+
+        {/* Dev-only quick switch between trainer/client (hidden in production). */}
+        <DevPanel />
       </View>
     </SafeAreaView>
   );

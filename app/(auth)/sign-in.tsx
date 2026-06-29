@@ -20,6 +20,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
 
 import { AUTH_MODE, profileComplete, sendOtp, useAuth, verifyOtp } from "@/lib/auth";
+import { DevPanel } from "@/components/DevPanel";
 
 export default function SignInScreen() {
   const { session, profile } = useAuth();
@@ -135,6 +136,9 @@ export default function SignInScreen() {
               </Text>
             </Pressable>
           ) : null}
+
+          {/* Dev-only quick switch (hidden in production builds). */}
+          <DevPanel />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>
