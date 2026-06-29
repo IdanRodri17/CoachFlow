@@ -1,9 +1,8 @@
 // lib/database.types.ts — typed shape of the database, used by lib/supabase.ts
-// so queries like supabase.from("profiles") are fully type-checked.
+// so queries like supabase.from("profiles") / .from("exercises") are type-checked.
 //
 // This mirrors what `npm run db:types` generates once the Supabase CLI is linked.
-// Until then we maintain it by hand, one table per migration. After V1's
-// 0001_profiles.sql is applied, regenerating will produce an equivalent file.
+// Until then we maintain it by hand, one table per migration.
 
 export type Json =
   | string
@@ -16,6 +15,7 @@ export type Json =
 export type Database = {
   public: {
     Tables: {
+      // --- V1: 0001_profiles.sql ---
       profiles: {
         Row: {
           id: string;
@@ -27,8 +27,6 @@ export type Database = {
           accepted_health_disclaimer_at: string | null;
           created_at: string;
         };
-        // Insert: what's required vs optional when creating a row. Columns with a
-        // DB default (locale, created_at) or that are nullable are optional here.
         Insert: {
           id: string;
           role: "trainer" | "client";
@@ -39,7 +37,6 @@ export type Database = {
           accepted_health_disclaimer_at?: string | null;
           created_at?: string;
         };
-        // Update: every column optional (you patch only what changes).
         Update: {
           id?: string;
           role?: "trainer" | "client";
@@ -48,6 +45,46 @@ export type Database = {
           avatar_url?: string | null;
           accepted_terms_at?: string | null;
           accepted_health_disclaimer_at?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      // --- V2: 0002_exercises.sql ---
+      exercises: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          name: string;
+          description: string | null;
+          muscle_group: string | null;
+          video_url: string | null;
+          thumbnail_url: string | null;
+          default_sets: number | null;
+          default_reps: number | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          name: string;
+          description?: string | null;
+          muscle_group?: string | null;
+          video_url?: string | null;
+          thumbnail_url?: string | null;
+          default_sets?: number | null;
+          default_reps?: number | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          name?: string;
+          description?: string | null;
+          muscle_group?: string | null;
+          video_url?: string | null;
+          thumbnail_url?: string | null;
+          default_sets?: number | null;
+          default_reps?: number | null;
           created_at?: string;
         };
         Relationships: [];

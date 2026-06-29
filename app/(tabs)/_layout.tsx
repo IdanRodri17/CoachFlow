@@ -31,6 +31,9 @@ export default function TabsLayout() {
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: "#0f172a" }}>
       <Tabs.Screen name="index" options={{ title: "Home" }} />
+      {/* "exercises" is a folder with its own Stack, so hide the tab header
+          (the inner stack provides headers). */}
+      <Tabs.Screen name="exercises" options={{ title: "Exercises", headerShown: false }} />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
   );
