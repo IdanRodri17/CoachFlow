@@ -68,3 +68,27 @@ export function daysBetween(aISO: string, bISO: string): number {
   const b = Date.parse(`${bISO}T00:00:00Z`);
   return Math.round((a - b) / MS_PER_DAY);
 }
+
+/** Returns the "YYYY-MM-DD" that is `days` after the given date (date-only math). */
+export function addDays(dateISO: string, days: number): string {
+  const ms = Date.parse(`${dateISO}T00:00:00Z`) + days * 86_400_000;
+  return new Date(ms).toISOString().slice(0, 10);
+}
+
+/**
+ * Human-friendly label for a "YYYY-MM-DD", e.g. "Mon, Jul 6".
+ * Interprets the date at midday so the weekday is right in the user's zone.
+ */
+export function formatDisplayDate(
+  dateISO: string,
+  locale: string = "en",
+  timeZone: string = DEFAULT_TIME_ZONE,
+): string {
+  const d = new Date(`${dateISO}T12:00:00Z`);
+  return new Intl.DateTimeFormat(locale, {
+    weekday: "short",
+    month: "short",
+    day: "numeric",
+    timeZone,
+  }).format(d);
+}

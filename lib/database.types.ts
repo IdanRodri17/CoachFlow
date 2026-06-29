@@ -151,9 +151,73 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V4: 0004_scheduling.sql ---
+      trainer_clients: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          client_id: string;
+          status: "active" | "paused";
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          client_id: string;
+          status?: "active" | "paused";
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          client_id?: string;
+          status?: "active" | "paused";
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      scheduled_workouts: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          client_id: string;
+          template_id: string | null;
+          scheduled_date: string;
+          status: "scheduled" | "completed";
+          notes: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          client_id: string;
+          template_id?: string | null;
+          scheduled_date: string;
+          status?: "scheduled" | "completed";
+          notes?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          client_id?: string;
+          template_id?: string | null;
+          scheduled_date?: string;
+          status?: "scheduled" | "completed";
+          notes?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
-    Functions: Record<string, never>;
+    Functions: {
+      // V4: add a client to the caller-trainer's roster by email.
+      add_client_by_email: {
+        Args: { p_email: string };
+        Returns: undefined;
+      };
+    };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
   };

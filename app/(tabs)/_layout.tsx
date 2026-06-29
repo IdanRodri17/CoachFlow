@@ -36,10 +36,14 @@ export default function TabsLayout() {
       {/* "exercises"/"templates" are folders with their own Stack, so hide the
           tab header (the inner stack provides headers). */}
       <Tabs.Screen name="exercises" options={{ title: "Exercises", headerShown: false }} />
-      {/* Templates is trainer-only: href:null removes the tab for clients. */}
+      {/* Templates + Schedule are trainer-only: href:null removes them for clients. */}
       <Tabs.Screen
         name="templates"
         options={{ title: "Templates", headerShown: false, href: isTrainer ? undefined : null }}
+      />
+      <Tabs.Screen
+        name="schedule"
+        options={{ title: "Schedule", headerShown: false, href: isTrainer ? undefined : null }}
       />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>
