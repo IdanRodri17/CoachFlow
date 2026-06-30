@@ -506,9 +506,11 @@ function LoggingSession({
 
                 <View className="mt-3 flex-row flex-wrap gap-2">
                   <SmallBtn label="+ Add set" onPress={() => addRow(ex.exerciseId)} />
-                  {ex.restSeconds && ex.restSeconds > 0 ? (
-                    <SmallBtn dark label={`Rest ${ex.restSeconds}s`} onPress={() => setActiveRest(ex.restSeconds!)} />
-                  ) : null}
+                  <SmallBtn
+                    dark
+                    label={`Rest ${ex.restSeconds ?? 60}s`}
+                    onPress={() => setActiveRest(ex.restSeconds ?? 60)}
+                  />
                   {!swapped ? (
                     <>
                       <SmallBtn

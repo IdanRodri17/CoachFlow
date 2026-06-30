@@ -6,11 +6,11 @@
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link } from "expo-router";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { formatDisplayDate, isToday, todayISO } from "@/lib/dates";
+import { addDays, formatDisplayDate, isToday, todayISO } from "@/lib/dates";
 
 export default function HomeScreen() {
   const { session, profile } = useAuth();
@@ -43,6 +43,22 @@ export default function HomeScreen() {
     },
   });
 
+  // Client can nudge a workout's date a day at a time (for training on their own
+  // schedule). RLS lets a client update their own scheduled workouts.
+  const queryClient = useQueryClient();
+  const shift = useMutation({
+    mutationFn: async ({ id, date }: { id: string; date: string }) => {
+      const { error } = await supabase.from("scheduled_workouts").update({ scheduled_date: date }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["scheduled-client"] }),
+  });
+  function shiftDay(s: { id: string; scheduled_date: string }, delta: number) {
+    const next = addDays(s.scheduled_date, delta);
+    if (delta < 0 && next < todayISO()) return; // never move before today
+    shift.mutate({ id: s.id, date: next });
+  }
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 pt-6">
@@ -68,29 +84,40 @@ export default function HomeScreen() {
           </View>
         ) : upcoming.data && upcoming.data.length > 0 ? (
           <View className="mt-6 gap-3 pb-6">
-            {upcoming.data.map((s) => (
-              <Link key={s.id} href={`/workout/${s.id}`} asChild>
-                <Pressable className="rounded-xl border border-slate-200 px-4 py-3 active:bg-slate-50">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
-                    {s.status === "completed" ? (
-                      <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                        Done ✓
+            {upcoming.data.map((s) => {
+              const done = s.status === "completed";
+              return (
+                <View key={s.id} className="flex-row items-center gap-2">
+                  <ShiftBtn
+                    label="◀"
+                    disabled={done || isToday(s.scheduled_date) || shift.isPending}
+                    onPress={() => shiftDay(s, -1)}
+                  />
+                  <Link href={`/workout/${s.id}`} asChild>
+                    <Pressable className="flex-1 rounded-xl border border-slate-200 px-4 py-3 active:bg-slate-50">
+                      <View className="flex-row items-center justify-between">
+                        <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
+                        {done ? (
+                          <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                            Done ✓
+                          </Text>
+                        ) : isToday(s.scheduled_date) ? (
+                          <Text className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
+                            Today
+                          </Text>
+                        ) : null}
+                      </View>
+                      <Text className="mt-0.5 text-sm text-slate-500">
+                        {formatDisplayDate(s.scheduled_date)}
+                        {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
                       </Text>
-                    ) : isToday(s.scheduled_date) ? (
-                      <Text className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
-                        Today
-                      </Text>
-                    ) : null}
-                  </View>
-                  <Text className="mt-0.5 text-sm text-slate-500">
-                    {formatDisplayDate(s.scheduled_date)}
-                    {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
-                  </Text>
-                  {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
-                </Pressable>
-              </Link>
-            ))}
+                      {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
+                    </Pressable>
+                  </Link>
+                  <ShiftBtn label="▶" disabled={done || shift.isPending} onPress={() => shiftDay(s, 1)} />
+                </View>
+              );
+            })}
           </View>
         ) : (
           <View className="mt-8 items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
@@ -104,5 +131,27 @@ export default function HomeScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function ShiftBtn({
+  label,
+  disabled,
+  onPress,
+}: {
+  label: string;
+  disabled: boolean;
+  onPress: () => void;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      disabled={disabled}
+      className={`h-10 w-9 items-center justify-center rounded-lg border ${
+        disabled ? "border-slate-200" : "border-slate-300 active:bg-slate-100"
+      }`}
+    >
+      <Text className={`text-base ${disabled ? "text-slate-300" : "text-slate-700"}`}>{label}</Text>
+    </Pressable>
   );
 }

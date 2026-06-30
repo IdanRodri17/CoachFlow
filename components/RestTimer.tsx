@@ -43,8 +43,13 @@ export function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => 
         {mm}:{String(ss).padStart(2, "0")}
       </Text>
       <View className="mt-2 flex-row justify-center gap-2">
+        <TimerBtn label="−30" onPress={() => setRemaining((r) => Math.max(0, r - 30))} />
+        <TimerBtn label="−10" onPress={() => setRemaining((r) => Math.max(0, r - 10))} />
+        <TimerBtn label="+10" onPress={() => setRemaining((r) => r + 10)} />
+        <TimerBtn label="+30" onPress={() => setRemaining((r) => r + 30)} />
+      </View>
+      <View className="mt-2 flex-row justify-center gap-2">
         <TimerBtn label={running ? "Pause" : "Resume"} onPress={() => setRunning((r) => !r)} />
-        <TimerBtn label="+30s" onPress={() => setRemaining((r) => r + 30)} />
         <TimerBtn label="Skip" onPress={finish} />
       </View>
     </View>

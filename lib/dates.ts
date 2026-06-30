@@ -92,3 +92,15 @@ export function formatDisplayDate(
     timeZone,
   }).format(d);
 }
+
+/** Day of week for a "YYYY-MM-DD": 0 = Sunday … 6 = Saturday. */
+export function weekdayOf(dateISO: string): number {
+  return new Date(`${dateISO}T12:00:00Z`).getUTCDay();
+}
+
+/** Returns the "YYYY-MM-DD" that is `months` calendar months after the date. */
+export function addMonths(dateISO: string, months: number): string {
+  const [y, m, d] = dateISO.split("-").map(Number);
+  // Date.UTC rolls month overflow into the year automatically.
+  return new Date(Date.UTC(y, m - 1 + months, d, 12, 0, 0)).toISOString().slice(0, 10);
+}

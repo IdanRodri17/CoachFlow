@@ -1,7 +1,7 @@
-// app/(tabs)/schedule/new.tsx — assign a workout (create).
-//
-// Uses the shared ScheduleForm. If the trainer typed a one-off name, we create
-// an offline (managed) client on the fly, then insert the scheduled workout.
+// app/(tabs)/schedule/new.tsx — assign a workout (create), with optional weekly
+// recurrence. If the trainer typed a one-off name we create an offline client
+// first; then we insert one scheduled workout per date (a single date, or every
+// chosen weekday for N weeks).
 
 import { Redirect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
+import { addDays, addMonths, weekdayOf } from "@/lib/dates";
 import { ScheduleForm, type SchedulePayload } from "@/components/ScheduleForm";
 
 export default function NewScheduleScreen() {
@@ -34,9 +35,9 @@ export default function NewScheduleScreen() {
 
   const mutation = useMutation({
     mutationFn: async (payload: SchedulePayload) => {
+      // Resolve the client once (creating an offline client if a name was typed).
       let client_id: string | null = null;
       let managed_client_id: string | null = null;
-
       if (payload.client.mode === "new") {
         const { data, error } = await supabase
           .from("managed_clients")
@@ -51,16 +52,32 @@ export default function NewScheduleScreen() {
         managed_client_id = payload.client.refId;
       }
 
-      const { error } = await supabase.from("scheduled_workouts").insert({
+      // Build the date list: a single date, or every chosen weekday from the
+      // start date until N weeks / N months later.
+      let dates: string[];
+      if (payload.repeat && payload.repeat.days.length > 0) {
+        const { days, count, unit } = payload.repeat;
+        const end = unit === "months" ? addMonths(payload.date, count) : addDays(payload.date, count * 7);
+        dates = [];
+        for (let d = payload.date; d < end; d = addDays(d, 1)) {
+          if (days.includes(weekdayOf(d))) dates.push(d);
+        }
+        if (dates.length === 0) dates = [payload.date];
+      } else {
+        dates = [payload.date];
+      }
+
+      const rows = dates.map((d) => ({
         trainer_id: trainerId,
         client_id,
         managed_client_id,
         template_id: payload.templateId,
-        scheduled_date: payload.date,
+        scheduled_date: d,
         scheduled_time: payload.time,
         notes: payload.note,
-        status: "scheduled",
-      });
+        status: "scheduled" as const,
+      }));
+      const { error } = await supabase.from("scheduled_workouts").insert(rows);
       if (error) throw error;
     },
     onSuccess: () => {
@@ -80,6 +97,7 @@ export default function NewScheduleScreen() {
       submitting={mutation.isPending}
       errorMessage={mutation.error ? (mutation.error as Error).message : null}
       onSubmit={(payload) => mutation.mutate(payload)}
+      allowRepeat
     />
   );
 }
