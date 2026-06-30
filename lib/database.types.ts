@@ -308,6 +308,37 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V5b: 0005b_exercise_adjustments.sql ---
+      exercise_adjustments: {
+        Row: {
+          id: string;
+          workout_log_id: string;
+          exercise_id: string;
+          action: "skipped" | "swapped";
+          swapped_for_exercise_id: string | null;
+          reason: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          workout_log_id: string;
+          exercise_id: string;
+          action: "skipped" | "swapped";
+          swapped_for_exercise_id?: string | null;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          workout_log_id?: string;
+          exercise_id?: string;
+          action?: "skipped" | "swapped";
+          swapped_for_exercise_id?: string | null;
+          reason?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {

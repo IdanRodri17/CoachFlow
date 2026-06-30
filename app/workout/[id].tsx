@@ -2,9 +2,10 @@
 // where :id is a scheduled_workout id). Client-only.
 //
 // Shows the trainer's note, then each exercise with its "last time" numbers and
-// targets, editable set rows (reps × weight), and a rest button that starts the
-// countdown. "Complete workout" writes the workout_log + set_logs and flips the
-// scheduled workout to 'completed'.
+// targets, editable set rows (reps × weight, pre-filled with last time), a rest
+// button, and a per-exercise Skip / Swap menu (V5b). "Complete workout" writes
+// the workout_log + set_logs (+ exercise_adjustments) and flips the scheduled
+// workout to 'completed'. A completed workout opens a read-only summary.
 
 import { useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
@@ -16,6 +17,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { formatDisplayDate, toDateString } from "@/lib/dates";
 import { RestTimer } from "@/components/RestTimer";
+import { AdjustmentModal, type AdjustmentResult } from "@/components/AdjustmentModal";
 
 type SessionExercise = {
   exerciseId: string;
@@ -74,7 +76,6 @@ export default function WorkoutScreen() {
         if (exIds.length > 0) {
           const { data: exs } = await supabase.from("exercises").select("id, name").in("id", exIds);
           exs?.forEach((e) => nameMap.set(e.id, e.name));
-          // Most recent previous set per exercise (client's own, RLS-scoped).
           const { data: sls } = await supabase
             .from("set_logs")
             .select("exercise_id, reps, weight, created_at")
@@ -124,15 +125,17 @@ export default function WorkoutScreen() {
   return <LoggingSession scheduledId={id} clientId={session!.user.id} data={query.data} />;
 }
 
+// ---------------------------------------------------------------------------
+// Completed summary (read-only)
+// ---------------------------------------------------------------------------
 type LoggedSet = { set_index: number; reps: number | null; weight: number | null; is_pr: boolean };
 type LoggedGroup = { exerciseId: string; name: string; sets: LoggedSet[] };
+type Adj = { action: "skipped" | "swapped"; exerciseName: string; swapName: string | null; reason: string | null };
 
-// Read-only summary of a completed workout: what the client actually logged.
 function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: string | null }) {
   const query = useQuery({
     queryKey: ["workout-summary", scheduledId],
     queryFn: async () => {
-      // The most recent log for this scheduled workout (client's own via RLS).
       const { data: log, error } = await supabase
         .from("workout_logs")
         .select("*")
@@ -141,43 +144,54 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
         .limit(1)
         .maybeSingle();
       if (error) throw error;
-      if (!log) return { log: null, groups: [] as LoggedGroup[] };
+      if (!log) return { log: null, groups: [] as LoggedGroup[], adjustments: [] as Adj[] };
 
-      const { data: sets, error: setErr } = await supabase
-        .from("set_logs")
-        .select("*")
-        .eq("workout_log_id", log.id)
-        .order("set_index");
-      if (setErr) throw setErr;
+      const [setsRes, adjRes] = await Promise.all([
+        supabase.from("set_logs").select("*").eq("workout_log_id", log.id).order("set_index"),
+        supabase.from("exercise_adjustments").select("*").eq("workout_log_id", log.id),
+      ]);
+      if (setsRes.error) throw setsRes.error;
+      if (adjRes.error) throw adjRes.error;
+      const sets = setsRes.data ?? [];
+      const adjustmentsRaw = adjRes.data ?? [];
 
-      const exIds = [...new Set((sets ?? []).map((s) => s.exercise_id))];
+      // Names for every exercise referenced (sets + adjustments).
+      const exIds = [
+        ...new Set([
+          ...sets.map((s) => s.exercise_id),
+          ...adjustmentsRaw.map((a) => a.exercise_id),
+          ...adjustmentsRaw.map((a) => a.swapped_for_exercise_id).filter(Boolean) as string[],
+        ]),
+      ];
       const nameMap = new Map<string, string>();
       if (exIds.length > 0) {
         const { data: exs } = await supabase.from("exercises").select("id, name").in("id", exIds);
         exs?.forEach((e) => nameMap.set(e.id, e.name));
       }
 
-      // Group the sets by exercise, in the order they first appear.
       const order: string[] = [];
       const byEx = new Map<string, LoggedSet[]>();
-      for (const s of sets ?? []) {
+      for (const s of sets) {
         if (!byEx.has(s.exercise_id)) {
           byEx.set(s.exercise_id, []);
           order.push(s.exercise_id);
         }
-        byEx.get(s.exercise_id)!.push({
-          set_index: s.set_index,
-          reps: s.reps,
-          weight: s.weight,
-          is_pr: s.is_pr,
-        });
+        byEx.get(s.exercise_id)!.push({ set_index: s.set_index, reps: s.reps, weight: s.weight, is_pr: s.is_pr });
       }
       const groups: LoggedGroup[] = order.map((exId) => ({
         exerciseId: exId,
         name: nameMap.get(exId) ?? "Exercise",
         sets: byEx.get(exId)!,
       }));
-      return { log, groups };
+
+      const adjustments: Adj[] = adjustmentsRaw.map((a) => ({
+        action: a.action,
+        exerciseName: nameMap.get(a.exercise_id) ?? "Exercise",
+        swapName: a.swapped_for_exercise_id ? nameMap.get(a.swapped_for_exercise_id) ?? "Exercise" : null,
+        reason: a.reason,
+      }));
+
+      return { log, groups, adjustments };
     },
   });
 
@@ -191,6 +205,7 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
 
   const log = query.data?.log ?? null;
   const groups = query.data?.groups ?? [];
+  const adjustments = query.data?.adjustments ?? [];
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
@@ -201,9 +216,7 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
           {log ? (
             <Text className="mt-1 text-sm text-slate-500">
               {formatDisplayDate(toDateString(new Date(log.completed_at)))}
-              {log.duration_seconds
-                ? ` · ${Math.max(1, Math.round(log.duration_seconds / 60))} min`
-                : ""}
+              {log.duration_seconds ? ` · ${Math.max(1, Math.round(log.duration_seconds / 60))} min` : ""}
             </Text>
           ) : null}
         </View>
@@ -217,39 +230,57 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
           </View>
         ) : null}
 
-        {groups.length === 0 ? (
+        {groups.length === 0 && adjustments.length === 0 ? (
           <Text className="text-center text-sm text-slate-400">No sets were logged for this workout.</Text>
-        ) : (
-          groups.map((g) => (
-            <View key={g.exerciseId} className="mb-3 rounded-2xl border border-slate-200 p-4">
-              <Text className="text-base font-bold text-slate-900">{g.name}</Text>
-              <View className="mt-2 gap-1">
-                {g.sets.map((s, i) => (
-                  <View key={i} className="flex-row items-center justify-between">
-                    <Text className="text-sm text-slate-500">Set {s.set_index + 1}</Text>
-                    <View className="flex-row items-center gap-2">
-                      <Text className="text-base text-slate-900">
-                        {s.reps ?? "—"} reps × {s.weight ?? "—"}
-                        {s.weight != null ? "kg" : ""}
+        ) : null}
+
+        {groups.map((g) => (
+          <View key={g.exerciseId} className="mb-3 rounded-2xl border border-slate-200 p-4">
+            <Text className="text-base font-bold text-slate-900">{g.name}</Text>
+            <View className="mt-2 gap-1">
+              {g.sets.map((s, i) => (
+                <View key={i} className="flex-row items-center justify-between">
+                  <Text className="text-sm text-slate-500">Set {s.set_index + 1}</Text>
+                  <View className="flex-row items-center gap-2">
+                    <Text className="text-base text-slate-900">
+                      {s.reps ?? "—"} reps × {s.weight ?? "—"}
+                      {s.weight != null ? "kg" : ""}
+                    </Text>
+                    {s.is_pr ? (
+                      <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
+                        PR
                       </Text>
-                      {s.is_pr ? (
-                        <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
-                          PR
-                        </Text>
-                      ) : null}
-                    </View>
+                    ) : null}
                   </View>
-                ))}
-              </View>
+                </View>
+              ))}
             </View>
-          ))
-        )}
+          </View>
+        ))}
+
+        {/* Skips / swaps */}
+        {adjustments.map((a, i) => (
+          <View key={i} className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+            <Text className="text-sm font-semibold text-slate-700">
+              {a.action === "skipped"
+                ? `Skipped ${a.exerciseName}`
+                : `Swapped ${a.exerciseName} → ${a.swapName}`}
+            </Text>
+            {a.reason ? <Text className="mt-0.5 text-sm text-slate-500">“{a.reason}”</Text> : null}
+          </View>
+        ))}
       </ScrollView>
     </SafeAreaView>
   );
 }
 
+// ---------------------------------------------------------------------------
+// Active logging session
+// ---------------------------------------------------------------------------
 type Row = { reps: string; weight: string };
+type Adjustment =
+  | { action: "skipped"; reason: string }
+  | { action: "swapped"; reason: string; swapId: string; swapName: string };
 
 function LoggingSession({
   scheduledId,
@@ -264,10 +295,6 @@ function LoggingSession({
   const queryClient = useQueryClient();
   const startedAt = useRef(Date.now());
 
-  // One array of set rows per exercise, seeded with the target number of sets and
-  // PRE-FILLED with last time's reps/weight (so repeating a workout is one tap) —
-  // falling back to the trainer's target when there's no history. The client can
-  // edit any value before completing.
   const [rows, setRows] = useState<Record<string, Row[]>>(() => {
     const initial: Record<string, Row[]> = {};
     data.exercises.forEach((ex) => {
@@ -282,6 +309,20 @@ function LoggingSession({
     return initial;
   });
   const [activeRest, setActiveRest] = useState<number | null>(null);
+  const [adjustments, setAdjustments] = useState<Record<string, Adjustment>>({});
+  const [modal, setModal] = useState<{ exerciseId: string; exerciseName: string; mode: "skip" | "swap" } | null>(
+    null,
+  );
+
+  // The exercise library (for the swap picker) — client reads roster-scoped.
+  const library = useQuery({
+    queryKey: ["exercises"],
+    queryFn: async () => {
+      const { data, error } = await supabase.from("exercises").select("id, name").order("name");
+      if (error) throw error;
+      return data;
+    },
+  });
 
   function updateRow(exId: string, idx: number, field: keyof Row, value: string) {
     setRows((prev) => {
@@ -295,6 +336,25 @@ function LoggingSession({
   function addRow(exId: string) {
     setRows((prev) => ({ ...prev, [exId]: [...prev[exId], { reps: "", weight: "" }] }));
   }
+  function undoAdjust(exId: string) {
+    setAdjustments((prev) => {
+      const next = { ...prev };
+      delete next[exId];
+      return next;
+    });
+  }
+  function confirmAdjust(result: AdjustmentResult) {
+    if (!modal) return;
+    if (modal.mode === "skip") {
+      setAdjustments((prev) => ({ ...prev, [modal.exerciseId]: { action: "skipped", reason: result.reason } }));
+    } else if (result.swapId && result.swapName) {
+      setAdjustments((prev) => ({
+        ...prev,
+        [modal.exerciseId]: { action: "swapped", reason: result.reason, swapId: result.swapId!, swapName: result.swapName! },
+      }));
+    }
+    setModal(null);
+  }
 
   const complete = useMutation({
     mutationFn: async () => {
@@ -306,22 +366,38 @@ function LoggingSession({
         .single();
       if (logErr) throw logErr;
 
-      // Only persist set rows the client actually filled in.
-      const setRowsToInsert = data.exercises.flatMap((ex) =>
-        rows[ex.exerciseId]
+      // Set logs: skip 'skipped' exercises; 'swapped' ones log against the substitute.
+      const setRowsToInsert = data.exercises.flatMap((ex) => {
+        const adj = adjustments[ex.exerciseId];
+        if (adj?.action === "skipped") return [];
+        const targetExerciseId = adj?.action === "swapped" ? adj.swapId : ex.exerciseId;
+        return rows[ex.exerciseId]
           .map((r, idx) => ({ r, idx }))
           .filter(({ r }) => r.reps.trim() !== "" || r.weight.trim() !== "")
           .map(({ r, idx }) => ({
             workout_log_id: log.id,
-            exercise_id: ex.exerciseId,
+            exercise_id: targetExerciseId,
             set_index: idx,
             reps: toInt(r.reps),
             weight: toNum(r.weight),
-          })),
-      );
+          }));
+      });
       if (setRowsToInsert.length > 0) {
         const { error: setErr } = await supabase.from("set_logs").insert(setRowsToInsert);
         if (setErr) throw setErr;
+      }
+
+      // Adjustment rows (skips + swaps).
+      const adjRows = Object.entries(adjustments).map(([exerciseId, adj]) => ({
+        workout_log_id: log.id,
+        exercise_id: exerciseId,
+        action: adj.action,
+        swapped_for_exercise_id: adj.action === "swapped" ? adj.swapId : null,
+        reason: adj.reason.trim() === "" ? null : adj.reason.trim(),
+      }));
+      if (adjRows.length > 0) {
+        const { error: adjErr } = await supabase.from("exercise_adjustments").insert(adjRows);
+        if (adjErr) throw adjErr;
       }
 
       const { error: swErr } = await supabase
@@ -341,7 +417,6 @@ function LoggingSession({
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
-        {/* Trainer note */}
         {data.note ? (
           <View className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <Text className="text-xs font-bold uppercase tracking-wide text-amber-700">
@@ -359,62 +434,97 @@ function LoggingSession({
             </Text>
           </View>
         ) : (
-          data.exercises.map((ex) => (
-            <View key={ex.exerciseId} className="mb-4 rounded-2xl border border-slate-200 p-4">
-              <Text className="text-lg font-bold text-slate-900">{ex.name}</Text>
-              <View className="mt-1 flex-row flex-wrap gap-x-4">
-                <Text className="text-sm text-slate-500">
-                  Last time:{" "}
-                  {ex.lastTime && (ex.lastTime.weight != null || ex.lastTime.reps != null)
-                    ? `${ex.lastTime.weight ?? "—"}${ex.lastTime.weight != null ? "kg" : ""} × ${ex.lastTime.reps ?? "—"}`
-                    : "—"}
-                </Text>
-                <Text className="text-sm text-slate-400">
-                  Target: {ex.targetSets ?? "—"} × {ex.targetReps ?? "—"}
-                  {ex.targetWeight != null ? ` @ ${ex.targetWeight}kg` : ""}
-                </Text>
-              </View>
+          data.exercises.map((ex) => {
+            const adj = adjustments[ex.exerciseId];
 
-              {/* Set rows */}
-              <View className="mt-3 gap-2">
-                {rows[ex.exerciseId].map((r, idx) => (
-                  <View key={idx} className="flex-row items-center gap-2">
-                    <Text className="w-12 text-sm font-medium text-slate-500">Set {idx + 1}</Text>
-                    <SetInput
-                      value={r.reps}
-                      placeholder={ex.targetReps != null ? String(ex.targetReps) : "reps"}
-                      onChangeText={(v) => updateRow(ex.exerciseId, idx, "reps", v)}
-                      suffix="reps"
-                    />
-                    <SetInput
-                      value={r.weight}
-                      placeholder={ex.targetWeight != null ? String(ex.targetWeight) : "kg"}
-                      onChangeText={(v) => updateRow(ex.exerciseId, idx, "weight", v)}
-                      suffix="kg"
-                      decimal
-                    />
+            // Skipped → collapsed card.
+            if (adj?.action === "skipped") {
+              return (
+                <View key={ex.exerciseId} className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
+                  <View className="flex-row items-center justify-between">
+                    <Text className="text-base font-semibold text-slate-400 line-through">{ex.name}</Text>
+                    <Text className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">
+                      Skipped
+                    </Text>
                   </View>
-                ))}
-              </View>
-
-              <View className="mt-3 flex-row gap-2">
-                <Pressable
-                  className="rounded-lg border border-slate-300 px-3 py-2 active:bg-slate-100"
-                  onPress={() => addRow(ex.exerciseId)}
-                >
-                  <Text className="text-sm font-semibold text-slate-700">+ Add set</Text>
-                </Pressable>
-                {ex.restSeconds && ex.restSeconds > 0 ? (
-                  <Pressable
-                    className="rounded-lg bg-slate-900 px-3 py-2 active:opacity-80"
-                    onPress={() => setActiveRest(ex.restSeconds!)}
-                  >
-                    <Text className="text-sm font-semibold text-white">Rest {ex.restSeconds}s</Text>
+                  {adj.reason ? <Text className="mt-1 text-sm text-slate-500">“{adj.reason}”</Text> : null}
+                  <Pressable className="mt-2 self-start" onPress={() => undoAdjust(ex.exerciseId)}>
+                    <Text className="text-sm font-semibold text-slate-600">Undo</Text>
                   </Pressable>
-                ) : null}
+                </View>
+              );
+            }
+
+            const swapped = adj?.action === "swapped" ? adj : null;
+            return (
+              <View key={ex.exerciseId} className="mb-4 rounded-2xl border border-slate-200 p-4">
+                <Text className="text-lg font-bold text-slate-900">{ex.name}</Text>
+
+                {swapped ? (
+                  <View className="mt-1 rounded-lg bg-slate-100 px-3 py-2">
+                    <Text className="text-sm font-medium text-slate-700">Swapped → {swapped.swapName}</Text>
+                    {swapped.reason ? <Text className="text-sm text-slate-500">“{swapped.reason}”</Text> : null}
+                    <Pressable className="mt-1 self-start" onPress={() => undoAdjust(ex.exerciseId)}>
+                      <Text className="text-sm font-semibold text-slate-600">Undo</Text>
+                    </Pressable>
+                  </View>
+                ) : (
+                  <View className="mt-1 flex-row flex-wrap gap-x-4">
+                    <Text className="text-sm text-slate-500">
+                      Last time:{" "}
+                      {ex.lastTime && (ex.lastTime.weight != null || ex.lastTime.reps != null)
+                        ? `${ex.lastTime.weight ?? "—"}${ex.lastTime.weight != null ? "kg" : ""} × ${ex.lastTime.reps ?? "—"}`
+                        : "—"}
+                    </Text>
+                    <Text className="text-sm text-slate-400">
+                      Target: {ex.targetSets ?? "—"} × {ex.targetReps ?? "—"}
+                      {ex.targetWeight != null ? ` @ ${ex.targetWeight}kg` : ""}
+                    </Text>
+                  </View>
+                )}
+
+                <View className="mt-3 gap-2">
+                  {rows[ex.exerciseId].map((r, idx) => (
+                    <View key={idx} className="flex-row items-center gap-2">
+                      <Text className="w-12 text-sm font-medium text-slate-500">Set {idx + 1}</Text>
+                      <SetInput
+                        value={r.reps}
+                        placeholder={ex.targetReps != null ? String(ex.targetReps) : "reps"}
+                        onChangeText={(v) => updateRow(ex.exerciseId, idx, "reps", v)}
+                        suffix="reps"
+                      />
+                      <SetInput
+                        value={r.weight}
+                        placeholder={ex.targetWeight != null ? String(ex.targetWeight) : "kg"}
+                        onChangeText={(v) => updateRow(ex.exerciseId, idx, "weight", v)}
+                        suffix="kg"
+                        decimal
+                      />
+                    </View>
+                  ))}
+                </View>
+
+                <View className="mt-3 flex-row flex-wrap gap-2">
+                  <SmallBtn label="+ Add set" onPress={() => addRow(ex.exerciseId)} />
+                  {ex.restSeconds && ex.restSeconds > 0 ? (
+                    <SmallBtn dark label={`Rest ${ex.restSeconds}s`} onPress={() => setActiveRest(ex.restSeconds!)} />
+                  ) : null}
+                  {!swapped ? (
+                    <>
+                      <SmallBtn
+                        label="Skip"
+                        onPress={() => setModal({ exerciseId: ex.exerciseId, exerciseName: ex.name, mode: "skip" })}
+                      />
+                      <SmallBtn
+                        label="Swap"
+                        onPress={() => setModal({ exerciseId: ex.exerciseId, exerciseName: ex.name, mode: "swap" })}
+                      />
+                    </>
+                  ) : null}
+                </View>
               </View>
-            </View>
-          ))
+            );
+          })
         )}
 
         {complete.error ? (
@@ -434,13 +544,42 @@ function LoggingSession({
         </Pressable>
       </ScrollView>
 
-      {/* Rest timer pinned to the bottom while active */}
       {activeRest != null ? (
         <View className="absolute inset-x-0 bottom-0 px-4 pb-6">
           <RestTimer seconds={activeRest} onDone={() => setActiveRest(null)} />
         </View>
       ) : null}
+
+      <AdjustmentModal
+        visible={modal != null}
+        mode={modal?.mode ?? null}
+        exerciseName={modal?.exerciseName ?? ""}
+        library={(library.data ?? []).filter((e) => e.id !== modal?.exerciseId)}
+        onClose={() => setModal(null)}
+        onConfirm={confirmAdjust}
+      />
     </SafeAreaView>
+  );
+}
+
+function SmallBtn({
+  label,
+  onPress,
+  dark,
+}: {
+  label: string;
+  onPress: () => void;
+  dark?: boolean;
+}) {
+  return (
+    <Pressable
+      onPress={onPress}
+      className={`rounded-lg px-3 py-2 ${
+        dark ? "bg-slate-900 active:opacity-80" : "border border-slate-300 active:bg-slate-100"
+      }`}
+    >
+      <Text className={`text-sm font-semibold ${dark ? "text-white" : "text-slate-700"}`}>{label}</Text>
+    </Pressable>
   );
 }
 
