@@ -187,6 +187,7 @@ export type Database = {
           scheduled_date: string;
           scheduled_time: string | null;
           status: "scheduled" | "completed";
+          with_trainer: boolean;
           notes: string | null;
           created_at: string;
         };
@@ -199,6 +200,7 @@ export type Database = {
           scheduled_date: string;
           scheduled_time?: string | null;
           status?: "scheduled" | "completed";
+          with_trainer?: boolean;
           notes?: string | null;
           created_at?: string;
         };
@@ -211,6 +213,7 @@ export type Database = {
           scheduled_date?: string;
           scheduled_time?: string | null;
           status?: "scheduled" | "completed";
+          with_trainer?: boolean;
           notes?: string | null;
           created_at?: string;
         };

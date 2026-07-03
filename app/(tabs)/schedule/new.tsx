@@ -75,6 +75,7 @@ export default function NewScheduleScreen() {
         scheduled_date: d,
         scheduled_time: payload.time,
         notes: payload.note,
+        with_trainer: payload.withTrainer,
         status: "scheduled" as const,
       }));
       const { error } = await supabase.from("scheduled_workouts").insert(rows);

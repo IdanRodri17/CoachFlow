@@ -55,6 +55,7 @@ export default function EditScheduleScreen() {
         date: data.scheduled_date,
         time: data.scheduled_time ? data.scheduled_time.slice(0, 5) : null, // "HH:MM:SS" -> "HH:MM"
         note: data.notes,
+        withTrainer: data.with_trainer,
       };
     },
   });
@@ -86,6 +87,7 @@ export default function EditScheduleScreen() {
           scheduled_date: payload.date,
           scheduled_time: payload.time,
           notes: payload.note,
+          with_trainer: payload.withTrainer,
         })
         .eq("id", id);
       if (error) throw error;

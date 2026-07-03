@@ -29,6 +29,9 @@ export type SchedulePayload = {
   date: string;
   time: string | null;
   note: string | null;
+  // true = a fixed session with the trainer (client can't move it);
+  // false = a solo workout the client can shift.
+  withTrainer: boolean;
   // When set, repeat on these weekdays (0=Sun..6=Sat) for `count` weeks/months
   // from `date`.
   repeat?: { days: number[]; count: number; unit: "weeks" | "months" };
@@ -42,6 +45,7 @@ export type ScheduleFormInitial = {
   date?: string;
   time?: string | null;
   note?: string | null;
+  withTrainer?: boolean;
 };
 
 export function ScheduleForm({
@@ -75,6 +79,7 @@ export function ScheduleForm({
   const [date, setDate] = useState(initial?.date ?? addDays(todayISO(), 1));
   const [time, setTime] = useState<string | null>(initial?.time ?? null);
   const [note, setNote] = useState(initial?.note ?? "");
+  const [withTrainer, setWithTrainer] = useState(initial?.withTrainer ?? true);
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
   const [repeatCount, setRepeatCount] = useState(4);
   const [repeatUnit, setRepeatUnit] = useState<"weeks" | "months">("weeks");
@@ -99,6 +104,7 @@ export function ScheduleForm({
       date,
       time,
       note: note.trim().length > 0 ? note.trim() : null,
+      withTrainer,
       repeat:
         allowRepeat && repeatDays.length > 0
           ? { days: repeatDays, count: repeatCount, unit: repeatUnit }
@@ -143,6 +149,31 @@ export function ScheduleForm({
             }}
             editable={!submitting}
           />
+        </Section>
+
+        {/* Session type */}
+        <Section label="Session type">
+          <Pressable
+            onPress={() => setWithTrainer((v) => !v)}
+            disabled={submitting}
+            className="flex-row items-center gap-3"
+          >
+            <View
+              className={`h-6 w-6 items-center justify-center rounded-md border ${
+                withTrainer ? "border-indigo-600 bg-indigo-600" : "border-slate-400 bg-white"
+              }`}
+            >
+              {withTrainer ? <Text className="text-sm font-bold text-white">✓</Text> : null}
+            </View>
+            <View className="flex-1">
+              <Text className="text-base text-slate-900">With trainer</Text>
+              <Text className="text-xs text-slate-400">
+                {withTrainer
+                  ? "A trainer session — the client can't move the date."
+                  : "A solo workout — the client can shift it a day."}
+              </Text>
+            </View>
+          </Pressable>
         </Section>
 
         {/* Template (optional, recommended) */}

@@ -86,6 +86,45 @@ export default function HomeScreen() {
           <View className="mt-6 gap-3 pb-6">
             {upcoming.data.map((s) => {
               const done = s.status === "completed";
+              const withTrainer = s.with_trainer;
+              const card = (
+                <Link href={`/workout/${s.id}`} asChild>
+                  <Pressable
+                    className={`rounded-xl px-4 py-3 ${
+                      withTrainer
+                        ? "border-2 border-indigo-500 bg-indigo-50 active:opacity-90"
+                        : "flex-1 border border-slate-200 bg-white active:bg-slate-50"
+                    }`}
+                  >
+                    <View className="flex-row items-center justify-between">
+                      <Text className={`text-base font-bold ${withTrainer ? "text-indigo-900" : "text-slate-900"}`}>
+                        {s.template_name}
+                      </Text>
+                      {done ? (
+                        <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                          Done ✓
+                        </Text>
+                      ) : withTrainer ? (
+                        <Text className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white">
+                          💪 With trainer
+                        </Text>
+                      ) : isToday(s.scheduled_date) ? (
+                        <Text className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
+                          Today
+                        </Text>
+                      ) : null}
+                    </View>
+                    <Text className={`mt-0.5 text-sm ${withTrainer ? "text-indigo-700" : "text-slate-500"}`}>
+                      {formatDisplayDate(s.scheduled_date)}
+                      {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
+                    </Text>
+                    {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
+                  </Pressable>
+                </Link>
+              );
+
+              // Trainer-led: fixed (no shift arrows). Solo: client can nudge ±1 day.
+              if (withTrainer) return <View key={s.id}>{card}</View>;
               return (
                 <View key={s.id} className="flex-row items-center gap-2">
                   <ShiftBtn
@@ -93,27 +132,7 @@ export default function HomeScreen() {
                     disabled={done || isToday(s.scheduled_date) || shift.isPending}
                     onPress={() => shiftDay(s, -1)}
                   />
-                  <Link href={`/workout/${s.id}`} asChild>
-                    <Pressable className="flex-1 rounded-xl border border-slate-200 px-4 py-3 active:bg-slate-50">
-                      <View className="flex-row items-center justify-between">
-                        <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
-                        {done ? (
-                          <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                            Done ✓
-                          </Text>
-                        ) : isToday(s.scheduled_date) ? (
-                          <Text className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
-                            Today
-                          </Text>
-                        ) : null}
-                      </View>
-                      <Text className="mt-0.5 text-sm text-slate-500">
-                        {formatDisplayDate(s.scheduled_date)}
-                        {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
-                      </Text>
-                      {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
-                    </Pressable>
-                  </Link>
+                  {card}
                   <ShiftBtn label="▶" disabled={done || shift.isPending} onPress={() => shiftDay(s, 1)} />
                 </View>
               );
