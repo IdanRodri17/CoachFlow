@@ -18,6 +18,7 @@ import { useAuth } from "@/lib/auth";
 import { formatDisplayDate, toDateString } from "@/lib/dates";
 import { RestTimer } from "@/components/RestTimer";
 import { AdjustmentModal, type AdjustmentResult } from "@/components/AdjustmentModal";
+import { detectPRs } from "@/lib/pr";
 
 type SessionExercise = {
   exerciseId: string;
@@ -221,6 +222,19 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
           ) : null}
         </View>
 
+        {log && (log.effort_rating != null || log.client_note) ? (
+          <View className="mb-5 rounded-xl border border-slate-200 p-4">
+            {log.effort_rating != null ? (
+              <Text className="text-sm text-slate-700">
+                Effort: <Text className="font-bold text-slate-900">{log.effort_rating}/10</Text>
+              </Text>
+            ) : null}
+            {log.client_note ? (
+              <Text className="mt-1 text-sm text-slate-500">“{log.client_note}”</Text>
+            ) : null}
+          </View>
+        ) : null}
+
         {note ? (
           <View className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
             <Text className="text-xs font-bold uppercase tracking-wide text-amber-700">
@@ -313,6 +327,8 @@ function LoggingSession({
   const [modal, setModal] = useState<{ exerciseId: string; exerciseName: string; mode: "skip" | "swap" } | null>(
     null,
   );
+  const [effort, setEffort] = useState<number | null>(null);
+  const [effortNote, setEffortNote] = useState("");
 
   // The exercise library (for the swap picker) — client reads roster-scoped.
   const library = useQuery({
@@ -359,15 +375,9 @@ function LoggingSession({
   const complete = useMutation({
     mutationFn: async () => {
       const duration = Math.round((Date.now() - startedAt.current) / 1000);
-      const { data: log, error: logErr } = await supabase
-        .from("workout_logs")
-        .insert({ scheduled_workout_id: scheduledId, client_id: clientId, duration_seconds: duration })
-        .select("id")
-        .single();
-      if (logErr) throw logErr;
 
-      // Set logs: skip 'skipped' exercises; 'swapped' ones log against the substitute.
-      const setRowsToInsert = data.exercises.flatMap((ex) => {
+      // 1) Collect the filled set rows (swaps log against the substitute).
+      const newRows = data.exercises.flatMap((ex) => {
         const adj = adjustments[ex.exerciseId];
         if (adj?.action === "skipped") return [];
         const targetExerciseId = adj?.action === "swapped" ? adj.swapId : ex.exerciseId;
@@ -375,19 +385,68 @@ function LoggingSession({
           .map((r, idx) => ({ r, idx }))
           .filter(({ r }) => r.reps.trim() !== "" || r.weight.trim() !== "")
           .map(({ r, idx }) => ({
-            workout_log_id: log.id,
             exercise_id: targetExerciseId,
             set_index: idx,
             reps: toInt(r.reps),
             weight: toNum(r.weight),
           }));
       });
-      if (setRowsToInsert.length > 0) {
-        const { error: setErr } = await supabase.from("set_logs").insert(setRowsToInsert);
+
+      // 2) PR detection vs the client's past sets for those exercises (lib/pr.ts).
+      const exIds = [...new Set(newRows.map((r) => r.exercise_id))];
+      const historyByEx = new Map<string, { weight: number | null; reps: number | null }[]>();
+      exIds.forEach((id) => historyByEx.set(id, []));
+      if (exIds.length > 0) {
+        const { data: hist } = await supabase
+          .from("set_logs")
+          .select("exercise_id, weight, reps")
+          .in("exercise_id", exIds);
+        hist?.forEach((h) => historyByEx.get(h.exercise_id)?.push({ weight: h.weight, reps: h.reps }));
+      }
+      const isPrByRow = new Array<boolean>(newRows.length).fill(false);
+      const idxByEx = new Map<string, number[]>();
+      newRows.forEach((r, i) => {
+        if (!idxByEx.has(r.exercise_id)) idxByEx.set(r.exercise_id, []);
+        idxByEx.get(r.exercise_id)!.push(i);
+      });
+      idxByEx.forEach((idxs, exId) => {
+        const flags = detectPRs(
+          historyByEx.get(exId) ?? [],
+          idxs.map((i) => ({ weight: newRows[i].weight, reps: newRows[i].reps })),
+        );
+        idxs.forEach((i, k) => (isPrByRow[i] = flags[k]));
+      });
+
+      // 3) Create the log (with effort + note).
+      const { data: log, error: logErr } = await supabase
+        .from("workout_logs")
+        .insert({
+          scheduled_workout_id: scheduledId,
+          client_id: clientId,
+          duration_seconds: duration,
+          effort_rating: effort,
+          client_note: effortNote.trim() === "" ? null : effortNote.trim(),
+        })
+        .select("id")
+        .single();
+      if (logErr) throw logErr;
+
+      // 4) Set logs (with PR flags).
+      if (newRows.length > 0) {
+        const { error: setErr } = await supabase.from("set_logs").insert(
+          newRows.map((r, i) => ({
+            workout_log_id: log.id,
+            exercise_id: r.exercise_id,
+            set_index: r.set_index,
+            reps: r.reps,
+            weight: r.weight,
+            is_pr: isPrByRow[i],
+          })),
+        );
         if (setErr) throw setErr;
       }
 
-      // Adjustment rows (skips + swaps).
+      // 5) Adjustment rows (skips + swaps).
       const adjRows = Object.entries(adjustments).map(([exerciseId, adj]) => ({
         workout_log_id: log.id,
         exercise_id: exerciseId,
@@ -400,6 +459,7 @@ function LoggingSession({
         if (adjErr) throw adjErr;
       }
 
+      // 6) Mark the scheduled workout completed.
       const { error: swErr } = await supabase
         .from("scheduled_workouts")
         .update({ status: "completed" })
@@ -528,6 +588,38 @@ function LoggingSession({
             );
           })
         )}
+
+        {/* Effort + note (V6) */}
+        <View className="mb-4">
+          <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+            How did it feel?
+          </Text>
+          <View className="flex-row flex-wrap gap-2">
+            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
+              const on = effort === n;
+              return (
+                <Pressable
+                  key={n}
+                  onPress={() => setEffort(on ? null : n)}
+                  className={`h-9 w-9 items-center justify-center rounded-lg border ${
+                    on ? "border-slate-900 bg-slate-900" : "border-slate-300"
+                  }`}
+                >
+                  <Text className={`text-sm font-semibold ${on ? "text-white" : "text-slate-700"}`}>{n}</Text>
+                </Pressable>
+              );
+            })}
+          </View>
+          <Text className="mt-1 text-xs text-slate-400">1 (easy) – 10 (all-out). Optional.</Text>
+          <TextInput
+            className="mt-3 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
+            placeholder="Optional note (e.g. shoulder twinged)"
+            placeholderTextColor="#94a3b8"
+            value={effortNote}
+            onChangeText={setEffortNote}
+            multiline
+          />
+        </View>
 
         {complete.error ? (
           <Text className="mb-3 text-sm text-red-600">{(complete.error as Error).message}</Text>
