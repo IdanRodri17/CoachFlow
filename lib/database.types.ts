@@ -342,6 +342,37 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V7: 0007_progress.sql ---
+      progress_entries: {
+        Row: {
+          id: string;
+          client_id: string;
+          date: string;
+          weight: number | null;
+          measurements: Json | null;
+          photo_url: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          date: string;
+          weight?: number | null;
+          measurements?: Json | null;
+          photo_url?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          date?: string;
+          weight?: number | null;
+          measurements?: Json | null;
+          photo_url?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: Record<string, never>;
     Functions: {
