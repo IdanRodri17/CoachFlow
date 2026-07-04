@@ -1,7 +1,9 @@
 // app/(tabs)/index.tsx — the Home tab (route: /).
 //
 // Client: a greeting + their UPCOMING scheduled workouts (date + template name).
-// Trainer: a greeting + a pointer to the Schedule tab (their real dashboard is V8).
+// Trainer: the dashboard (V8) — roster with did-today / streak / due-overdue,
+// each row drilling into app/dashboard/[refId].tsx. All derived numbers (missed,
+// streak) come from the SQL views in 0008_dashboard_views.sql, never computed here.
 
 import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
@@ -10,11 +12,62 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { useRosterClients } from "@/lib/useRoster";
 import { addDays, formatDisplayDate, isToday, todayISO } from "@/lib/dates";
+
+// Every roster member is keyed by client_id for app clients, or "m:<id>" for
+// offline/managed clients — matches the subject_key the dashboard views use.
+function rosterKey(kind: "app" | "managed", refId: string) {
+  return kind === "app" ? refId : `m:${refId}`;
+}
 
 export default function HomeScreen() {
   const { session, profile } = useAuth();
+  const queryClient = useQueryClient();
   const isTrainer = profile?.role === "trainer";
+  const trainerId = session?.user.id ?? "";
+
+  const roster = useRosterClients(trainerId, { enabled: isTrainer && !!session });
+
+  const dashboard = useQuery({
+    queryKey: ["dashboard-status"],
+    enabled: isTrainer && !!session,
+    queryFn: async () => {
+      const [streaksRes, statusRes] = await Promise.all([
+        supabase.from("client_streaks").select("*").eq("trainer_id", trainerId),
+        supabase.from("client_workout_status").select("*").eq("trainer_id", trainerId),
+      ]);
+      if (streaksRes.error) throw streaksRes.error;
+      if (statusRes.error) throw statusRes.error;
+
+      const streakByKey = new Map<string, number>();
+      streaksRes.data.forEach((r) => {
+        streakByKey.set(r.client_id ?? `m:${r.managed_client_id}`, r.current_streak);
+      });
+      const statusByKey = new Map<string, (typeof statusRes.data)[number]>();
+      statusRes.data.forEach((r) => {
+        statusByKey.set(r.client_id ?? `m:${r.managed_client_id}`, r);
+      });
+      return { streakByKey, statusByKey };
+    },
+  });
+
+  // Trainer-only: mark an offline (managed) client's oldest due-or-overdue
+  // workout as completed. Offline clients have no app account, so this is the
+  // only way their scheduled_workouts.status ever becomes 'completed'.
+  const markComplete = useMutation({
+    mutationFn: async (scheduledWorkoutId: string) => {
+      const { error } = await supabase
+        .from("scheduled_workouts")
+        .update({ status: "completed" })
+        .eq("id", scheduledWorkoutId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
+      queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
+    },
+  });
 
   // Client's upcoming scheduled workouts (today onward).
   const upcoming = useQuery({
@@ -45,7 +98,6 @@ export default function HomeScreen() {
 
   // Client can nudge a workout's date a day at a time (for training on their own
   // schedule). RLS lets a client update their own scheduled workouts.
-  const queryClient = useQueryClient();
   const shift = useMutation({
     mutationFn: async ({ id, date }: { id: string; date: string }) => {
       const { error } = await supabase.from("scheduled_workouts").update({ scheduled_date: date }).eq("id", id);
@@ -70,13 +122,73 @@ export default function HomeScreen() {
         </Text>
 
         {isTrainer ? (
-          <View className="mt-8 items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
-            <Text className="text-center text-base font-medium text-slate-700">
-              Your dashboard arrives in a later step
-            </Text>
-            <Text className="mt-2 text-center text-sm text-slate-400">
-              For now, use the Schedule tab to add clients and assign workouts.
-            </Text>
+          <View className="mt-6 pb-6">
+            {dashboard.error ? (
+              <Text className="mb-3 text-sm text-red-600">{(dashboard.error as Error).message}</Text>
+            ) : null}
+            {roster.isLoading || dashboard.isLoading ? (
+              <ActivityIndicator />
+            ) : roster.data && roster.data.length > 0 ? (
+              <View className="gap-3">
+                {roster.data.map((c) => {
+                  const status = dashboard.data?.statusByKey.get(rosterKey(c.kind, c.refId));
+                  const streak = dashboard.data?.streakByKey.get(rosterKey(c.kind, c.refId)) ?? 0;
+                  return (
+                    <View
+                      key={`${c.kind}-${c.refId}`}
+                      className="rounded-xl border border-slate-200 px-4 py-3"
+                    >
+                      <Link href={`/dashboard/${c.refId}?kind=${c.kind}`} asChild>
+                        <Pressable className="active:opacity-70">
+                          <View className="flex-row items-center justify-between">
+                            <Text className="text-base font-semibold text-slate-900">{c.name}</Text>
+                            {status?.completed_today ? (
+                              <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
+                                ✓ Done today
+                              </Text>
+                            ) : status?.is_overdue ? (
+                              <Text className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                                ⚠ Overdue
+                              </Text>
+                            ) : status?.has_workout_today ? (
+                              <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
+                                Due today
+                              </Text>
+                            ) : (
+                              <Text className="text-xs text-slate-400">—</Text>
+                            )}
+                          </View>
+                          <View className="mt-1 flex-row items-center gap-2">
+                            <Text className="text-sm text-slate-500">🔥 {streak} streak</Text>
+                            {c.kind === "managed" ? (
+                              <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+                                offline
+                              </Text>
+                            ) : null}
+                          </View>
+                        </Pressable>
+                      </Link>
+                      {c.kind === "managed" && status?.actionable_id ? (
+                        <Pressable
+                          className="mt-2 items-center self-start rounded-lg border border-slate-300 px-3 py-1.5 active:bg-slate-100"
+                          disabled={markComplete.isPending}
+                          onPress={() => markComplete.mutate(status.actionable_id!)}
+                        >
+                          <Text className="text-xs font-semibold text-slate-700">Mark complete</Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            ) : (
+              <View className="items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
+                <Text className="text-center text-base font-medium text-slate-700">No clients yet</Text>
+                <Text className="mt-2 text-center text-sm text-slate-400">
+                  Add clients from the Schedule tab to see their status here.
+                </Text>
+              </View>
+            )}
           </View>
         ) : upcoming.isLoading ? (
           <View className="mt-10">

@@ -16,9 +16,10 @@ export type RosterClient = {
   name: string;
 };
 
-export function useRosterClients(trainerId: string) {
+export function useRosterClients(trainerId: string, options?: { enabled?: boolean }) {
   return useQuery({
     queryKey: ["roster-clients"],
+    enabled: options?.enabled ?? true,
     queryFn: async (): Promise<RosterClient[]> => {
       const [appRes, managedRes] = await Promise.all([
         supabase

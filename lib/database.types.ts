@@ -374,7 +374,36 @@ export type Database = {
         Relationships: [];
       };
     };
-    Views: Record<string, never>;
+    Views: {
+      // --- V8: 0008_dashboard_views.sql ---
+      client_streaks: {
+        Row: {
+          trainer_id: string;
+          client_id: string | null;
+          managed_client_id: string | null;
+          subject_key: string;
+          current_streak: number;
+        };
+        Relationships: [];
+      };
+      client_workout_status: {
+        Row: {
+          trainer_id: string;
+          client_id: string | null;
+          managed_client_id: string | null;
+          completed_today: boolean;
+          has_workout_today: boolean;
+          is_overdue: boolean;
+          overdue_count: number;
+          actionable_id: string | null;
+          actionable_date: string | null;
+          next_scheduled_id: string | null;
+          next_scheduled_date: string | null;
+          next_scheduled_time: string | null;
+        };
+        Relationships: [];
+      };
+    };
     Functions: {
       // V4: add a client to the caller-trainer's roster by email.
       add_client_by_email: {
