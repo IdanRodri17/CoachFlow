@@ -477,6 +477,10 @@ function LoggingSession({
       queryClient.invalidateQueries({ queryKey: ["badges", clientId] });
       queryClient.invalidateQueries({ queryKey: ["package", clientId] });
       queryClient.invalidateQueries({ queryKey: ["package", "app", clientId] });
+      // Trainer-side views (stale otherwise if using the same device's dev
+      // quick-switch, which shares one query cache across both roles).
+      queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
+      queryClient.invalidateQueries({ queryKey: ["client-detail", "app", clientId] });
       router.back();
     },
   });
