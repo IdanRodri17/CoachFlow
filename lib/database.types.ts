@@ -398,6 +398,28 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V9: 0009_badges.sql ---
+      badges: {
+        Row: {
+          id: string;
+          client_id: string;
+          type: "first_workout" | "streak_10" | "first_month";
+          earned_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          type: "first_workout" | "streak_10" | "first_month";
+          earned_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          type?: "first_workout" | "streak_10" | "first_month";
+          earned_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       // --- V8: 0008_dashboard_views.sql ---

@@ -19,6 +19,7 @@ import { formatDisplayDate, toDateString } from "@/lib/dates";
 import { RestTimer } from "@/components/RestTimer";
 import { AdjustmentModal, type AdjustmentResult } from "@/components/AdjustmentModal";
 import { detectPRs } from "@/lib/pr";
+import { checkAndAwardBadges } from "@/lib/badges";
 
 type SessionExercise = {
   exerciseId: string;
@@ -465,11 +466,15 @@ function LoggingSession({
         .update({ status: "completed" })
         .eq("id", scheduledId);
       if (swErr) throw swErr;
+
+      // 7) Badges (V9) — deterministic, reuses the V8 streak view (lib/badges.ts).
+      await checkAndAwardBadges(clientId);
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["scheduled-client"] });
       queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
       queryClient.invalidateQueries({ queryKey: ["workout-session", scheduledId] });
+      queryClient.invalidateQueries({ queryKey: ["badges", clientId] });
       router.back();
     },
   });
