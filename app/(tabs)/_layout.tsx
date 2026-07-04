@@ -45,10 +45,14 @@ export default function TabsLayout() {
         name="schedule"
         options={{ title: "Schedule", headerShown: false, href: isTrainer ? undefined : null }}
       />
-      {/* Progress is client-only. */}
+      {/* Progress + Check-in are client-only. */}
       <Tabs.Screen
         name="progress"
         options={{ title: "Progress", href: isTrainer ? null : undefined }}
+      />
+      <Tabs.Screen
+        name="checkin"
+        options={{ title: "Check-in", href: isTrainer ? null : undefined }}
       />
       <Tabs.Screen name="profile" options={{ title: "Profile" }} />
     </Tabs>

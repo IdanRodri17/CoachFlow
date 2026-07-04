@@ -4,6 +4,7 @@
 // Signing out clears the Supabase session; the (tabs) guard then bounces you
 // back to the sign-in screen automatically.
 // V9 (client only): earned badges + a "Share progress" card (app/share-card).
+// V10 (client only): sessions remaining, if the trainer has set up a package.
 
 import { Link } from "expo-router";
 import { ActivityIndicator, Pressable, Text, View } from "react-native";
@@ -33,6 +34,20 @@ export default function ProfileScreen() {
     },
   });
 
+  const packageQuery = useQuery({
+    queryKey: ["package", session?.user.id],
+    enabled: isClient && !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("packages")
+        .select("total_sessions, used_sessions")
+        .eq("client_id", session!.user.id)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <View className="flex-1 px-6 pt-6">
@@ -46,6 +61,16 @@ export default function ProfileScreen() {
           />
           <Field label="Account" value={session?.user.email ?? session?.user.phone ?? "—"} />
         </View>
+
+        {isClient && packageQuery.data ? (
+          <View className="mt-6">
+            <Text className="text-xs uppercase tracking-wide text-slate-400">Sessions remaining</Text>
+            <Text className="mt-1 text-base text-slate-900">
+              {packageQuery.data.total_sessions - packageQuery.data.used_sessions} of{" "}
+              {packageQuery.data.total_sessions}
+            </Text>
+          </View>
+        ) : null}
 
         {isClient ? (
           <View className="mt-6">

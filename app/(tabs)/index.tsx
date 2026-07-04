@@ -33,12 +33,21 @@ export default function HomeScreen() {
     queryKey: ["dashboard-status"],
     enabled: isTrainer && !!session,
     queryFn: async () => {
-      const [streaksRes, statusRes] = await Promise.all([
+      const [streaksRes, statusRes, unpaidRes] = await Promise.all([
         supabase.from("client_streaks").select("*").eq("trainer_id", trainerId),
         supabase.from("client_workout_status").select("*").eq("trainer_id", trainerId),
+        // Payment reminder (V10 add-on): completed-but-unpaid sessions, grouped
+        // per client here in app code — a simple count doesn't need a SQL view.
+        supabase
+          .from("scheduled_workouts")
+          .select("client_id, managed_client_id")
+          .eq("trainer_id", trainerId)
+          .eq("status", "completed")
+          .eq("paid", false),
       ]);
       if (streaksRes.error) throw streaksRes.error;
       if (statusRes.error) throw statusRes.error;
+      if (unpaidRes.error) throw unpaidRes.error;
 
       const streakByKey = new Map<string, number>();
       streaksRes.data.forEach((r) => {
@@ -48,7 +57,12 @@ export default function HomeScreen() {
       statusRes.data.forEach((r) => {
         statusByKey.set(r.client_id ?? `m:${r.managed_client_id}`, r);
       });
-      return { streakByKey, statusByKey };
+      const unpaidByKey = new Map<string, number>();
+      unpaidRes.data.forEach((r) => {
+        const key = r.client_id ?? `m:${r.managed_client_id}`;
+        unpaidByKey.set(key, (unpaidByKey.get(key) ?? 0) + 1);
+      });
+      return { streakByKey, statusByKey, unpaidByKey };
     },
   });
 
@@ -133,6 +147,7 @@ export default function HomeScreen() {
                 {roster.data.map((c) => {
                   const status = dashboard.data?.statusByKey.get(rosterKey(c.kind, c.refId));
                   const streak = dashboard.data?.streakByKey.get(rosterKey(c.kind, c.refId)) ?? 0;
+                  const unpaidCount = dashboard.data?.unpaidByKey.get(rosterKey(c.kind, c.refId)) ?? 0;
                   return (
                     <View
                       key={`${c.kind}-${c.refId}`}
@@ -163,6 +178,11 @@ export default function HomeScreen() {
                             {c.kind === "managed" ? (
                               <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
                                 offline
+                              </Text>
+                            ) : null}
+                            {unpaidCount > 0 ? (
+                              <Text className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-800">
+                                💰 {unpaidCount} unpaid
                               </Text>
                             ) : null}
                           </View>

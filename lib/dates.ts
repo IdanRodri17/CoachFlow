@@ -104,3 +104,12 @@ export function addMonths(dateISO: string, months: number): string {
   // Date.UTC rolls month overflow into the year automatically.
   return new Date(Date.UTC(y, m - 1 + months, d, 12, 0, 0)).toISOString().slice(0, 10);
 }
+
+/**
+ * The "YYYY-MM-DD" of the Sunday that starts the week containing `dateISO`
+ * (defaults to today, user-local). Used by the V10 weekly check-in — "once
+ * per week" is enforced against this value, not raw UTC week boundaries.
+ */
+export function weekStartOf(dateISO: string = todayISO()): string {
+  return addDays(dateISO, -weekdayOf(dateISO));
+}

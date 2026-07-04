@@ -475,6 +475,8 @@ function LoggingSession({
       queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
       queryClient.invalidateQueries({ queryKey: ["workout-session", scheduledId] });
       queryClient.invalidateQueries({ queryKey: ["badges", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["package", clientId] });
+      queryClient.invalidateQueries({ queryKey: ["package", "app", clientId] });
       router.back();
     },
   });

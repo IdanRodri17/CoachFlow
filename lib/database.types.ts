@@ -190,6 +190,8 @@ export type Database = {
           with_trainer: boolean;
           notes: string | null;
           created_at: string;
+          // --- V10: 0010_checkins_packages.sql ---
+          paid: boolean;
         };
         Insert: {
           id?: string;
@@ -203,6 +205,7 @@ export type Database = {
           with_trainer?: boolean;
           notes?: string | null;
           created_at?: string;
+          paid?: boolean;
         };
         Update: {
           id?: string;
@@ -216,6 +219,7 @@ export type Database = {
           with_trainer?: boolean;
           notes?: string | null;
           created_at?: string;
+          paid?: boolean;
         };
         Relationships: [];
       };
@@ -417,6 +421,73 @@ export type Database = {
           client_id?: string;
           type?: "first_workout" | "streak_10" | "first_month";
           earned_at?: string;
+        };
+        Relationships: [];
+      };
+      // --- V10: 0010_checkins_packages.sql ---
+      check_ins: {
+        Row: {
+          id: string;
+          client_id: string;
+          week_start: string;
+          sleep: number;
+          energy: number;
+          soreness: number;
+          adherence: number;
+          note: string | null;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          client_id: string;
+          week_start: string;
+          sleep: number;
+          energy: number;
+          soreness: number;
+          adherence: number;
+          note?: string | null;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          client_id?: string;
+          week_start?: string;
+          sleep?: number;
+          energy?: number;
+          soreness?: number;
+          adherence?: number;
+          note?: string | null;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
+      packages: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          client_id: string | null;
+          managed_client_id: string | null;
+          total_sessions: number;
+          used_sessions: number;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
+          total_sessions?: number;
+          used_sessions?: number;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
+          total_sessions?: number;
+          used_sessions?: number;
+          created_at?: string;
         };
         Relationships: [];
       };

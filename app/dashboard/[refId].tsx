@@ -45,10 +45,12 @@ type Detail =
       status: WorkoutStatus | null;
       logs: {
         id: string;
+        scheduledWorkoutId: string;
         completed_at: string;
         effort_rating: number | null;
         client_note: string | null;
         template_name: string;
+        paid: boolean;
       }[];
       prs: { exercise_name: string; weight: number | null; reps: number | null; date: string }[];
       chartData: { label: string; value: number }[];
@@ -63,6 +65,7 @@ type Detail =
         scheduled_date: string;
         status: "scheduled" | "completed";
         template_name: string;
+        paid: boolean;
       }[];
     };
 
@@ -103,7 +106,7 @@ export default function ClientDetailScreen() {
       if (kind === "managed") {
         const { data: recent, error } = await supabase
           .from("scheduled_workouts")
-          .select("id, scheduled_date, status, template_id")
+          .select("id, scheduled_date, status, template_id, paid")
           .eq("trainer_id", trainerId)
           .eq("managed_client_id", refId)
           .order("scheduled_date", { ascending: false })
@@ -127,6 +130,7 @@ export default function ClientDetailScreen() {
             scheduled_date: r.scheduled_date,
             status: r.status,
             template_name: r.template_id ? tNames.get(r.template_id) ?? "Workout" : "Workout",
+            paid: r.paid,
           })),
         };
       }
@@ -155,10 +159,11 @@ export default function ClientDetailScreen() {
       const logs = logsRes.data;
       const scheduledIds = [...new Set(logs.map((l) => l.scheduled_workout_id))];
       const tNameByScheduled = new Map<string, string>();
+      const paidByScheduled = new Map<string, boolean>();
       if (scheduledIds.length > 0) {
         const { data: sws } = await supabase
           .from("scheduled_workouts")
-          .select("id, template_id")
+          .select("id, template_id, paid")
           .in("id", scheduledIds);
         const tplIds = [...new Set((sws ?? []).map((s) => s.template_id).filter(Boolean) as string[])];
         const tNames = new Map<string, string>();
@@ -168,6 +173,7 @@ export default function ClientDetailScreen() {
         }
         sws?.forEach((s) => {
           tNameByScheduled.set(s.id, s.template_id ? tNames.get(s.template_id) ?? "Workout" : "Workout");
+          paidByScheduled.set(s.id, s.paid);
         });
       }
 
@@ -205,10 +211,12 @@ export default function ClientDetailScreen() {
         status,
         logs: logs.map((l) => ({
           id: l.id,
+          scheduledWorkoutId: l.scheduled_workout_id,
           completed_at: l.completed_at,
           effort_rating: l.effort_rating,
           client_note: l.client_note,
           template_name: tNameByScheduled.get(l.scheduled_workout_id) ?? "Workout",
+          paid: paidByScheduled.get(l.scheduled_workout_id) ?? false,
         })),
         prs,
         chartData: progressRes.data
@@ -230,6 +238,81 @@ export default function ClientDetailScreen() {
       queryClient.invalidateQueries({ queryKey: ["client-detail", kind, refId] });
       queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
       queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
+      queryClient.invalidateQueries({ queryKey: ["package", kind, refId] });
+    },
+  });
+
+  // Payment reminder (V10 add-on) — a manual "did I collect payment for this
+  // session" flag per workout. Trainer-only by RLS trigger (a client can't
+  // flip their own); not a payment system, just bookkeeping.
+  const togglePaid = useMutation({
+    mutationFn: async ({ scheduledWorkoutId, paid }: { scheduledWorkoutId: string; paid: boolean }) => {
+      const { error } = await supabase.from("scheduled_workouts").update({ paid }).eq("id", scheduledWorkoutId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-detail", kind, refId] });
+      queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
+    },
+  });
+
+  // Session package (V10) — both client kinds. used_sessions auto-increments
+  // via a DB trigger on completion (0010_checkins_packages.sql); the trainer
+  // only ever edits total_sessions here.
+  const streakCol = kind === "app" ? "client_id" : "managed_client_id";
+  const [totalSessionsInput, setTotalSessionsInput] = useState("");
+
+  const packageQuery = useQuery({
+    queryKey: ["package", kind, refId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("packages")
+        .select("*")
+        .eq("trainer_id", trainerId)
+        .eq(streakCol, refId)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const savePackage = useMutation({
+    mutationFn: async (totalSessions: number) => {
+      if (packageQuery.data) {
+        const { error } = await supabase
+          .from("packages")
+          .update({ total_sessions: totalSessions })
+          .eq("id", packageQuery.data.id);
+        if (error) throw error;
+      } else if (kind === "app") {
+        const { error } = await supabase
+          .from("packages")
+          .insert({ trainer_id: trainerId, client_id: refId, total_sessions: totalSessions });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("packages")
+          .insert({ trainer_id: trainerId, managed_client_id: refId, total_sessions: totalSessions });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["package", kind, refId] }),
+  });
+
+  // Latest weekly check-in (V10) — app clients only (self-reported).
+  const latestCheckin = useQuery({
+    queryKey: ["latest-checkin", refId],
+    enabled: kind === "app",
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("check_ins")
+        .select("*")
+        .eq("client_id", refId)
+        .order("week_start", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
     },
   });
 
@@ -359,8 +442,71 @@ export default function ClientDetailScreen() {
           <Text className="mt-2 text-sm text-red-600">{(markComplete.error as Error).message}</Text>
         ) : null}
 
+        <View className="mt-7 rounded-2xl border border-slate-200 p-4">
+          <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+            Session package
+          </Text>
+          {packageQuery.data ? (
+            <Text className="mt-1 text-base text-slate-900">
+              {packageQuery.data.total_sessions - packageQuery.data.used_sessions} of{" "}
+              {packageQuery.data.total_sessions} sessions remaining
+              <Text className="text-sm text-slate-400"> ({packageQuery.data.used_sessions} used)</Text>
+            </Text>
+          ) : (
+            <Text className="mt-1 text-sm text-slate-400">No package set up yet.</Text>
+          )}
+          <View className="mt-3 flex-row items-center gap-2">
+            <TextInput
+              className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900"
+              placeholder="Total"
+              placeholderTextColor="#94a3b8"
+              keyboardType="number-pad"
+              value={totalSessionsInput}
+              onChangeText={setTotalSessionsInput}
+            />
+            <Pressable
+              className="items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 active:opacity-80"
+              disabled={savePackage.isPending || totalSessionsInput.trim() === ""}
+              onPress={() => savePackage.mutate(Number.parseInt(totalSessionsInput, 10))}
+            >
+              {savePackage.isPending ? (
+                <ActivityIndicator color="#ffffff" size="small" />
+              ) : (
+                <Text className="text-sm font-semibold text-white">
+                  {packageQuery.data ? "Update total" : "Set total"}
+                </Text>
+              )}
+            </Pressable>
+          </View>
+          {savePackage.error ? (
+            <Text className="mt-2 text-xs text-red-600">{(savePackage.error as Error).message}</Text>
+          ) : null}
+        </View>
+
         {d.kind === "app" ? (
           <>
+            <View className="mt-7 rounded-2xl border border-slate-200 p-4">
+              <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500">
+                Latest check-in
+              </Text>
+              {latestCheckin.data ? (
+                <>
+                  <Text className="mt-1 text-sm text-slate-500">
+                    Week of {formatDisplayDate(latestCheckin.data.week_start)}
+                  </Text>
+                  <Text className="mt-1 text-sm text-slate-700">
+                    Sleep {latestCheckin.data.sleep} · Energy {latestCheckin.data.energy} · Soreness{" "}
+                    {latestCheckin.data.soreness} · Adherence {latestCheckin.data.adherence}
+                  </Text>
+                  {latestCheckin.data.note ? (
+                    <Text className="mt-1 text-sm text-slate-400">“{latestCheckin.data.note}”</Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text className="mt-1 text-sm text-slate-400">No check-ins yet.</Text>
+              )}
+            </View>
+
             <View className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-4">
               <Text className="text-xs font-bold uppercase tracking-wide text-amber-700">
                 🔒 Private notes — trainer only
@@ -474,6 +620,11 @@ export default function ClientDetailScreen() {
                       <Text className="mt-1 text-sm text-slate-600">Effort: {l.effort_rating}/10</Text>
                     ) : null}
                     {l.client_note ? <Text className="mt-1 text-sm text-slate-400">“{l.client_note}”</Text> : null}
+                    <PaidToggle
+                      paid={l.paid}
+                      pending={togglePaid.isPending}
+                      onToggle={() => togglePaid.mutate({ scheduledWorkoutId: l.scheduledWorkoutId, paid: !l.paid })}
+                    />
                   </View>
                 ))}
               </View>
@@ -513,14 +664,20 @@ export default function ClientDetailScreen() {
             {d.recentScheduled.length > 0 ? (
               <View className="gap-2">
                 {d.recentScheduled.map((r) => (
-                  <View
-                    key={r.id}
-                    className="flex-row items-center justify-between rounded-xl border border-slate-200 p-3"
-                  >
-                    <Text className="text-sm font-semibold text-slate-900">{r.template_name}</Text>
-                    <Text className="text-xs text-slate-500">
-                      {formatDisplayDate(r.scheduled_date)} · {r.status === "completed" ? "✓ Done" : "Not done"}
-                    </Text>
+                  <View key={r.id} className="rounded-xl border border-slate-200 p-3">
+                    <View className="flex-row items-center justify-between">
+                      <Text className="text-sm font-semibold text-slate-900">{r.template_name}</Text>
+                      <Text className="text-xs text-slate-500">
+                        {formatDisplayDate(r.scheduled_date)} · {r.status === "completed" ? "✓ Done" : "Not done"}
+                      </Text>
+                    </View>
+                    {r.status === "completed" ? (
+                      <PaidToggle
+                        paid={r.paid}
+                        pending={togglePaid.isPending}
+                        onToggle={() => togglePaid.mutate({ scheduledWorkoutId: r.id, paid: !r.paid })}
+                      />
+                    ) : null}
                   </View>
                 ))}
               </View>
@@ -531,5 +688,19 @@ export default function ClientDetailScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function PaidToggle({ paid, pending, onToggle }: { paid: boolean; pending: boolean; onToggle: () => void }) {
+  return (
+    <Pressable
+      className={`mt-2 self-start rounded-full px-2 py-0.5 ${paid ? "bg-emerald-100" : "bg-slate-100"}`}
+      disabled={pending}
+      onPress={onToggle}
+    >
+      <Text className={`text-xs font-semibold ${paid ? "text-emerald-700" : "text-slate-500"}`}>
+        {paid ? "💰 Paid" : "Mark paid"}
+      </Text>
+    </Pressable>
   );
 }
