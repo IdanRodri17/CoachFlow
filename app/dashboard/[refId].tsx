@@ -8,8 +8,9 @@
 // account — they never create workout_logs or progress_entries — so they just
 // get their completed-workout history and the "mark complete" action.
 
+import { useState } from "react";
 import { Redirect, useLocalSearchParams } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
@@ -20,12 +21,21 @@ import { LineChart } from "@/components/LineChart";
 import type { Database } from "@/lib/database.types";
 
 type WorkoutStatus = Database["public"]["Views"]["client_workout_status"]["Row"];
+type ClientNote = Database["public"]["Tables"]["client_notes"]["Row"];
 
 const shortDate = (iso: string) =>
   new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: DEFAULT_TIME_ZONE }).format(
     new Date(`${iso}T12:00:00Z`),
   );
 const dayOf = (timestamptz: string) => formatDisplayDate(toDateString(new Date(timestamptz)));
+const noteTimestamp = (iso: string) =>
+  new Intl.DateTimeFormat("en", {
+    month: "short",
+    day: "numeric",
+    hour: "2-digit",
+    minute: "2-digit",
+    timeZone: DEFAULT_TIME_ZONE,
+  }).format(new Date(iso));
 
 type Detail =
   | {
@@ -223,6 +233,65 @@ export default function ClientDetailScreen() {
     },
   });
 
+  // Private trainer-only notes (V8b) — app clients only (client_notes.client_id
+  // -> profiles). No client-read RLS policy exists at all, so these never
+  // surface anywhere in the client's app.
+  const [newNote, setNewNote] = useState("");
+  const [editingNoteId, setEditingNoteId] = useState<string | null>(null);
+  const [editingBody, setEditingBody] = useState("");
+
+  const notes = useQuery({
+    queryKey: ["client-notes", refId],
+    enabled: kind === "app",
+    queryFn: async (): Promise<ClientNote[]> => {
+      const { data, error } = await supabase
+        .from("client_notes")
+        .select("*")
+        .eq("trainer_id", trainerId)
+        .eq("client_id", refId)
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const addNote = useMutation({
+    mutationFn: async (body: string) => {
+      const { error } = await supabase.from("client_notes").insert({ trainer_id: trainerId, client_id: refId, body });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-notes", refId] });
+      setNewNote("");
+    },
+  });
+
+  const updateNote = useMutation({
+    mutationFn: async ({ id, body }: { id: string; body: string }) => {
+      const { error } = await supabase.from("client_notes").update({ body }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["client-notes", refId] });
+      setEditingNoteId(null);
+    },
+  });
+
+  const deleteNote = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("client_notes").delete().eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["client-notes", refId] }),
+  });
+
+  function confirmDeleteNote(id: string) {
+    Alert.alert("Delete note", "This can't be undone.", [
+      { text: "Cancel", style: "cancel" },
+      { text: "Delete", style: "destructive", onPress: () => deleteNote.mutate(id) },
+    ]);
+  }
+
   if (detail.isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -292,6 +361,97 @@ export default function ClientDetailScreen() {
 
         {d.kind === "app" ? (
           <>
+            <View className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-4">
+              <Text className="text-xs font-bold uppercase tracking-wide text-amber-700">
+                🔒 Private notes — trainer only
+              </Text>
+              <Text className="mt-1 text-xs text-amber-700">The client can never see these.</Text>
+
+              <View className="mt-3 flex-row items-end gap-2">
+                <TextInput
+                  className="flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900"
+                  placeholder="e.g. needs core work, tends to skip legs"
+                  placeholderTextColor="#b45309"
+                  value={newNote}
+                  onChangeText={setNewNote}
+                  multiline
+                />
+                <Pressable
+                  className="items-center justify-center rounded-lg bg-slate-900 px-3 py-2.5 active:opacity-80"
+                  disabled={addNote.isPending || newNote.trim().length === 0}
+                  onPress={() => addNote.mutate(newNote.trim())}
+                >
+                  {addNote.isPending ? (
+                    <ActivityIndicator color="#ffffff" size="small" />
+                  ) : (
+                    <Text className="text-sm font-semibold text-white">Add</Text>
+                  )}
+                </Pressable>
+              </View>
+              {addNote.error ? (
+                <Text className="mt-2 text-xs text-red-600">{(addNote.error as Error).message}</Text>
+              ) : null}
+
+              <View className="mt-3 gap-2">
+                {notes.isLoading ? (
+                  <ActivityIndicator />
+                ) : notes.data && notes.data.length > 0 ? (
+                  notes.data.map((n) => (
+                    <View key={n.id} className="rounded-lg border border-amber-200 bg-white p-3">
+                      {editingNoteId === n.id ? (
+                        <>
+                          <TextInput
+                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                            value={editingBody}
+                            onChangeText={setEditingBody}
+                            multiline
+                            autoFocus
+                          />
+                          <View className="mt-2 flex-row gap-2">
+                            <Pressable
+                              className="rounded-lg bg-slate-900 px-3 py-1.5 active:opacity-80"
+                              disabled={updateNote.isPending || editingBody.trim().length === 0}
+                              onPress={() => updateNote.mutate({ id: n.id, body: editingBody.trim() })}
+                            >
+                              <Text className="text-xs font-semibold text-white">Save</Text>
+                            </Pressable>
+                            <Pressable
+                              className="rounded-lg border border-slate-300 px-3 py-1.5 active:bg-slate-100"
+                              onPress={() => setEditingNoteId(null)}
+                            >
+                              <Text className="text-xs font-semibold text-slate-700">Cancel</Text>
+                            </Pressable>
+                          </View>
+                        </>
+                      ) : (
+                        <>
+                          <Text className="text-sm text-slate-800">{n.body}</Text>
+                          <View className="mt-2 flex-row items-center justify-between">
+                            <Text className="text-xs text-slate-400">{noteTimestamp(n.created_at)}</Text>
+                            <View className="flex-row gap-3">
+                              <Pressable
+                                onPress={() => {
+                                  setEditingNoteId(n.id);
+                                  setEditingBody(n.body);
+                                }}
+                              >
+                                <Text className="text-xs font-semibold text-slate-500">Edit</Text>
+                              </Pressable>
+                              <Pressable onPress={() => confirmDeleteNote(n.id)}>
+                                <Text className="text-xs font-semibold text-red-600">Delete</Text>
+                              </Pressable>
+                            </View>
+                          </View>
+                        </>
+                      )}
+                    </View>
+                  ))
+                ) : (
+                  <Text className="text-xs text-amber-700">No notes yet.</Text>
+                )}
+              </View>
+            </View>
+
             <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
               Weight over time
             </Text>

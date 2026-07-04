@@ -373,6 +373,31 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V8b: 0008b_client_notes.sql ---
+      client_notes: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          client_id: string;
+          body: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          client_id: string;
+          body: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          client_id?: string;
+          body?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       // --- V8: 0008_dashboard_views.sql ---
