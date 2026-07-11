@@ -14,6 +14,8 @@ export type RosterClient = {
   kind: "app" | "managed";
   refId: string;
   name: string;
+  // Trainer-entered contact phone for WhatsApp reminders (V11) — null if unset.
+  phone: string | null;
 };
 
 export function useRosterClients(trainerId: string, options?: { enabled?: boolean }) {
@@ -24,12 +26,12 @@ export function useRosterClients(trainerId: string, options?: { enabled?: boolea
       const [appRes, managedRes] = await Promise.all([
         supabase
           .from("trainer_clients")
-          .select("client_id, created_at")
+          .select("client_id, contact_phone, created_at")
           .eq("trainer_id", trainerId)
           .order("created_at"),
         supabase
           .from("managed_clients")
-          .select("id, name, created_at")
+          .select("id, name, phone, created_at")
           .eq("trainer_id", trainerId)
           .order("created_at"),
       ]);
@@ -51,11 +53,13 @@ export function useRosterClients(trainerId: string, options?: { enabled?: boolea
         kind: "app",
         refId: r.client_id,
         name: names.get(r.client_id) ?? "Client",
+        phone: r.contact_phone,
       }));
       const managed: RosterClient[] = (managedRes.data ?? []).map((r) => ({
         kind: "managed",
         refId: r.id,
         name: r.name,
+        phone: r.phone,
       }));
       return [...app, ...managed];
     },

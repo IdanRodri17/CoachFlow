@@ -5,17 +5,20 @@
 //   - offline clients: added by name only (managed_clients) — won't use the app
 // Both can be scheduled. Sections: add app client, add offline client, roster,
 // schedule button, upcoming.
+// V11: each roster row gets a trainer-entered contact phone (for WhatsApp
+// reminders); each upcoming row gets a "Remind on WhatsApp" action.
 
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, Redirect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { useRosterClients } from "@/lib/useRoster";
+import { useRosterClients, type RosterClient } from "@/lib/useRoster";
 import { formatDisplayDate, todayISO } from "@/lib/dates";
+import { buildWhatsAppReminderLink } from "@/lib/whatsapp";
 
 export default function ScheduleHomeScreen() {
   const { session, profile } = useAuth();
@@ -46,15 +49,26 @@ export default function ScheduleHomeScreen() {
       const managedIds = [...new Set(sws.map((s) => s.managed_client_id).filter(Boolean) as string[])];
       const tplIds = [...new Set(sws.map((s) => s.template_id).filter(Boolean) as string[])];
       const cNames = new Map<string, string>();
+      const cPhones = new Map<string, string | null>();
       const mNames = new Map<string, string>();
+      const mPhones = new Map<string, string | null>();
       const tNames = new Map<string, string>();
       if (clientIds.length > 0) {
-        const { data } = await supabase.from("profiles").select("id, display_name").in("id", clientIds);
-        data?.forEach((p) => cNames.set(p.id, p.display_name));
+        const { data } = await supabase
+          .from("trainer_clients")
+          .select("client_id, contact_phone")
+          .eq("trainer_id", trainerId)
+          .in("client_id", clientIds);
+        data?.forEach((r) => cPhones.set(r.client_id, r.contact_phone));
+        const { data: profs } = await supabase.from("profiles").select("id, display_name").in("id", clientIds);
+        profs?.forEach((p) => cNames.set(p.id, p.display_name));
       }
       if (managedIds.length > 0) {
-        const { data } = await supabase.from("managed_clients").select("id, name").in("id", managedIds);
-        data?.forEach((m) => mNames.set(m.id, m.name));
+        const { data } = await supabase.from("managed_clients").select("id, name, phone").in("id", managedIds);
+        data?.forEach((m) => {
+          mNames.set(m.id, m.name);
+          mPhones.set(m.id, m.phone);
+        });
       }
       if (tplIds.length > 0) {
         const { data } = await supabase.from("workout_templates").select("id, name").in("id", tplIds);
@@ -67,6 +81,7 @@ export default function ScheduleHomeScreen() {
           : s.managed_client_id
             ? mNames.get(s.managed_client_id) ?? "Client"
             : "Client",
+        client_phone: s.client_id ? cPhones.get(s.client_id) ?? null : s.managed_client_id ? mPhones.get(s.managed_client_id) ?? null : null,
         template_name: s.template_id ? tNames.get(s.template_id) ?? "Workout" : "Workout",
       }));
     },
@@ -92,6 +107,28 @@ export default function ScheduleHomeScreen() {
       queryClient.invalidateQueries({ queryKey: ["roster-clients"] });
       setOfflineName("");
     },
+  });
+
+  // Trainer-entered contact phone (V11) — powers "Remind on WhatsApp" below,
+  // since neither auth mode exposes a client's real phone to this session.
+  const savePhone = useMutation({
+    mutationFn: async ({ client, phone }: { client: RosterClient; phone: string }) => {
+      if (client.kind === "app") {
+        const { error } = await supabase
+          .from("trainer_clients")
+          .update({ contact_phone: phone || null })
+          .eq("trainer_id", trainerId)
+          .eq("client_id", client.refId);
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("managed_clients")
+          .update({ phone: phone || null })
+          .eq("id", client.refId);
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["roster-clients"] }),
   });
 
   return (
@@ -138,17 +175,11 @@ export default function ScheduleHomeScreen() {
         ) : roster.data && roster.data.length > 0 ? (
           <View className="gap-2">
             {roster.data.map((c) => (
-              <View
+              <RosterRow
                 key={`${c.kind}-${c.refId}`}
-                className="flex-row items-center justify-between rounded-xl border border-slate-200 px-4 py-3"
-              >
-                <Text className="text-base font-medium text-slate-900">{c.name}</Text>
-                {c.kind === "managed" ? (
-                  <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                    offline
-                  </Text>
-                ) : null}
-              </View>
+                client={c}
+                onSavePhone={(phone) => savePhone.mutate({ client: c, phone })}
+              />
             ))}
           </View>
         ) : (
@@ -171,18 +202,38 @@ export default function ScheduleHomeScreen() {
           <ActivityIndicator />
         ) : upcoming.data && upcoming.data.length > 0 ? (
           <View className="gap-2">
-            {upcoming.data.map((s) => (
-              <Link key={s.id} href={`/schedule/${s.id}`} asChild>
-                <Pressable className="rounded-xl border border-slate-200 px-4 py-3 active:bg-slate-50">
-                  <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
-                  <Text className="mt-0.5 text-sm text-slate-500">
-                    {s.client_name} · {formatDisplayDate(s.scheduled_date)}
-                    {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
-                  </Text>
-                  {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
-                </Pressable>
-              </Link>
-            ))}
+            {upcoming.data.map((s) => {
+              const whatsappLink = buildWhatsAppReminderLink({
+                phone: s.client_phone,
+                clientName: s.client_name,
+                trainerName: profile?.display_name ?? "your trainer",
+                dateLabel: formatDisplayDate(s.scheduled_date),
+                timeLabel: s.scheduled_time ? s.scheduled_time.slice(0, 5) : null,
+                templateName: s.template_name,
+              });
+              return (
+                <View key={s.id} className="rounded-xl border border-slate-200 px-4 py-3">
+                  <Link href={`/schedule/${s.id}`} asChild>
+                    <Pressable className="active:opacity-70">
+                      <Text className="text-base font-semibold text-slate-900">{s.template_name}</Text>
+                      <Text className="mt-0.5 text-sm text-slate-500">
+                        {s.client_name} · {formatDisplayDate(s.scheduled_date)}
+                        {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
+                      </Text>
+                      {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
+                    </Pressable>
+                  </Link>
+                  {whatsappLink ? (
+                    <Pressable
+                      className="mt-2 items-center self-start rounded-lg border border-emerald-300 px-3 py-1.5 active:bg-emerald-50"
+                      onPress={() => Linking.openURL(whatsappLink)}
+                    >
+                      <Text className="text-xs font-semibold text-emerald-700">💬 Remind on WhatsApp</Text>
+                    </Pressable>
+                  ) : null}
+                </View>
+              );
+            })}
           </View>
         ) : (
           <Text className="text-sm text-slate-400">Nothing scheduled yet.</Text>
@@ -232,6 +283,42 @@ function AddRow({
           <Text className="text-base font-semibold text-white">Add</Text>
         )}
       </Pressable>
+    </View>
+  );
+}
+
+// A roster row with an inline-editable contact phone (V11 — powers "Remind
+// on WhatsApp"). Local state per row so editing one doesn't affect others.
+function RosterRow({
+  client,
+  onSavePhone,
+}: {
+  client: RosterClient;
+  onSavePhone: (phone: string) => void;
+}) {
+  const [phone, setPhone] = useState(client.phone ?? "");
+
+  return (
+    <View className="rounded-xl border border-slate-200 px-4 py-3">
+      <View className="flex-row items-center justify-between">
+        <Text className="text-base font-medium text-slate-900">{client.name}</Text>
+        {client.kind === "managed" ? (
+          <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+            offline
+          </Text>
+        ) : null}
+      </View>
+      <TextInput
+        className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900"
+        placeholder="Phone for WhatsApp (e.g. +9725...)"
+        placeholderTextColor="#94a3b8"
+        keyboardType="phone-pad"
+        value={phone}
+        onChangeText={setPhone}
+        onEndEditing={() => {
+          if (phone.trim() !== (client.phone ?? "")) onSavePhone(phone.trim());
+        }}
+      />
     </View>
   );
 }

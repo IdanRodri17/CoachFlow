@@ -38,8 +38,9 @@ yarn-error.*
 supabase/.branches
 supabase/.temp
 
-# dev-only seed helper (kept local, not committed)
+# dev-only seed helpers (kept local, not committed)
 supabase/seed_dev_workout.sql
+supabase/seed_dev_sms_reminder.sql
 
 # typescript
 *.tsbuildinfo
@@ -47,3 +48,8 @@ supabase/seed_dev_workout.sql
 # generated native folders
 /ios
 /android
+
+# Supabase CLI binary (downloaded locally, not part of the project source)
+supabase.exe
+supabase-go.exe
+supabase.tar.gz

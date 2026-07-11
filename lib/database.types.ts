@@ -159,6 +159,8 @@ export type Database = {
           client_id: string;
           status: "active" | "paused";
           created_at: string;
+          // --- V11: 0011_reminders.sql ---
+          contact_phone: string | null;
         };
         Insert: {
           id?: string;
@@ -166,6 +168,7 @@ export type Database = {
           client_id: string;
           status?: "active" | "paused";
           created_at?: string;
+          contact_phone?: string | null;
         };
         Update: {
           id?: string;
@@ -173,6 +176,7 @@ export type Database = {
           client_id?: string;
           status?: "active" | "paused";
           created_at?: string;
+          contact_phone?: string | null;
         };
         Relationships: [];
       };
@@ -192,6 +196,9 @@ export type Database = {
           created_at: string;
           // --- V10: 0010_checkins_packages.sql ---
           paid: boolean;
+          // --- V11: 0011_reminders.sql ---
+          reminded_at: string | null;
+          sms_reminded_at: string | null;
         };
         Insert: {
           id?: string;
@@ -206,6 +213,8 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           paid?: boolean;
+          reminded_at?: string | null;
+          sms_reminded_at?: string | null;
         };
         Update: {
           id?: string;
@@ -220,6 +229,8 @@ export type Database = {
           notes?: string | null;
           created_at?: string;
           paid?: boolean;
+          reminded_at?: string | null;
+          sms_reminded_at?: string | null;
         };
         Relationships: [];
       };
@@ -231,6 +242,8 @@ export type Database = {
           name: string;
           note: string | null;
           created_at: string;
+          // --- V11: 0011_reminders.sql ---
+          phone: string | null;
         };
         Insert: {
           id?: string;
@@ -238,6 +251,7 @@ export type Database = {
           name: string;
           note?: string | null;
           created_at?: string;
+          phone?: string | null;
         };
         Update: {
           id?: string;
@@ -245,6 +259,7 @@ export type Database = {
           name?: string;
           note?: string | null;
           created_at?: string;
+          phone?: string | null;
         };
         Relationships: [];
       };
