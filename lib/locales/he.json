@@ -66,6 +66,11 @@
       "projected": "צפי",
       "unpaid": "לתשלום",
       "priceGapHint": "ל-{{count}} מתאמנים לא הוגדר מחיר"
+    },
+    "atRisk": {
+      "title": "בסיכון",
+      "missedStreak": "פספס/ה 2 אימונים אחרונים",
+      "goneQuiet": "נעלם/ה"
     }
   },
   "profile": {

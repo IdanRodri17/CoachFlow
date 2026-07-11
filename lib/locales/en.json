@@ -66,6 +66,11 @@
       "projected": "Projected",
       "unpaid": "Unpaid",
       "priceGapHint": "{{count}} client(s) with no price set"
+    },
+    "atRisk": {
+      "title": "At risk",
+      "missedStreak": "Missed last 2",
+      "goneQuiet": "Gone quiet"
     }
   },
   "profile": {

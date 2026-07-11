@@ -5,7 +5,7 @@
 // each row drilling into app/dashboard/[refId].tsx. All derived numbers (missed,
 // streak) come from the SQL views in 0008_dashboard_views.sql, never computed here.
 
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -15,6 +15,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
 import { addDays, formatDisplayDate, isToday, todayISO } from "@/lib/dates";
+import { buildWhatsAppReminderLink } from "@/lib/whatsapp";
 
 // Every roster member is keyed by client_id for app clients, or "m:<id>" for
 // offline/managed clients — matches the subject_key the dashboard views use.
@@ -50,6 +51,18 @@ export default function HomeScreen() {
         .eq("trainer_id", trainerId)
         .eq("month", currentMonthKey)
         .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  // V16: retention radar — flagged clients from the client_risk view
+  // (0016_client_risk.sql), never computed here.
+  const atRisk = useQuery({
+    queryKey: ["client-risk"],
+    enabled: isTrainer && !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("client_risk").select("*").eq("trainer_id", trainerId);
       if (error) throw error;
       return data;
     },
@@ -106,6 +119,7 @@ export default function HomeScreen() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
       queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
+      queryClient.invalidateQueries({ queryKey: ["client-risk"] });
     },
   });
 
@@ -204,6 +218,51 @@ export default function HomeScreen() {
                 )}
               </Pressable>
             </Link>
+
+            {/* V16: retention radar — only rendered when non-empty. */}
+            {atRisk.data && atRisk.data.length > 0 ? (
+              <View className="mb-4 gap-2">
+                <Text className="text-left text-sm font-semibold text-slate-700">{t("home.atRisk.title")}</Text>
+                {atRisk.data.map((r) => {
+                  const kind: "app" | "managed" = r.client_id ? "app" : "managed";
+                  const refId = (r.client_id ?? r.managed_client_id) as string;
+                  const client = roster.data?.find((c) => c.kind === kind && c.refId === refId);
+                  const name = client?.name ?? t("schedule.home.client");
+                  const whatsappLink = buildWhatsAppReminderLink({
+                    phone: client?.phone ?? null,
+                    clientName: name,
+                    trainerName: profile?.display_name ?? t("schedule.home.yourTrainer"),
+                    dateLabel: "today",
+                    timeLabel: null,
+                    templateName: "next",
+                  });
+                  return (
+                    <View key={`${kind}-${refId}`} className="rounded-xl border border-red-200 bg-red-50 px-4 py-3">
+                      <Link href={`/dashboard/${refId}?kind=${kind}`} asChild>
+                        <Pressable className="active:opacity-70">
+                          <View className="flex-row items-center justify-between gap-2">
+                            <Text className="flex-1 text-left text-base font-semibold text-slate-900">{name}</Text>
+                            <Text className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
+                              {r.reason === "missed_streak" ? t("home.atRisk.missedStreak") : t("home.atRisk.goneQuiet")}
+                            </Text>
+                          </View>
+                        </Pressable>
+                      </Link>
+                      {whatsappLink ? (
+                        <Pressable
+                          className="mt-2 items-center self-start rounded-lg border border-emerald-300 px-3 py-1.5 active:bg-emerald-50"
+                          onPress={() => Linking.openURL(whatsappLink)}
+                        >
+                          <Text className="text-xs font-semibold text-emerald-700">
+                            {t("schedule.home.remindOnWhatsApp")}
+                          </Text>
+                        </Pressable>
+                      ) : null}
+                    </View>
+                  );
+                })}
+              </View>
+            ) : null}
 
             {/* V14: client management lives on its own screen now, off Schedule. */}
             <View className="mb-3 flex-row items-center justify-between">

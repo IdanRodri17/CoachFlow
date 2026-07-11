@@ -589,6 +589,17 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V16: 0016_client_risk.sql ---
+      client_risk: {
+        Row: {
+          trainer_id: string;
+          client_id: string | null;
+          managed_client_id: string | null;
+          subject_key: string;
+          reason: string;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
       // V4: add a client to the caller-trainer's roster by email.
