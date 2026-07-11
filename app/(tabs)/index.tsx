@@ -22,7 +22,9 @@ function rosterKey(kind: "app" | "managed", refId: string) {
   return kind === "app" ? refId : `m:${refId}`;
 }
 
-function formatMoney(value: number, locale: string) {
+// Shared with app/money.tsx (V13b) — kept here rather than a new lib file to
+// stay within the step's file budget.
+export function formatMoney(value: number, locale: string) {
   return new Intl.NumberFormat(locale === "he" ? "he" : "en").format(Math.round(value));
 }
 
@@ -161,41 +163,47 @@ export default function HomeScreen() {
 
         {isTrainer ? (
           <View className="mt-6 pb-6">
-            <View className="mb-4 rounded-2xl border border-slate-200 p-4">
-              <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {t("home.money.title")}
-              </Text>
-              {money.isLoading ? (
-                <ActivityIndicator className="mt-3" />
-              ) : money.error ? (
-                <Text className="mt-2 w-full text-left text-xs text-red-600">
-                  {(money.error as Error).message}
-                </Text>
-              ) : (
-                <>
-                  <View className="mt-3 flex-row gap-4">
-                    <MoneyStat
-                      label={t("home.money.earned")}
-                      value={formatMoney(money.data?.earned ?? 0, i18n.language)}
-                    />
-                    <MoneyStat
-                      label={t("home.money.projected")}
-                      value={formatMoney(money.data?.projected ?? 0, i18n.language)}
-                    />
-                    <MoneyStat
-                      label={t("home.money.unpaid")}
-                      value={formatMoney(money.data?.unpaid ?? 0, i18n.language)}
-                      accent
-                    />
-                  </View>
-                  {money.data && money.data.clients_without_price > 0 ? (
-                    <Text className="mt-3 w-full text-left text-xs text-amber-600">
-                      {t("home.money.priceGapHint", { count: money.data.clients_without_price })}
-                    </Text>
-                  ) : null}
-                </>
-              )}
-            </View>
+            {/* V13b: tap for the all-clients monthly history (app/money.tsx). */}
+            <Link href="/money" asChild>
+              <Pressable className="mb-4 rounded-2xl border border-slate-200 p-4 active:opacity-70">
+                <View className="flex-row items-center justify-between">
+                  <Text className="text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                    {t("home.money.title")}
+                  </Text>
+                  <Text className="text-left text-xs text-slate-400">{t("home.money.viewHistory")}</Text>
+                </View>
+                {money.isLoading ? (
+                  <ActivityIndicator className="mt-3" />
+                ) : money.error ? (
+                  <Text className="mt-2 w-full text-left text-xs text-red-600">
+                    {(money.error as Error).message}
+                  </Text>
+                ) : (
+                  <>
+                    <View className="mt-3 flex-row gap-4">
+                      <MoneyStat
+                        label={t("home.money.earned")}
+                        value={formatMoney(money.data?.earned ?? 0, i18n.language)}
+                      />
+                      <MoneyStat
+                        label={t("home.money.projected")}
+                        value={formatMoney(money.data?.projected ?? 0, i18n.language)}
+                      />
+                      <MoneyStat
+                        label={t("home.money.unpaid")}
+                        value={formatMoney(money.data?.unpaid ?? 0, i18n.language)}
+                        accent
+                      />
+                    </View>
+                    {money.data && money.data.clients_without_price > 0 ? (
+                      <Text className="mt-3 w-full text-left text-xs text-amber-600">
+                        {t("home.money.priceGapHint", { count: money.data.clients_without_price })}
+                      </Text>
+                    ) : null}
+                  </>
+                )}
+              </Pressable>
+            </Link>
 
             {dashboard.error ? (
               <Text className="mb-3 w-full text-left text-sm text-red-600">
@@ -343,7 +351,7 @@ export default function HomeScreen() {
   );
 }
 
-function MoneyStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+export function MoneyStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
   return (
     <View className="flex-1">
       <Text className="w-full text-left text-xs text-slate-400">{label}</Text>

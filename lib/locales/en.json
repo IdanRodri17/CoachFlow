@@ -57,6 +57,7 @@
     "done": "Done ✓",
     "money": {
       "title": "This month",
+      "viewHistory": "History ›",
       "earned": "Earned",
       "projected": "Projected",
       "unpaid": "Unpaid",
@@ -372,6 +373,14 @@
     "intermediate": "Intermediate",
     "advanced": "Advanced",
     "save": "Save"
+  },
+  "money": {
+    "title": "Monthly summary",
+    "sessionsCompleted": "{{count}} session(s) completed",
+    "earned": "Earned",
+    "collected": "Collected",
+    "outstanding": "Outstanding",
+    "noHistoryYet": "No activity yet — once you schedule and complete workouts, monthly totals will show up here."
   },
   "shareCard": {
     "sharingUnavailable": "Sharing isn't available on this device.",

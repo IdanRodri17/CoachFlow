@@ -57,6 +57,7 @@
     "done": "בוצע ✓",
     "money": {
       "title": "החודש",
+      "viewHistory": "‹ היסטוריה",
       "earned": "הרווחת",
       "projected": "צפי",
       "unpaid": "לתשלום",
@@ -372,6 +373,14 @@
     "intermediate": "בינוני/ת",
     "advanced": "מתקדם/ת",
     "save": "שמירה"
+  },
+  "money": {
+    "title": "סיכום חודשי",
+    "sessionsCompleted": "{{count}} אימונים הושלמו",
+    "earned": "הרווחת",
+    "collected": "נגבה",
+    "outstanding": "לתשלום",
+    "noHistoryYet": "אין עדיין פעילות — ברגע שתקבעו ותשלימו אימונים, הסיכום החודשי יופיע כאן."
   },
   "shareCard": {
     "sharingUnavailable": "שיתוף לא זמין במכשיר הזה.",
