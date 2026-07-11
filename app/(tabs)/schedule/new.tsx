@@ -5,6 +5,7 @@
 
 import { Redirect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -14,6 +15,7 @@ import { ScheduleForm, type SchedulePayload } from "@/components/ScheduleForm";
 
 export default function NewScheduleScreen() {
   const { session, profile } = useAuth();
+  const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
 
@@ -94,7 +96,7 @@ export default function NewScheduleScreen() {
       templates={templates.data ?? []}
       loadingRoster={roster.isLoading}
       loadingTemplates={templates.isLoading}
-      submitLabel="Assign workout"
+      submitLabel={t("schedule.form.assignWorkout")}
       submitting={mutation.isPending}
       errorMessage={mutation.error ? (mutation.error as Error).message : null}
       onSubmit={(payload) => mutation.mutate(payload)}

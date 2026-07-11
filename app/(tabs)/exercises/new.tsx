@@ -5,6 +5,7 @@
 
 import { Redirect, useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -14,6 +15,7 @@ export default function NewExerciseScreen() {
   const { session, profile } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   // Only trainers create exercises; clients shouldn't reach here.
   if (profile && profile.role !== "trainer") return <Redirect href="/exercises" />;
@@ -33,7 +35,7 @@ export default function NewExerciseScreen() {
 
   return (
     <ExerciseForm
-      submitLabel="Create exercise"
+      submitLabel={t("exercises.form.createExercise")}
       submitting={mutation.isPending}
       errorMessage={mutation.error ? (mutation.error as Error).message : null}
       onSubmit={(input) => mutation.mutate(input)}

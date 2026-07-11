@@ -6,6 +6,7 @@
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -21,6 +22,7 @@ export default function EditScheduleScreen() {
   const { session, profile } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   if (profile && profile.role !== "trainer") return <Redirect href="/" />;
   const trainerId = session!.user.id;
@@ -112,9 +114,9 @@ export default function EditScheduleScreen() {
   });
 
   function confirmDelete() {
-    Alert.alert("Delete workout", "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate() },
+    Alert.alert(t("schedule.detail.deleteWorkout"), t("schedule.detail.deleteWorkoutConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("schedule.detail.delete"), style: "destructive", onPress: () => deleteMutation.mutate() },
     ]);
   }
 
@@ -130,7 +132,7 @@ export default function EditScheduleScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text className="text-center text-sm text-red-600">
-          {workout.error ? (workout.error as Error).message : "Workout not found."}
+          {workout.error ? (workout.error as Error).message : t("schedule.detail.workoutNotFound")}
         </Text>
       </View>
     );
@@ -143,7 +145,7 @@ export default function EditScheduleScreen() {
       loadingRoster={false}
       loadingTemplates={false}
       initial={workout.data}
-      submitLabel="Save changes"
+      submitLabel={t("schedule.detail.saveChanges")}
       submitting={updateMutation.isPending}
       errorMessage={updateMutation.error ? (updateMutation.error as Error).message : null}
       onSubmit={(payload) => updateMutation.mutate(payload)}
@@ -153,7 +155,7 @@ export default function EditScheduleScreen() {
           disabled={deleteMutation.isPending}
           onPress={confirmDelete}
         >
-          <Text className="text-base font-semibold text-red-600">Delete workout</Text>
+          <Text className="text-base font-semibold text-red-600">{t("schedule.detail.deleteWorkout")}</Text>
         </Pressable>
       }
     />

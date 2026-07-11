@@ -18,12 +18,15 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { AUTH_MODE, profileComplete, sendOtp, useAuth, verifyOtp } from "@/lib/auth";
 import { DevPanel } from "@/components/DevPanel";
+import { LTR_INPUT_STYLE, LTR_WRITING_DIRECTION_ONLY } from "@/lib/i18n";
 
 export default function SignInScreen() {
   const { session, profile } = useAuth();
+  const { t } = useTranslation();
   const [phase, setPhase] = useState<"enter" | "code">("enter");
   const [identifier, setIdentifier] = useState(""); // email (or phone in sms mode)
   const [code, setCode] = useState("");
@@ -69,17 +72,20 @@ export default function SignInScreen() {
         behavior={Platform.OS === "ios" ? "padding" : undefined}
       >
         <View className="flex-1 justify-center px-6">
-          <Text className="text-3xl font-bold text-slate-900">CoachFlow</Text>
-          <Text className="mt-1 mb-8 text-base text-slate-500">
+          <Text className="w-full text-left text-3xl font-bold text-slate-900">{t("signIn.appName")}</Text>
+          <Text className="mt-1 mb-8 w-full text-left text-base text-slate-500">
             {phase === "enter"
-              ? `Sign in with your ${isEmail ? "email" : "phone number"}`
-              : `Enter the code we sent to ${identifier}`}
+              ? isEmail
+                ? t("signIn.subtitleEmail")
+                : t("signIn.subtitlePhone")
+              : t("signIn.subtitleCode", { identifier })}
           </Text>
 
           {phase === "enter" ? (
             <TextInput
               className="rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
-              placeholder={isEmail ? "you@example.com" : "+972…"}
+              style={LTR_INPUT_STYLE}
+              placeholder={isEmail ? t("signIn.emailPlaceholder") : t("signIn.phonePlaceholder")}
               placeholderTextColor="#94a3b8"
               autoCapitalize="none"
               autoCorrect={false}
@@ -91,6 +97,7 @@ export default function SignInScreen() {
           ) : (
             <TextInput
               className="rounded-xl border border-slate-300 px-4 py-3 text-center text-2xl tracking-[4px] text-slate-900"
+              style={LTR_WRITING_DIRECTION_ONLY}
               placeholder="00000000"
               placeholderTextColor="#94a3b8"
               keyboardType="number-pad"
@@ -104,7 +111,7 @@ export default function SignInScreen() {
           )}
 
           {error ? (
-            <Text className="mt-3 text-sm text-red-600">{error}</Text>
+            <Text className="mt-3 w-full text-left text-sm text-red-600">{error}</Text>
           ) : null}
 
           <Pressable
@@ -116,7 +123,7 @@ export default function SignInScreen() {
               <ActivityIndicator color="#ffffff" />
             ) : (
               <Text className="text-base font-semibold text-white">
-                {phase === "enter" ? "Send code" : "Verify & continue"}
+                {phase === "enter" ? t("signIn.sendCode") : t("signIn.verifyAndContinue")}
               </Text>
             )}
           </Pressable>
@@ -132,7 +139,7 @@ export default function SignInScreen() {
               }}
             >
               <Text className="text-sm text-slate-500">
-                Use a different {isEmail ? "email" : "number"}
+                {isEmail ? t("signIn.useDifferentEmail") : t("signIn.useDifferentNumber")}
               </Text>
             </Pressable>
           ) : null}

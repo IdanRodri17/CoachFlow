@@ -2,11 +2,13 @@
 // tabs). Gives the logging screen a header with a back button.
 
 import { Stack } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 export default function WorkoutLayout() {
+  const { t } = useTranslation();
   return (
     <Stack>
-      <Stack.Screen name="[id]" options={{ title: "Workout" }} />
+      <Stack.Screen name="[id]" options={{ title: t("workout.title") }} />
     </Stack>
   );
 }

@@ -5,13 +5,19 @@
 // its header (see (tabs)/_layout.tsx) so only this stack's headers show.
 
 import { Stack } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 export default function ExercisesStackLayout() {
+  const { t } = useTranslation();
+
   return (
     <Stack>
-      <Stack.Screen name="index" options={{ title: "Exercises" }} />
-      <Stack.Screen name="new" options={{ title: "New exercise", presentation: "modal" }} />
-      <Stack.Screen name="[id]" options={{ title: "Exercise" }} />
+      <Stack.Screen name="index" options={{ title: t("exercises.list.title") }} />
+      <Stack.Screen
+        name="new"
+        options={{ title: t("exercises.list.newExercise"), presentation: "modal" }}
+      />
+      <Stack.Screen name="[id]" options={{ title: t("exercises.list.exercise") }} />
     </Stack>
   );
 }

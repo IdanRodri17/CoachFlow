@@ -4,6 +4,7 @@
 // Values are "HH:MM" strings (or null). Same idea as DateChips — no native module.
 
 import { Pressable, ScrollView, Text } from "react-native";
+import { useTranslation } from "react-i18next";
 
 // Build the slots once at module load (one per hour).
 const SLOTS: string[] = [];
@@ -18,15 +19,16 @@ export function TimeChips({
   value: string | null;
   onChange: (time: string | null) => void;
 }) {
+  const { t } = useTranslation();
   return (
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerClassName="gap-2 py-1 pr-4"
+      contentContainerClassName="gap-2 py-1 pe-4"
     >
-      <Chip label="Any time" selected={value === null} onPress={() => onChange(null)} />
-      {SLOTS.map((t) => (
-        <Chip key={t} label={t} selected={value === t} onPress={() => onChange(t)} />
+      <Chip label={t("schedule.form.anyTime")} selected={value === null} onPress={() => onChange(null)} />
+      {SLOTS.map((slot) => (
+        <Chip key={slot} label={slot} selected={value === slot} onPress={() => onChange(slot)} />
       ))}
     </ScrollView>
   );

@@ -5,6 +5,7 @@ import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, Redirect, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -12,6 +13,7 @@ import { useAuth } from "@/lib/auth";
 export default function TemplatesListScreen() {
   const { profile } = useAuth();
   const router = useRouter();
+  const { t } = useTranslation();
 
   // Templates are trainer-only.
   if (profile && profile.role !== "trainer") return <Redirect href="/" />;
@@ -43,11 +45,13 @@ export default function TemplatesListScreen() {
           className="items-center rounded-xl bg-slate-900 px-4 py-3 active:opacity-80"
           onPress={() => router.push("/templates/new")}
         >
-          <Text className="text-base font-semibold text-white">+ Create template</Text>
+          <Text className="text-base font-semibold text-white">{t("templates.list.createTemplate")}</Text>
         </Pressable>
       </View>
 
-      {error ? <Text className="px-4 pt-4 text-sm text-red-600">{error.message}</Text> : null}
+      {error ? (
+        <Text className="w-full text-left px-4 pt-4 text-sm text-red-600">{error.message}</Text>
+      ) : null}
 
       <FlatList
         data={data ?? []}
@@ -55,9 +59,9 @@ export default function TemplatesListScreen() {
         contentContainerClassName="p-4 gap-3"
         ListEmptyComponent={
           <View className="items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
-            <Text className="text-center text-base font-medium text-slate-700">No templates yet</Text>
+            <Text className="text-center text-base font-medium text-slate-700">{t("templates.list.emptyTitle")}</Text>
             <Text className="mt-2 text-center text-sm text-slate-400">
-              Build a reusable workout once, assign it to many clients later.
+              {t("templates.list.emptyHint")}
             </Text>
           </View>
         }

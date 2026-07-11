@@ -5,6 +5,7 @@
 
 import { Redirect, useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -14,6 +15,7 @@ export default function NewTemplateScreen() {
   const { session, profile } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   if (profile && profile.role !== "trainer") return <Redirect href="/" />;
 
@@ -53,7 +55,7 @@ export default function NewTemplateScreen() {
 
   return (
     <TemplateBuilder
-      submitLabel="Create template"
+      submitLabel={t("templates.form.createTemplate")}
       submitting={mutation.isPending}
       errorMessage={mutation.error ? (mutation.error as Error).message : null}
       onSubmit={(input) => mutation.mutate(input)}

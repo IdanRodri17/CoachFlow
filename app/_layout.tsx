@@ -3,7 +3,9 @@
 // With Expo Router the app/ folder tree IS the navigation tree (like Next.js).
 // This file installs the app-wide providers exactly once:
 //   1. global.css        — NativeWind/Tailwind styles (import first).
-//   2. RTL support        — enabled from day one so Hebrew (V12) works later.
+//   2. lib/i18n           — i18next + RTL (V12a). Imported for its side effect:
+//      it calls I18nManager.allowRTL/forceRTL at module load, before first
+//      render, so a Hebrew-locale device is already mirrored correctly.
 //   3. GestureHandlerRootView / SafeAreaProvider — required by navigation + insets.
 //   4. QueryClientProvider — TanStack Query (server-state cache).
 //   5. AuthProvider        — our session + profile context (lib/auth.tsx).
@@ -11,18 +13,16 @@
 //      ((auth), (tabs)) decide for themselves who is allowed in, using <Redirect>.
 
 import "../global.css";
+import "@/lib/i18n";
 
-import { I18nManager } from "react-native";
+import { useEffect } from "react";
 import { Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 
+import { restoreSavedLocale } from "@/lib/i18n";
 import { AuthProvider } from "@/lib/auth";
-
-// RTL-AWARE FROM DAY ONE (a CoachFlow rule — see CLAUDE.md / SRS §6).
-// allowRTL permits mirroring for RTL locales; the actual Hebrew toggle lands in V12.
-I18nManager.allowRTL(true);
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -31,6 +31,12 @@ const queryClient = new QueryClient({
 });
 
 export default function RootLayout() {
+  // Applies a previously-chosen language (Profile > Language) if it differs
+  // from the device-locale default lib/i18n started with.
+  useEffect(() => {
+    restoreSavedLocale();
+  }, []);
+
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
       <SafeAreaProvider>

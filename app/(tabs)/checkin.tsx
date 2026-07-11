@@ -11,21 +11,24 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { formatDisplayDate, todayISO, weekStartOf } from "@/lib/dates";
+import { directionalTextClassName } from "@/lib/i18n";
 
 const FIELDS = [
-  { key: "sleep", label: "Sleep" },
-  { key: "energy", label: "Energy" },
-  { key: "soreness", label: "Soreness" },
-  { key: "adherence", label: "Adherence" },
+  { key: "sleep", labelKey: "checkin.fields.sleep" },
+  { key: "energy", labelKey: "checkin.fields.energy" },
+  { key: "soreness", labelKey: "checkin.fields.soreness" },
+  { key: "adherence", labelKey: "checkin.fields.adherence" },
 ] as const;
 type FieldKey = (typeof FIELDS)[number]["key"];
 
 export default function CheckinScreen() {
   const { session, profile } = useAuth();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
 
   const [values, setValues] = useState<Record<FieldKey, number>>({
@@ -84,24 +87,26 @@ export default function CheckinScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6">
-        <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          This week
+        <Text className="mb-2 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("checkin.thisWeek")}
         </Text>
 
         {current ? (
           <View className="rounded-2xl border border-emerald-200 bg-emerald-50 p-4">
-            <Text className="text-sm font-semibold text-emerald-800">
-              ✓ You checked in for this week
+            <Text className="w-full text-left text-sm font-semibold text-emerald-800">
+              {t("checkin.checkedInThisWeek")}
             </Text>
             <View className="mt-3 gap-1.5">
               {FIELDS.map((f) => (
                 <Text key={f.key} className="text-sm text-emerald-900">
-                  {f.label}: {current[f.key]}/5
+                  {t(f.labelKey)}: {current[f.key]}/5
                 </Text>
               ))}
             </View>
             {current.note ? (
-              <Text className="mt-2 text-sm text-emerald-700">“{current.note}”</Text>
+              <Text className="mt-2 w-full text-left text-sm text-emerald-700">
+                “{current.note}”
+              </Text>
             ) : null}
           </View>
         ) : (
@@ -109,7 +114,7 @@ export default function CheckinScreen() {
             <View className="gap-4">
               {FIELDS.map((f) => (
                 <View key={f.key}>
-                  <Text className="mb-1.5 text-sm font-medium text-slate-700">{f.label}</Text>
+                  <Text className="mb-1.5 w-full text-left text-sm font-medium text-slate-700">{t(f.labelKey)}</Text>
                   <ScaleSelector
                     value={values[f.key]}
                     onChange={(v) => setValues((prev) => ({ ...prev, [f.key]: v }))}
@@ -118,10 +123,10 @@ export default function CheckinScreen() {
               ))}
             </View>
 
-            <Text className="mb-1.5 mt-4 text-sm font-medium text-slate-700">Note (optional)</Text>
+            <Text className="mb-1.5 mt-4 w-full text-left text-sm font-medium text-slate-700">{t("checkin.noteLabel")}</Text>
             <TextInput
-              className="rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900"
-              placeholder="Anything your trainer should know?"
+              className={`rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900 ${directionalTextClassName()}`}
+              placeholder={t("checkin.notePlaceholder")}
               placeholderTextColor="#94a3b8"
               value={note}
               onChangeText={setNote}
@@ -129,7 +134,7 @@ export default function CheckinScreen() {
             />
 
             {submit.error ? (
-              <Text className="mt-2 text-sm text-red-600">{(submit.error as Error).message}</Text>
+              <Text className="mt-2 w-full text-left text-sm text-red-600">{(submit.error as Error).message}</Text>
             ) : null}
 
             <Pressable
@@ -140,31 +145,35 @@ export default function CheckinScreen() {
               {submit.isPending ? (
                 <ActivityIndicator color="#ffffff" />
               ) : (
-                <Text className="text-base font-semibold text-white">Submit check-in</Text>
+                <Text className="text-base font-semibold text-white">{t("checkin.submit")}</Text>
               )}
             </Pressable>
           </View>
         )}
 
-        <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          History
+        <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("checkin.history")}
         </Text>
         {past.length > 0 ? (
           <View className="gap-2">
             {past.map((c) => (
               <View key={c.id} className="rounded-xl border border-slate-200 p-3">
-                <Text className="text-sm font-semibold text-slate-900">
-                  Week of {formatDisplayDate(c.week_start)}
+                <Text className="w-full text-left text-sm font-semibold text-slate-900">
+                  {t("checkin.weekOf", { date: formatDisplayDate(c.week_start) })}
                 </Text>
                 <Text className="mt-1 text-sm text-slate-500">
-                  {FIELDS.map((f) => `${f.label} ${c[f.key]}`).join(" · ")}
+                  {FIELDS.map((f) => `${t(f.labelKey)} ${c[f.key]}`).join(" · ")}
                 </Text>
-                {c.note ? <Text className="mt-1 text-sm text-slate-400">“{c.note}”</Text> : null}
+                {c.note ? (
+                  <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                    “{c.note}”
+                  </Text>
+                ) : null}
               </View>
             ))}
           </View>
         ) : (
-          <Text className="text-sm text-slate-400">No past check-ins yet.</Text>
+          <Text className="w-full text-left text-sm text-slate-400">{t("checkin.noPastCheckins")}</Text>
         )}
       </ScrollView>
     </SafeAreaView>

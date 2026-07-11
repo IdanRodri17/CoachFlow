@@ -4,6 +4,7 @@
 
 import { useState } from "react";
 import { Text as RNText, View } from "react-native";
+import { useTranslation } from "react-i18next";
 import Svg, { Circle, Line, Polyline, Text as SvgText } from "react-native-svg";
 
 export type ChartPoint = { label: string; value: number };
@@ -11,13 +12,14 @@ export type ChartPoint = { label: string; value: number };
 const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
 
 export function LineChart({ data, height = 200 }: { data: ChartPoint[]; height?: number }) {
+  const { t } = useTranslation();
   const [width, setWidth] = useState(0);
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {data.length === 0 ? (
         <RNText className="py-8 text-center text-sm text-slate-400">
-          Log your weight to see the trend.
+          {t("progress.logToSeeTrend")}
         </RNText>
       ) : width > 0 ? (
         <Chart data={data} width={width} height={height} />

@@ -5,6 +5,9 @@
 import { useEffect, useState } from "react";
 import { Modal, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
+
+import { directionalTextClassName } from "@/lib/i18n";
 
 export type AdjustmentResult = { reason: string; swapId?: string; swapName?: string };
 
@@ -23,6 +26,7 @@ export function AdjustmentModal({
   onClose: () => void;
   onConfirm: (result: AdjustmentResult) => void;
 }) {
+  const { t } = useTranslation();
   const [reason, setReason] = useState("");
   const [swapId, setSwapId] = useState<string | null>(null);
 
@@ -50,17 +54,17 @@ export function AdjustmentModal({
       <View className="flex-1 justify-end bg-black/40">
         <SafeAreaView edges={["bottom"]} className="rounded-t-3xl bg-white">
           <View className="px-6 py-5">
-            <Text className="text-lg font-bold text-slate-900">
-              {mode === "skip" ? "Skip" : "Swap"} {exerciseName}
+            <Text className="text-lg font-bold text-slate-900 w-full text-left">
+              {mode === "skip" ? t("workout.adjustment.skip") : t("workout.adjustment.swap")} {exerciseName}
             </Text>
 
             {mode === "swap" ? (
               <>
-                <Text className="mb-2 mt-4 text-sm font-medium text-slate-700">Substitute with</Text>
+                <Text className="mb-2 mt-4 text-sm font-medium text-slate-700 w-full text-left">{t("workout.adjustment.substituteWith")}</Text>
                 <ScrollView className="max-h-56" keyboardShouldPersistTaps="handled">
                   <View className="gap-2">
                     {library.length === 0 ? (
-                      <Text className="text-sm text-slate-400">No other exercises in the library.</Text>
+                      <Text className="text-sm text-slate-400 w-full text-left">{t("workout.adjustment.noOtherExercises")}</Text>
                     ) : (
                       library.map((e) => (
                         <Pressable
@@ -80,10 +84,10 @@ export function AdjustmentModal({
               </>
             ) : null}
 
-            <Text className="mb-2 mt-4 text-sm font-medium text-slate-700">Reason (optional)</Text>
+            <Text className="mb-2 mt-4 text-sm font-medium text-slate-700 w-full text-left">{t("workout.adjustment.reasonOptional")}</Text>
             <TextInput
-              className="rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
-              placeholder={mode === "skip" ? "e.g. shoulder pain" : "e.g. machine was taken"}
+              className={`rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
+              placeholder={mode === "skip" ? t("workout.adjustment.reasonPlaceholderSkip") : t("workout.adjustment.reasonPlaceholderSwap")}
               placeholderTextColor="#94a3b8"
               value={reason}
               onChangeText={setReason}
@@ -95,7 +99,7 @@ export function AdjustmentModal({
                 onPress={onClose}
                 className="flex-1 items-center rounded-xl border border-slate-300 px-4 py-3 active:bg-slate-100"
               >
-                <Text className="text-base font-semibold text-slate-700">Cancel</Text>
+                <Text className="text-base font-semibold text-slate-700">{t("common.cancel")}</Text>
               </Pressable>
               <Pressable
                 onPress={confirm}
@@ -105,7 +109,7 @@ export function AdjustmentModal({
                 }`}
               >
                 <Text className="text-base font-semibold text-white">
-                  {mode === "skip" ? "Skip exercise" : "Swap"}
+                  {mode === "skip" ? t("workout.adjustment.skipExercise") : t("workout.adjustment.swap")}
                 </Text>
               </Pressable>
             </View>

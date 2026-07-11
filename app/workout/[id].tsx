@@ -12,10 +12,12 @@ import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from 
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { formatDisplayDate, toDateString } from "@/lib/dates";
+import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
 import { RestTimer } from "@/components/RestTimer";
 import { AdjustmentModal, type AdjustmentResult } from "@/components/AdjustmentModal";
 import { detectPRs } from "@/lib/pr";
@@ -49,6 +51,7 @@ const toNum = (v: string) => {
 export default function WorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile, session } = useAuth();
+  const { t } = useTranslation();
 
   // Only clients log workouts.
   if (profile && profile.role !== "client") return <Redirect href="/" />;
@@ -72,7 +75,7 @@ export default function WorkoutScreen() {
           .order("position");
         if (teErr) throw teErr;
 
-        const exIds = tes.map((t) => t.exercise_id);
+        const exIds = tes.map((te) => te.exercise_id);
         const nameMap = new Map<string, string>();
         const lastMap = new Map<string, { weight: number | null; reps: number | null }>();
         if (exIds.length > 0) {
@@ -88,14 +91,14 @@ export default function WorkoutScreen() {
           });
         }
 
-        exercises = tes.map((t) => ({
-          exerciseId: t.exercise_id,
-          name: nameMap.get(t.exercise_id) ?? "Exercise",
-          targetSets: t.target_sets,
-          targetReps: t.target_reps,
-          targetWeight: t.target_weight,
-          restSeconds: t.rest_seconds,
-          lastTime: lastMap.get(t.exercise_id) ?? null,
+        exercises = tes.map((te) => ({
+          exerciseId: te.exercise_id,
+          name: nameMap.get(te.exercise_id) ?? t("workout.exerciseFallback"),
+          targetSets: te.target_sets,
+          targetReps: te.target_reps,
+          targetWeight: te.target_weight,
+          restSeconds: te.rest_seconds,
+          lastTime: lastMap.get(te.exercise_id) ?? null,
         }));
       }
 
@@ -114,7 +117,7 @@ export default function WorkoutScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text className="text-center text-sm text-red-600">
-          {query.error ? (query.error as Error).message : "Workout not found."}
+          {query.error ? (query.error as Error).message : t("workout.notFound")}
         </Text>
       </View>
     );
@@ -135,6 +138,7 @@ type LoggedGroup = { exerciseId: string; name: string; sets: LoggedSet[] };
 type Adj = { action: "skipped" | "swapped"; exerciseName: string; swapName: string | null; reason: string | null };
 
 function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: string | null }) {
+  const { t } = useTranslation();
   const query = useQuery({
     queryKey: ["workout-summary", scheduledId],
     queryFn: async () => {
@@ -182,14 +186,14 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
       }
       const groups: LoggedGroup[] = order.map((exId) => ({
         exerciseId: exId,
-        name: nameMap.get(exId) ?? "Exercise",
+        name: nameMap.get(exId) ?? t("workout.exerciseFallback"),
         sets: byEx.get(exId)!,
       }));
 
       const adjustments: Adj[] = adjustmentsRaw.map((a) => ({
         action: a.action,
-        exerciseName: nameMap.get(a.exercise_id) ?? "Exercise",
-        swapName: a.swapped_for_exercise_id ? nameMap.get(a.swapped_for_exercise_id) ?? "Exercise" : null,
+        exerciseName: nameMap.get(a.exercise_id) ?? t("workout.exerciseFallback"),
+        swapName: a.swapped_for_exercise_id ? nameMap.get(a.swapped_for_exercise_id) ?? t("workout.exerciseFallback") : null,
         reason: a.reason,
       }));
 
@@ -214,11 +218,13 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
       <ScrollView contentContainerClassName="px-6 py-6">
         <View className="mb-5 items-center">
           <Text className="text-4xl">✅</Text>
-          <Text className="mt-2 text-xl font-bold text-slate-900">Workout completed</Text>
+          <Text className="mt-2 text-xl font-bold text-slate-900">{t("workout.completedTitle")}</Text>
           {log ? (
             <Text className="mt-1 text-sm text-slate-500">
               {formatDisplayDate(toDateString(new Date(log.completed_at)))}
-              {log.duration_seconds ? ` · ${Math.max(1, Math.round(log.duration_seconds / 60))} min` : ""}
+              {log.duration_seconds
+                ? ` · ${t("workout.durationMinutes", { count: Math.max(1, Math.round(log.duration_seconds / 60)) })}`
+                : ""}
             </Text>
           ) : null}
         </View>
@@ -227,43 +233,45 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
           <View className="mb-5 rounded-xl border border-slate-200 p-4">
             {log.effort_rating != null ? (
               <Text className="text-sm text-slate-700">
-                Effort: <Text className="font-bold text-slate-900">{log.effort_rating}/10</Text>
+                {t("workout.effortLabel")} <Text className="font-bold text-slate-900">{t("workout.effortValue", { value: log.effort_rating })}</Text>
               </Text>
             ) : null}
             {log.client_note ? (
-              <Text className="mt-1 text-sm text-slate-500">“{log.client_note}”</Text>
+              <Text className="mt-1 text-sm text-slate-500 w-full text-left">“{log.client_note}”</Text>
             ) : null}
           </View>
         ) : null}
 
         {note ? (
           <View className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <Text className="text-xs font-bold uppercase tracking-wide text-amber-700">
-              Note from your trainer
+            <Text className="text-xs font-bold uppercase tracking-wide text-amber-700 w-full text-left">
+              {t("workout.noteFromTrainer")}
             </Text>
-            <Text className="mt-1 text-base text-amber-900">{note}</Text>
+            <Text className="mt-1 text-base text-amber-900 w-full text-left">{note}</Text>
           </View>
         ) : null}
 
         {groups.length === 0 && adjustments.length === 0 ? (
-          <Text className="text-center text-sm text-slate-400">No sets were logged for this workout.</Text>
+          <Text className="text-center text-sm text-slate-400">{t("workout.noSetsLogged")}</Text>
         ) : null}
 
         {groups.map((g) => (
           <View key={g.exerciseId} className="mb-3 rounded-2xl border border-slate-200 p-4">
-            <Text className="text-base font-bold text-slate-900">{g.name}</Text>
+            <Text className="text-base font-bold text-slate-900 w-full text-left">{g.name}</Text>
             <View className="mt-2 gap-1">
               {g.sets.map((s, i) => (
                 <View key={i} className="flex-row items-center justify-between">
-                  <Text className="text-sm text-slate-500">Set {s.set_index + 1}</Text>
+                  <Text className="text-sm text-slate-500">{t("workout.setNumber", { number: s.set_index + 1 })}</Text>
                   <View className="flex-row items-center gap-2">
                     <Text className="text-base text-slate-900">
-                      {s.reps ?? "—"} reps × {s.weight ?? "—"}
-                      {s.weight != null ? "kg" : ""}
+                      {t("workout.repsXWeight", {
+                        reps: s.reps ?? "—",
+                        weight: `${s.weight ?? "—"}${s.weight != null ? "kg" : ""}`,
+                      })}
                     </Text>
                     {s.is_pr ? (
                       <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
-                        PR
+                        {t("workout.prBadge")}
                       </Text>
                     ) : null}
                   </View>
@@ -276,12 +284,12 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
         {/* Skips / swaps */}
         {adjustments.map((a, i) => (
           <View key={i} className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <Text className="text-sm font-semibold text-slate-700">
+            <Text className="text-sm font-semibold text-slate-700 w-full text-left">
               {a.action === "skipped"
-                ? `Skipped ${a.exerciseName}`
-                : `Swapped ${a.exerciseName} → ${a.swapName}`}
+                ? t("workout.skippedExercise", { name: a.exerciseName })
+                : t("workout.swappedExercise", { from: a.exerciseName, to: a.swapName })}
             </Text>
-            {a.reason ? <Text className="mt-0.5 text-sm text-slate-500">“{a.reason}”</Text> : null}
+            {a.reason ? <Text className="mt-0.5 text-sm text-slate-500 w-full text-left">“{a.reason}”</Text> : null}
           </View>
         ))}
       </ScrollView>
@@ -308,6 +316,7 @@ function LoggingSession({
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
   const startedAt = useRef(Date.now());
 
   const [rows, setRows] = useState<Record<string, Row[]>>(() => {
@@ -490,18 +499,18 @@ function LoggingSession({
       <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
         {data.note ? (
           <View className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <Text className="text-xs font-bold uppercase tracking-wide text-amber-700">
-              Note from your trainer
+            <Text className="text-xs font-bold uppercase tracking-wide text-amber-700 w-full text-left">
+              {t("workout.noteFromTrainer")}
             </Text>
-            <Text className="mt-1 text-base text-amber-900">{data.note}</Text>
+            <Text className="mt-1 text-base text-amber-900 w-full text-left">{data.note}</Text>
           </View>
         ) : null}
 
         {!data.hasTemplate ? (
           <View className="items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
-            <Text className="text-center text-base font-medium text-slate-700">Free workout</Text>
+            <Text className="text-center text-base font-medium text-slate-700">{t("workout.freeWorkout")}</Text>
             <Text className="mt-2 text-center text-sm text-slate-400">
-              No exercises listed — mark it complete when you're done.
+              {t("workout.freeWorkoutHint")}
             </Text>
           </View>
         ) : (
@@ -515,12 +524,12 @@ function LoggingSession({
                   <View className="flex-row items-center justify-between">
                     <Text className="text-base font-semibold text-slate-400 line-through">{ex.name}</Text>
                     <Text className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                      Skipped
+                      {t("workout.skippedBadge")}
                     </Text>
                   </View>
-                  {adj.reason ? <Text className="mt-1 text-sm text-slate-500">“{adj.reason}”</Text> : null}
+                  {adj.reason ? <Text className="mt-1 text-sm text-slate-500 w-full text-left">“{adj.reason}”</Text> : null}
                   <Pressable className="mt-2 self-start" onPress={() => undoAdjust(ex.exerciseId)}>
-                    <Text className="text-sm font-semibold text-slate-600">Undo</Text>
+                    <Text className="text-sm font-semibold text-slate-600">{t("workout.undo")}</Text>
                   </Pressable>
                 </View>
               );
@@ -529,27 +538,29 @@ function LoggingSession({
             const swapped = adj?.action === "swapped" ? adj : null;
             return (
               <View key={ex.exerciseId} className="mb-4 rounded-2xl border border-slate-200 p-4">
-                <Text className="text-lg font-bold text-slate-900">{ex.name}</Text>
+                <Text className="text-lg font-bold text-slate-900 w-full text-left">{ex.name}</Text>
 
                 {swapped ? (
                   <View className="mt-1 rounded-lg bg-slate-100 px-3 py-2">
-                    <Text className="text-sm font-medium text-slate-700">Swapped → {swapped.swapName}</Text>
-                    {swapped.reason ? <Text className="text-sm text-slate-500">“{swapped.reason}”</Text> : null}
+                    <Text className="text-sm font-medium text-slate-700 w-full text-left">
+                      {t("workout.swappedTo", { name: swapped.swapName })}
+                    </Text>
+                    {swapped.reason ? <Text className="text-sm text-slate-500 w-full text-left">“{swapped.reason}”</Text> : null}
                     <Pressable className="mt-1 self-start" onPress={() => undoAdjust(ex.exerciseId)}>
-                      <Text className="text-sm font-semibold text-slate-600">Undo</Text>
+                      <Text className="text-sm font-semibold text-slate-600">{t("workout.undo")}</Text>
                     </Pressable>
                   </View>
                 ) : (
                   <View className="mt-1 flex-row flex-wrap gap-x-4">
                     <Text className="text-sm text-slate-500">
-                      Last time:{" "}
+                      {t("workout.lastTimeLabel")}{" "}
                       {ex.lastTime && (ex.lastTime.weight != null || ex.lastTime.reps != null)
                         ? `${ex.lastTime.weight ?? "—"}${ex.lastTime.weight != null ? "kg" : ""} × ${ex.lastTime.reps ?? "—"}`
                         : "—"}
                     </Text>
                     <Text className="text-sm text-slate-400">
-                      Target: {ex.targetSets ?? "—"} × {ex.targetReps ?? "—"}
-                      {ex.targetWeight != null ? ` @ ${ex.targetWeight}kg` : ""}
+                      {t("workout.targetLabel")} {ex.targetSets ?? "—"} × {ex.targetReps ?? "—"}
+                      {ex.targetWeight != null ? ` @ ${ex.targetWeight}${t("workout.kgSuffix")}` : ""}
                     </Text>
                   </View>
                 )}
@@ -557,18 +568,18 @@ function LoggingSession({
                 <View className="mt-3 gap-2">
                   {rows[ex.exerciseId].map((r, idx) => (
                     <View key={idx} className="flex-row items-center gap-2">
-                      <Text className="w-12 text-sm font-medium text-slate-500">Set {idx + 1}</Text>
+                      <Text className="w-12 text-sm font-medium text-slate-500">{t("workout.setNumber", { number: idx + 1 })}</Text>
                       <SetInput
                         value={r.reps}
-                        placeholder={ex.targetReps != null ? String(ex.targetReps) : "reps"}
+                        placeholder={ex.targetReps != null ? String(ex.targetReps) : t("workout.repsPlaceholder")}
                         onChangeText={(v) => updateRow(ex.exerciseId, idx, "reps", v)}
-                        suffix="reps"
+                        suffix={t("workout.repsSuffix")}
                       />
                       <SetInput
                         value={r.weight}
-                        placeholder={ex.targetWeight != null ? String(ex.targetWeight) : "kg"}
+                        placeholder={ex.targetWeight != null ? String(ex.targetWeight) : t("workout.kgPlaceholder")}
                         onChangeText={(v) => updateRow(ex.exerciseId, idx, "weight", v)}
-                        suffix="kg"
+                        suffix={t("workout.kgSuffix")}
                         decimal
                       />
                     </View>
@@ -576,20 +587,20 @@ function LoggingSession({
                 </View>
 
                 <View className="mt-3 flex-row flex-wrap gap-2">
-                  <SmallBtn label="+ Add set" onPress={() => addRow(ex.exerciseId)} />
+                  <SmallBtn label={t("workout.addSet")} onPress={() => addRow(ex.exerciseId)} />
                   <SmallBtn
                     dark
-                    label={`Rest ${ex.restSeconds ?? 60}s`}
+                    label={t("workout.restSeconds", { seconds: ex.restSeconds ?? 60 })}
                     onPress={() => setActiveRest(ex.restSeconds ?? 60)}
                   />
                   {!swapped ? (
                     <>
                       <SmallBtn
-                        label="Skip"
+                        label={t("workout.skip")}
                         onPress={() => setModal({ exerciseId: ex.exerciseId, exerciseName: ex.name, mode: "skip" })}
                       />
                       <SmallBtn
-                        label="Swap"
+                        label={t("workout.swap")}
                         onPress={() => setModal({ exerciseId: ex.exerciseId, exerciseName: ex.name, mode: "swap" })}
                       />
                     </>
@@ -602,8 +613,8 @@ function LoggingSession({
 
         {/* Effort + note (V6) */}
         <View className="mb-4">
-          <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-            How did it feel?
+          <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500 w-full text-left">
+            {t("workout.howDidItFeel")}
           </Text>
           <View className="flex-row flex-wrap gap-2">
             {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
@@ -621,10 +632,10 @@ function LoggingSession({
               );
             })}
           </View>
-          <Text className="mt-1 text-xs text-slate-400">1 (easy) – 10 (all-out). Optional.</Text>
+          <Text className="mt-1 text-xs text-slate-400 w-full text-left">{t("workout.effortScaleHint")}</Text>
           <TextInput
-            className="mt-3 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
-            placeholder="Optional note (e.g. shoulder twinged)"
+            className={`mt-3 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
+            placeholder={t("workout.effortNotePlaceholder")}
             placeholderTextColor="#94a3b8"
             value={effortNote}
             onChangeText={setEffortNote}
@@ -633,7 +644,7 @@ function LoggingSession({
         </View>
 
         {complete.error ? (
-          <Text className="mb-3 text-sm text-red-600">{(complete.error as Error).message}</Text>
+          <Text className="mb-3 text-sm text-red-600 w-full text-left">{(complete.error as Error).message}</Text>
         ) : null}
 
         <Pressable
@@ -644,7 +655,7 @@ function LoggingSession({
           {complete.isPending ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text className="text-base font-bold text-white">Complete workout</Text>
+            <Text className="text-base font-bold text-white">{t("workout.completeWorkout")}</Text>
           )}
         </Pressable>
       </ScrollView>
@@ -705,6 +716,7 @@ function SetInput({
     <View className="flex-1 flex-row items-center rounded-lg border border-slate-300 px-3">
       <TextInput
         className="flex-1 py-2 text-base text-slate-900"
+        style={LTR_INPUT_STYLE}
         placeholder={placeholder}
         placeholderTextColor="#cbd5e1"
         keyboardType={decimal ? "decimal-pad" : "number-pad"}

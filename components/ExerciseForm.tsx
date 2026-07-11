@@ -14,8 +14,10 @@ import {
   TextInput,
   View,
 } from "react-native";
+import { useTranslation } from "react-i18next";
 
 import { isValidVideoUrl } from "@/lib/video";
+import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
 
 // The cleaned shape we hand back to the screen (ready for supabase insert/update).
 export type ExerciseInput = {
@@ -84,15 +86,16 @@ export function ExerciseForm({
   const [defaultSets, setDefaultSets] = useState(toText(initial?.default_sets));
   const [defaultReps, setDefaultReps] = useState(toText(initial?.default_reps));
   const [validationError, setValidationError] = useState<string | null>(null);
+  const { t } = useTranslation();
 
   function handleSubmit() {
     if (name.trim().length === 0) {
-      setValidationError("Name is required.");
+      setValidationError(t("exercises.form.nameRequired"));
       return;
     }
     // video_url is optional, but if present it must be a YouTube/Vimeo link.
     if (videoUrl.trim().length > 0 && !isValidVideoUrl(videoUrl)) {
-      setValidationError("Video URL must be a YouTube or Vimeo link.");
+      setValidationError(t("exercises.form.videoUrlInvalid"));
       return;
     }
     setValidationError(null);
@@ -115,25 +118,38 @@ export function ExerciseForm({
     >
       {header ? <View className="mb-5">{header}</View> : null}
 
-      <Labeled label="Name *">
-        <Input value={name} onChangeText={setName} placeholder="e.g. Back Squat" editable={!submitting} />
-      </Labeled>
-
-      <Labeled label="Muscle group">
-        <Input value={muscleGroup} onChangeText={setMuscleGroup} placeholder="e.g. legs" editable={!submitting} />
-      </Labeled>
-
-      <Labeled label="Description">
+      <Labeled label={t("exercises.form.nameLabel")}>
         <Input
-          value={description}
-          onChangeText={setDescription}
-          placeholder="Cues, setup, notes…"
+          value={name}
+          onChangeText={setName}
+          placeholder={t("exercises.form.namePlaceholder")}
           editable={!submitting}
-          multiline
+          className={directionalTextClassName()}
         />
       </Labeled>
 
-      <Labeled label="Demo video URL (YouTube or Vimeo)">
+      <Labeled label={t("exercises.form.muscleGroupLabel")}>
+        <Input
+          value={muscleGroup}
+          onChangeText={setMuscleGroup}
+          placeholder={t("exercises.form.muscleGroupPlaceholder")}
+          editable={!submitting}
+          className={directionalTextClassName()}
+        />
+      </Labeled>
+
+      <Labeled label={t("exercises.form.descriptionLabel")}>
+        <Input
+          value={description}
+          onChangeText={setDescription}
+          placeholder={t("exercises.form.descriptionPlaceholder")}
+          editable={!submitting}
+          multiline
+          className={directionalTextClassName()}
+        />
+      </Labeled>
+
+      <Labeled label={t("exercises.form.videoUrlLabel")}>
         <Input
           value={videoUrl}
           onChangeText={setVideoUrl}
@@ -142,10 +158,11 @@ export function ExerciseForm({
           autoCorrect={false}
           keyboardType="url"
           editable={!submitting}
+          style={LTR_INPUT_STYLE}
         />
       </Labeled>
 
-      <Labeled label="Thumbnail URL (optional)">
+      <Labeled label={t("exercises.form.thumbnailUrlLabel")}>
         <Input
           value={thumbnailUrl}
           onChangeText={setThumbnailUrl}
@@ -154,24 +171,39 @@ export function ExerciseForm({
           autoCorrect={false}
           keyboardType="url"
           editable={!submitting}
+          style={LTR_INPUT_STYLE}
         />
       </Labeled>
 
       <View className="flex-row gap-3">
         <View className="flex-1">
-          <Labeled label="Default sets">
-            <Input value={defaultSets} onChangeText={setDefaultSets} placeholder="4" keyboardType="number-pad" editable={!submitting} />
+          <Labeled label={t("exercises.form.defaultSetsLabel")}>
+            <Input
+              value={defaultSets}
+              onChangeText={setDefaultSets}
+              placeholder="4"
+              keyboardType="number-pad"
+              editable={!submitting}
+              style={LTR_INPUT_STYLE}
+            />
           </Labeled>
         </View>
         <View className="flex-1">
-          <Labeled label="Default reps">
-            <Input value={defaultReps} onChangeText={setDefaultReps} placeholder="8" keyboardType="number-pad" editable={!submitting} />
+          <Labeled label={t("exercises.form.defaultRepsLabel")}>
+            <Input
+              value={defaultReps}
+              onChangeText={setDefaultReps}
+              placeholder="8"
+              keyboardType="number-pad"
+              editable={!submitting}
+              style={LTR_INPUT_STYLE}
+            />
           </Labeled>
         </View>
       </View>
 
       {validationError || errorMessage ? (
-        <Text className="mb-3 text-sm text-red-600">{validationError ?? errorMessage}</Text>
+        <Text className="mb-3 w-full text-left text-sm text-red-600">{validationError ?? errorMessage}</Text>
       ) : null}
 
       <Pressable
@@ -195,17 +227,17 @@ export function ExerciseForm({
 function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View className="mb-4">
-      <Text className="mb-2 text-sm font-medium text-slate-700">{label}</Text>
+      <Text className="mb-2 w-full text-left text-sm font-medium text-slate-700">{label}</Text>
       {children}
     </View>
   );
 }
 
-function Input(props: React.ComponentProps<typeof TextInput>) {
+function Input({ className, ...props }: React.ComponentProps<typeof TextInput>) {
   return (
     <TextInput
       placeholderTextColor="#94a3b8"
-      className="rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
+      className={`rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${className ?? ""}`}
       {...props}
     />
   );

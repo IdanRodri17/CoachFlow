@@ -13,9 +13,11 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
+import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
 import { DEFAULT_TIME_ZONE, formatDisplayDate, toDateString } from "@/lib/dates";
 import { LineChart } from "@/components/LineChart";
 import type { Database } from "@/lib/database.types";
@@ -70,6 +72,7 @@ type Detail =
     };
 
 export default function ClientDetailScreen() {
+  const { t } = useTranslation();
   const { refId, kind: kindParam } = useLocalSearchParams<{ refId: string; kind?: string }>();
   const kind: "app" | "managed" = kindParam === "managed" ? "managed" : "app";
   const { session, profile } = useAuth();
@@ -99,7 +102,8 @@ export default function ClientDetailScreen() {
       if (streakRes.error) throw streakRes.error;
       if (statusRes.error) throw statusRes.error;
 
-      const name = ("display_name" in nameRes.data! ? nameRes.data.display_name : nameRes.data!.name) ?? "Client";
+      const name =
+        ("display_name" in nameRes.data! ? nameRes.data.display_name : nameRes.data!.name) ?? t("dashboard.client");
       const streak = streakRes.data?.current_streak ?? 0;
       const status = statusRes.data ?? null;
 
@@ -129,7 +133,7 @@ export default function ClientDetailScreen() {
             id: r.id,
             scheduled_date: r.scheduled_date,
             status: r.status,
-            template_name: r.template_id ? tNames.get(r.template_id) ?? "Workout" : "Workout",
+            template_name: r.template_id ? tNames.get(r.template_id) ?? t("dashboard.workout") : t("dashboard.workout"),
             paid: r.paid,
           })),
         };
@@ -172,7 +176,10 @@ export default function ClientDetailScreen() {
           tpls?.forEach((t) => tNames.set(t.id, t.name));
         }
         sws?.forEach((s) => {
-          tNameByScheduled.set(s.id, s.template_id ? tNames.get(s.template_id) ?? "Workout" : "Workout");
+          tNameByScheduled.set(
+            s.id,
+            s.template_id ? tNames.get(s.template_id) ?? t("dashboard.workout") : t("dashboard.workout"),
+          );
           paidByScheduled.set(s.id, s.paid);
         });
       }
@@ -197,7 +204,7 @@ export default function ClientDetailScreen() {
           exs?.forEach((e) => exNames.set(e.id, e.name));
         }
         prs = prSets.map((s) => ({
-          exercise_name: exNames.get(s.exercise_id) ?? "Exercise",
+          exercise_name: exNames.get(s.exercise_id) ?? t("dashboard.exercise"),
           weight: s.weight,
           reps: s.reps,
           date: prLogDates.get(s.workout_log_id) ?? "",
@@ -215,7 +222,7 @@ export default function ClientDetailScreen() {
           completed_at: l.completed_at,
           effort_rating: l.effort_rating,
           client_note: l.client_note,
-          template_name: tNameByScheduled.get(l.scheduled_workout_id) ?? "Workout",
+          template_name: tNameByScheduled.get(l.scheduled_workout_id) ?? t("dashboard.workout"),
           paid: paidByScheduled.get(l.scheduled_workout_id) ?? false,
         })),
         prs,
@@ -369,9 +376,9 @@ export default function ClientDetailScreen() {
   });
 
   function confirmDeleteNote(id: string) {
-    Alert.alert("Delete note", "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteNote.mutate(id) },
+    Alert.alert(t("dashboard.notes.deleteTitle"), t("dashboard.notes.deleteMessage"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("dashboard.notes.delete"), style: "destructive", onPress: () => deleteNote.mutate(id) },
     ]);
   }
 
@@ -386,7 +393,7 @@ export default function ClientDetailScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text className="text-center text-sm text-red-600">
-          {detail.error ? (detail.error as Error).message : "Client not found."}
+          {detail.error ? (detail.error as Error).message : t("dashboard.clientNotFound")}
         </Text>
       </View>
     );
@@ -397,33 +404,35 @@ export default function ClientDetailScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6">
-        <Text className="text-2xl font-bold text-slate-900">{d.name}</Text>
+        <Text className="w-full text-left text-2xl font-bold text-slate-900">{d.name}</Text>
 
         <View className="mt-2 flex-row flex-wrap items-center gap-2">
-          <Text className="text-sm text-slate-500">🔥 {d.streak} day streak</Text>
+          <Text className="text-sm text-slate-500">{t("dashboard.dayStreak", { count: d.streak })}</Text>
           {d.kind === "managed" ? (
-            <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">offline</Text>
+            <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
+              {t("dashboard.offline")}
+            </Text>
           ) : null}
           {d.status?.completed_today ? (
             <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-              ✓ Done today
+              {t("dashboard.doneToday")}
             </Text>
           ) : d.status?.is_overdue ? (
             <Text className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-              ⚠ Overdue ({d.status.overdue_count})
+              {t("dashboard.overdue", { count: d.status.overdue_count })}
             </Text>
           ) : d.status?.has_workout_today ? (
             <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-              Due today
+              {t("dashboard.dueToday")}
             </Text>
           ) : (
-            <Text className="text-xs text-slate-400">No workout today</Text>
+            <Text className="text-xs text-slate-400">{t("dashboard.noWorkoutToday")}</Text>
           )}
         </View>
 
         {d.status?.next_scheduled_date ? (
-          <Text className="mt-1 text-xs text-slate-400">
-            Next: {formatDisplayDate(d.status.next_scheduled_date)}
+          <Text className="mt-1 w-full text-left text-xs text-slate-400">
+            {t("dashboard.next", { date: formatDisplayDate(d.status.next_scheduled_date) })}
             {d.status.next_scheduled_time ? ` · ${d.status.next_scheduled_time.slice(0, 5)}` : ""}
           </Text>
         ) : null}
@@ -434,31 +443,41 @@ export default function ClientDetailScreen() {
             disabled={markComplete.isPending}
             onPress={() => markComplete.mutate(d.status!.actionable_id!)}
           >
-            <Text className="text-sm font-semibold text-slate-700">Mark complete</Text>
+            <Text className="text-sm font-semibold text-slate-700">{t("dashboard.markComplete")}</Text>
           </Pressable>
         ) : null}
 
         {markComplete.error ? (
-          <Text className="mt-2 text-sm text-red-600">{(markComplete.error as Error).message}</Text>
+          <Text className="mt-2 w-full text-left text-sm text-red-600">
+            {(markComplete.error as Error).message}
+          </Text>
         ) : null}
 
         <View className="mt-7 rounded-2xl border border-slate-200 p-4">
-          <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-            Session package
+          <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {t("dashboard.sessionPackage.title")}
           </Text>
           {packageQuery.data ? (
             <Text className="mt-1 text-base text-slate-900">
-              {packageQuery.data.total_sessions - packageQuery.data.used_sessions} of{" "}
-              {packageQuery.data.total_sessions} sessions remaining
-              <Text className="text-sm text-slate-400"> ({packageQuery.data.used_sessions} used)</Text>
+              {t("dashboard.sessionPackage.remaining", {
+                remaining: packageQuery.data.total_sessions - packageQuery.data.used_sessions,
+                total: packageQuery.data.total_sessions,
+              })}
+              <Text className="text-sm text-slate-400">
+                {" "}
+                {t("dashboard.sessionPackage.used", { count: packageQuery.data.used_sessions })}
+              </Text>
             </Text>
           ) : (
-            <Text className="mt-1 text-sm text-slate-400">No package set up yet.</Text>
+            <Text className="mt-1 w-full text-left text-sm text-slate-400">
+              {t("dashboard.sessionPackage.notSetUp")}
+            </Text>
           )}
           <View className="mt-3 flex-row items-center gap-2">
             <TextInput
               className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900"
-              placeholder="Total"
+              style={LTR_INPUT_STYLE}
+              placeholder={t("dashboard.sessionPackage.totalPlaceholder")}
               placeholderTextColor="#94a3b8"
               keyboardType="number-pad"
               value={totalSessionsInput}
@@ -473,50 +492,64 @@ export default function ClientDetailScreen() {
                 <ActivityIndicator color="#ffffff" size="small" />
               ) : (
                 <Text className="text-sm font-semibold text-white">
-                  {packageQuery.data ? "Update total" : "Set total"}
+                  {packageQuery.data
+                    ? t("dashboard.sessionPackage.updateTotal")
+                    : t("dashboard.sessionPackage.setTotal")}
                 </Text>
               )}
             </Pressable>
           </View>
           {savePackage.error ? (
-            <Text className="mt-2 text-xs text-red-600">{(savePackage.error as Error).message}</Text>
+            <Text className="mt-2 w-full text-left text-xs text-red-600">
+              {(savePackage.error as Error).message}
+            </Text>
           ) : null}
         </View>
 
         {d.kind === "app" ? (
           <>
             <View className="mt-7 rounded-2xl border border-slate-200 p-4">
-              <Text className="text-xs font-semibold uppercase tracking-wide text-slate-500">
-                Latest check-in
+              <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {t("dashboard.checkin.title")}
               </Text>
               {latestCheckin.data ? (
                 <>
                   <Text className="mt-1 text-sm text-slate-500">
-                    Week of {formatDisplayDate(latestCheckin.data.week_start)}
+                    {t("dashboard.checkin.weekOf", { date: formatDisplayDate(latestCheckin.data.week_start) })}
                   </Text>
                   <Text className="mt-1 text-sm text-slate-700">
-                    Sleep {latestCheckin.data.sleep} · Energy {latestCheckin.data.energy} · Soreness{" "}
-                    {latestCheckin.data.soreness} · Adherence {latestCheckin.data.adherence}
+                    {t("dashboard.checkin.summary", {
+                      sleep: latestCheckin.data.sleep,
+                      energy: latestCheckin.data.energy,
+                      soreness: latestCheckin.data.soreness,
+                      adherence: latestCheckin.data.adherence,
+                    })}
                   </Text>
                   {latestCheckin.data.note ? (
-                    <Text className="mt-1 text-sm text-slate-400">“{latestCheckin.data.note}”</Text>
+                    <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                      “{latestCheckin.data.note}”
+                    </Text>
                   ) : null}
                 </>
               ) : (
-                <Text className="mt-1 text-sm text-slate-400">No check-ins yet.</Text>
+                <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                  {t("dashboard.checkin.noneYet")}
+                </Text>
               )}
             </View>
 
             <View className="mt-7 rounded-2xl border border-amber-200 bg-amber-50 p-4">
-              <Text className="text-xs font-bold uppercase tracking-wide text-amber-700">
-                🔒 Private notes — trainer only
+              <Text className="w-full text-left text-xs font-bold uppercase tracking-wide text-amber-700">
+                {t("dashboard.notes.title")}
               </Text>
-              <Text className="mt-1 text-xs text-amber-700">The client can never see these.</Text>
+              <Text className="mt-1 w-full text-left text-xs text-amber-700">
+                {t("dashboard.notes.subtitle")}
+              </Text>
 
               <View className="mt-3 flex-row items-end gap-2">
                 <TextInput
-                  className="flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900"
-                  placeholder="e.g. needs core work, tends to skip legs"
+                  className={`flex-1 rounded-lg border border-amber-300 bg-white px-3 py-2 text-sm text-slate-900 ${directionalTextClassName()}`}
+                  placeholder={t("dashboard.notes.placeholder")}
                   placeholderTextColor="#b45309"
                   value={newNote}
                   onChangeText={setNewNote}
@@ -530,12 +563,14 @@ export default function ClientDetailScreen() {
                   {addNote.isPending ? (
                     <ActivityIndicator color="#ffffff" size="small" />
                   ) : (
-                    <Text className="text-sm font-semibold text-white">Add</Text>
+                    <Text className="text-sm font-semibold text-white">{t("dashboard.notes.add")}</Text>
                   )}
                 </Pressable>
               </View>
               {addNote.error ? (
-                <Text className="mt-2 text-xs text-red-600">{(addNote.error as Error).message}</Text>
+                <Text className="mt-2 w-full text-left text-xs text-red-600">
+                  {(addNote.error as Error).message}
+                </Text>
               ) : null}
 
               <View className="mt-3 gap-2">
@@ -547,7 +582,7 @@ export default function ClientDetailScreen() {
                       {editingNoteId === n.id ? (
                         <>
                           <TextInput
-                            className="rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900"
+                            className={`rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 ${directionalTextClassName()}`}
                             value={editingBody}
                             onChangeText={setEditingBody}
                             multiline
@@ -559,19 +594,19 @@ export default function ClientDetailScreen() {
                               disabled={updateNote.isPending || editingBody.trim().length === 0}
                               onPress={() => updateNote.mutate({ id: n.id, body: editingBody.trim() })}
                             >
-                              <Text className="text-xs font-semibold text-white">Save</Text>
+                              <Text className="text-xs font-semibold text-white">{t("common.save")}</Text>
                             </Pressable>
                             <Pressable
                               className="rounded-lg border border-slate-300 px-3 py-1.5 active:bg-slate-100"
                               onPress={() => setEditingNoteId(null)}
                             >
-                              <Text className="text-xs font-semibold text-slate-700">Cancel</Text>
+                              <Text className="text-xs font-semibold text-slate-700">{t("common.cancel")}</Text>
                             </Pressable>
                           </View>
                         </>
                       ) : (
                         <>
-                          <Text className="text-sm text-slate-800">{n.body}</Text>
+                          <Text className="w-full text-left text-sm text-slate-800">{n.body}</Text>
                           <View className="mt-2 flex-row items-center justify-between">
                             <Text className="text-xs text-slate-400">{noteTimestamp(n.created_at)}</Text>
                             <View className="flex-row gap-3">
@@ -581,10 +616,10 @@ export default function ClientDetailScreen() {
                                   setEditingBody(n.body);
                                 }}
                               >
-                                <Text className="text-xs font-semibold text-slate-500">Edit</Text>
+                                <Text className="text-xs font-semibold text-slate-500">{t("dashboard.notes.edit")}</Text>
                               </Pressable>
                               <Pressable onPress={() => confirmDeleteNote(n.id)}>
-                                <Text className="text-xs font-semibold text-red-600">Delete</Text>
+                                <Text className="text-xs font-semibold text-red-600">{t("dashboard.notes.delete")}</Text>
                               </Pressable>
                             </View>
                           </View>
@@ -593,20 +628,22 @@ export default function ClientDetailScreen() {
                     </View>
                   ))
                 ) : (
-                  <Text className="text-xs text-amber-700">No notes yet.</Text>
+                  <Text className="w-full text-left text-xs text-amber-700">
+                    {t("dashboard.notes.noneYet")}
+                  </Text>
                 )}
               </View>
             </View>
 
-            <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Weight over time
+            <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+              {t("dashboard.weightOverTime")}
             </Text>
             <View className="rounded-2xl border border-slate-200 p-3">
               <LineChart data={d.chartData} />
             </View>
 
-            <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Recent logs
+            <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+              {t("dashboard.recentLogs")}
             </Text>
             {d.logs.length > 0 ? (
               <View className="gap-2">
@@ -617,9 +654,15 @@ export default function ClientDetailScreen() {
                       <Text className="text-xs text-slate-400">{dayOf(l.completed_at)}</Text>
                     </View>
                     {l.effort_rating != null ? (
-                      <Text className="mt-1 text-sm text-slate-600">Effort: {l.effort_rating}/10</Text>
+                      <Text className="mt-1 text-sm text-slate-600">
+                        {t("dashboard.effort", { rating: l.effort_rating })}
+                      </Text>
                     ) : null}
-                    {l.client_note ? <Text className="mt-1 text-sm text-slate-400">“{l.client_note}”</Text> : null}
+                    {l.client_note ? (
+                      <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                        “{l.client_note}”
+                      </Text>
+                    ) : null}
                     <PaidToggle
                       paid={l.paid}
                       pending={togglePaid.isPending}
@@ -629,10 +672,14 @@ export default function ClientDetailScreen() {
                 ))}
               </View>
             ) : (
-              <Text className="text-sm text-slate-400">No completed workouts yet.</Text>
+              <Text className="w-full text-left text-sm text-slate-400">
+                {t("dashboard.noCompletedWorkouts")}
+              </Text>
             )}
 
-            <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">PRs</Text>
+            <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+              {t("dashboard.prsTitle")}
+            </Text>
             {d.prs.length > 0 ? (
               <View className="gap-2">
                 {d.prs.map((p, i) => (
@@ -645,7 +692,10 @@ export default function ClientDetailScreen() {
                       {p.date ? <Text className="text-xs text-slate-400">{dayOf(p.date)}</Text> : null}
                     </View>
                     <Text className="text-sm text-slate-500">
-                      {[p.weight != null ? `${p.weight}kg` : null, p.reps != null ? `${p.reps} reps` : null]
+                      {[
+                        p.weight != null ? t("dashboard.weightKg", { weight: p.weight }) : null,
+                        p.reps != null ? t("dashboard.reps", { count: p.reps }) : null,
+                      ]
                         .filter(Boolean)
                         .join(" × ")}
                     </Text>
@@ -653,13 +703,15 @@ export default function ClientDetailScreen() {
                 ))}
               </View>
             ) : (
-              <Text className="text-sm text-slate-400">No PRs yet.</Text>
+              <Text className="w-full text-left text-sm text-slate-400">
+                {t("dashboard.noPrsYet")}
+              </Text>
             )}
           </>
         ) : (
           <>
-            <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
-              Recent workouts
+            <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+              {t("dashboard.recentWorkouts")}
             </Text>
             {d.recentScheduled.length > 0 ? (
               <View className="gap-2">
@@ -668,7 +720,8 @@ export default function ClientDetailScreen() {
                     <View className="flex-row items-center justify-between">
                       <Text className="text-sm font-semibold text-slate-900">{r.template_name}</Text>
                       <Text className="text-xs text-slate-500">
-                        {formatDisplayDate(r.scheduled_date)} · {r.status === "completed" ? "✓ Done" : "Not done"}
+                        {formatDisplayDate(r.scheduled_date)} ·{" "}
+                        {r.status === "completed" ? t("dashboard.doneCheck") : t("dashboard.notDone")}
                       </Text>
                     </View>
                     {r.status === "completed" ? (
@@ -682,7 +735,9 @@ export default function ClientDetailScreen() {
                 ))}
               </View>
             ) : (
-              <Text className="text-sm text-slate-400">Nothing scheduled yet.</Text>
+              <Text className="w-full text-left text-sm text-slate-400">
+                {t("dashboard.nothingScheduledYet")}
+              </Text>
             )}
           </>
         )}
@@ -692,6 +747,7 @@ export default function ClientDetailScreen() {
 }
 
 function PaidToggle({ paid, pending, onToggle }: { paid: boolean; pending: boolean; onToggle: () => void }) {
+  const { t } = useTranslation();
   return (
     <Pressable
       className={`mt-2 self-start rounded-full px-2 py-0.5 ${paid ? "bg-emerald-100" : "bg-slate-100"}`}
@@ -699,7 +755,7 @@ function PaidToggle({ paid, pending, onToggle }: { paid: boolean; pending: boole
       onPress={onToggle}
     >
       <Text className={`text-xs font-semibold ${paid ? "text-emerald-700" : "text-slate-500"}`}>
-        {paid ? "💰 Paid" : "Mark paid"}
+        {paid ? t("dashboard.paid") : t("dashboard.markPaid")}
       </Text>
     </Pressable>
   );

@@ -9,11 +9,13 @@
 
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { profileComplete, useAuth } from "@/lib/auth";
 
 export default function TabsLayout() {
   const { loading, session, profile } = useAuth();
+  const { t } = useTranslation();
 
   // While auth is resolving, show a spinner (avoids flashing the wrong screen).
   if (loading) {
@@ -32,29 +34,29 @@ export default function TabsLayout() {
 
   return (
     <Tabs screenOptions={{ tabBarActiveTintColor: "#0f172a" }}>
-      <Tabs.Screen name="index" options={{ title: "Home" }} />
+      <Tabs.Screen name="index" options={{ title: t("tabs.home") }} />
       {/* "exercises"/"templates" are folders with their own Stack, so hide the
           tab header (the inner stack provides headers). */}
-      <Tabs.Screen name="exercises" options={{ title: "Exercises", headerShown: false }} />
+      <Tabs.Screen name="exercises" options={{ title: t("tabs.exercises"), headerShown: false }} />
       {/* Templates + Schedule are trainer-only: href:null removes them for clients. */}
       <Tabs.Screen
         name="templates"
-        options={{ title: "Templates", headerShown: false, href: isTrainer ? undefined : null }}
+        options={{ title: t("tabs.templates"), headerShown: false, href: isTrainer ? undefined : null }}
       />
       <Tabs.Screen
         name="schedule"
-        options={{ title: "Schedule", headerShown: false, href: isTrainer ? undefined : null }}
+        options={{ title: t("tabs.schedule"), headerShown: false, href: isTrainer ? undefined : null }}
       />
       {/* Progress + Check-in are client-only. */}
       <Tabs.Screen
         name="progress"
-        options={{ title: "Progress", href: isTrainer ? null : undefined }}
+        options={{ title: t("tabs.progress"), href: isTrainer ? null : undefined }}
       />
       <Tabs.Screen
         name="checkin"
-        options={{ title: "Check-in", href: isTrainer ? null : undefined }}
+        options={{ title: t("tabs.checkin"), href: isTrainer ? null : undefined }}
       />
-      <Tabs.Screen name="profile" options={{ title: "Profile" }} />
+      <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
     </Tabs>
   );
 }

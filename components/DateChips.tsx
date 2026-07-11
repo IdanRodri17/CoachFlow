@@ -25,7 +25,7 @@ export function DateChips({
     <ScrollView
       horizontal
       showsHorizontalScrollIndicator={false}
-      contentContainerClassName="gap-2 py-1 pr-4"
+      contentContainerClassName="gap-2 py-1 pe-4"
     >
       {options.map((d) => {
         const selected = d === value;

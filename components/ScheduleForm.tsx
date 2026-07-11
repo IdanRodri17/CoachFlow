@@ -11,8 +11,10 @@
 import { useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
+import { useTranslation } from "react-i18next";
 
 import { addDays, todayISO } from "@/lib/dates";
+import { directionalTextClassName } from "@/lib/i18n";
 import type { RosterClient } from "@/lib/useRoster";
 import { DateChips } from "@/components/DateChips";
 import { TimeChips } from "@/components/TimeChips";
@@ -37,7 +39,15 @@ export type SchedulePayload = {
   repeat?: { days: number[]; count: number; unit: "weeks" | "months" };
 };
 
-const WEEKDAYS = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+const WEEKDAY_KEYS = [
+  "schedule.form.weekday.sun",
+  "schedule.form.weekday.mon",
+  "schedule.form.weekday.tue",
+  "schedule.form.weekday.wed",
+  "schedule.form.weekday.thu",
+  "schedule.form.weekday.fri",
+  "schedule.form.weekday.sat",
+];
 
 export type ScheduleFormInitial = {
   client?: ClientRef;
@@ -73,6 +83,7 @@ export function ScheduleForm({
   footer?: React.ReactNode;
   allowRepeat?: boolean; // show the "repeat weekly" option (creating, not editing)
 }) {
+  const { t } = useTranslation();
   const [selected, setSelected] = useState<ClientRef | null>(initial?.client ?? null);
   const [newName, setNewName] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(initial?.templateId ?? null);
@@ -94,7 +105,7 @@ export function ScheduleForm({
     else if (selected) client = { mode: "existing", kind: selected.kind, refId: selected.refId };
 
     if (!client) {
-      setValidationError("Pick a client, or type a one-off name.");
+      setValidationError(t("schedule.form.pickClientError"));
       return;
     }
     setValidationError(null);
@@ -116,7 +127,7 @@ export function ScheduleForm({
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
         {/* Client */}
-        <Section label="Client">
+        <Section label={t("schedule.form.client")}>
           {loadingRoster ? (
             <ActivityIndicator />
           ) : roster.length > 0 ? (
@@ -125,7 +136,7 @@ export function ScheduleForm({
                 <SelectRow
                   key={`${c.kind}-${c.refId}`}
                   label={c.name}
-                  tag={c.kind === "managed" ? "offline" : undefined}
+                  tag={c.kind === "managed" ? t("schedule.form.offline") : undefined}
                   selected={!usingNewName && selected?.kind === c.kind && selected?.refId === c.refId}
                   onPress={() => {
                     setSelected({ kind: c.kind, refId: c.refId });
@@ -135,24 +146,24 @@ export function ScheduleForm({
               ))}
             </View>
           ) : (
-            <Text className="text-sm text-slate-400">No saved clients — type a name below.</Text>
+            <Text className="w-full text-left text-sm text-slate-400">{t("schedule.form.noSavedClients")}</Text>
           )}
           <TextInput
-            className="mt-2 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
-            placeholder="Or type a one-off client name"
+            className={`mt-2 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
+            placeholder={t("schedule.form.oneOffNamePlaceholder")}
             placeholderTextColor="#94a3b8"
             autoCapitalize="words"
             value={newName}
-            onChangeText={(t) => {
-              setNewName(t);
-              if (t.trim().length > 0) setSelected(null);
+            onChangeText={(text) => {
+              setNewName(text);
+              if (text.trim().length > 0) setSelected(null);
             }}
             editable={!submitting}
           />
         </Section>
 
         {/* Session type */}
-        <Section label="Session type">
+        <Section label={t("schedule.form.sessionType")}>
           <Pressable
             onPress={() => setWithTrainer((v) => !v)}
             disabled={submitting}
@@ -166,53 +177,53 @@ export function ScheduleForm({
               {withTrainer ? <Text className="text-sm font-bold text-white">✓</Text> : null}
             </View>
             <View className="flex-1">
-              <Text className="text-base text-slate-900">With trainer</Text>
+              <Text className="text-base text-slate-900">{t("schedule.form.withTrainer")}</Text>
               <Text className="text-xs text-slate-400">
                 {withTrainer
-                  ? "A trainer session — the client can't move the date."
-                  : "A solo workout — the client can shift it a day."}
+                  ? t("schedule.form.withTrainerHint")
+                  : t("schedule.form.soloWorkoutHint")}
               </Text>
             </View>
           </Pressable>
         </Section>
 
         {/* Template (optional, recommended) */}
-        <Section label="Template">
-          <Text className="-mt-1 mb-2 text-xs text-slate-400">
-            Recommended — but you can skip it and add it later.
+        <Section label={t("schedule.form.template")}>
+          <Text className="-mt-1 mb-2 w-full text-left text-xs text-slate-400">
+            {t("schedule.form.templateHint")}
           </Text>
           {loadingTemplates ? (
             <ActivityIndicator />
           ) : templates.length > 0 ? (
             <View className="gap-2">
-              {templates.map((t) => (
+              {templates.map((tpl) => (
                 <SelectRow
-                  key={t.id}
-                  label={t.name}
-                  selected={templateId === t.id}
+                  key={tpl.id}
+                  label={tpl.name}
+                  selected={templateId === tpl.id}
                   // Tap again to clear (no template).
-                  onPress={() => setTemplateId((prev) => (prev === t.id ? null : t.id))}
+                  onPress={() => setTemplateId((prev) => (prev === tpl.id ? null : tpl.id))}
                 />
               ))}
             </View>
           ) : (
-            <Text className="text-sm text-slate-400">No templates yet — build one in the Templates tab.</Text>
+            <Text className="w-full text-left text-sm text-slate-400">{t("schedule.form.noTemplatesYet")}</Text>
           )}
         </Section>
 
         {/* Date */}
-        <Section label="Date">
+        <Section label={t("schedule.form.date")}>
           <DateChips value={date} onChange={setDate} />
         </Section>
 
         {/* Repeat weekly (create only) */}
         {allowRepeat ? (
-          <Section label="Repeat weekly (optional)">
-            <Text className="-mt-1 mb-2 text-xs text-slate-400">
-              Pick weekdays to repeat from the date above. Leave empty for a one-off.
+          <Section label={t("schedule.form.repeatWeekly")}>
+            <Text className="-mt-1 mb-2 w-full text-left text-xs text-slate-400">
+              {t("schedule.form.repeatWeeklyHint")}
             </Text>
             <View className="flex-row flex-wrap gap-2">
-              {WEEKDAYS.map((w, i) => {
+              {WEEKDAY_KEYS.map((key, i) => {
                 const on = repeatDays.includes(i);
                 return (
                   <Pressable
@@ -225,7 +236,7 @@ export function ScheduleForm({
                     }`}
                   >
                     <Text className={`text-sm font-semibold ${on ? "text-white" : "text-slate-700"}`}>
-                      {w}
+                      {t(key)}
                     </Text>
                   </Pressable>
                 );
@@ -234,7 +245,7 @@ export function ScheduleForm({
             {repeatDays.length > 0 ? (
               <View className="mt-3 gap-3">
                 <View className="flex-row items-center gap-3">
-                  <Text className="text-sm text-slate-600">For</Text>
+                  <Text className="text-sm text-slate-600">{t("schedule.form.repeatFor")}</Text>
                   <Pressable
                     onPress={() => setRepeatCount((c) => Math.max(1, c - 1))}
                     className="h-9 w-9 items-center justify-center rounded-lg border border-slate-300 active:bg-slate-100"
@@ -261,7 +272,7 @@ export function ScheduleForm({
                         }`}
                       >
                         <Text className={`text-sm font-semibold ${on ? "text-white" : "text-slate-700"}`}>
-                          {u}
+                          {u === "weeks" ? t("schedule.form.weeks") : t("schedule.form.months")}
                         </Text>
                       </Pressable>
                     );
@@ -273,15 +284,15 @@ export function ScheduleForm({
         ) : null}
 
         {/* Time (optional) */}
-        <Section label="Time">
+        <Section label={t("schedule.form.time")}>
           <TimeChips value={time} onChange={setTime} />
         </Section>
 
         {/* Note */}
-        <Section label="Note (optional)">
+        <Section label={t("schedule.form.noteOptional")}>
           <TextInput
-            className="rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
-            placeholder="e.g. Today's lighter — focus on form."
+            className={`rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
+            placeholder={t("schedule.form.notePlaceholder")}
             placeholderTextColor="#94a3b8"
             value={note}
             onChangeText={setNote}
@@ -291,7 +302,7 @@ export function ScheduleForm({
         </Section>
 
         {validationError || errorMessage ? (
-          <Text className="mb-3 text-sm text-red-600">{validationError ?? errorMessage}</Text>
+          <Text className="mb-3 w-full text-left text-sm text-red-600">{validationError ?? errorMessage}</Text>
         ) : null}
 
         <Pressable
@@ -315,7 +326,7 @@ export function ScheduleForm({
 function Section({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View className="mb-6">
-      <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">{label}</Text>
+      <Text className="mb-2 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">{label}</Text>
       {children}
     </View>
   );

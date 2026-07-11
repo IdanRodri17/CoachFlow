@@ -6,8 +6,10 @@
 
 import { useEffect, useRef, useState } from "react";
 import { Pressable, Text, View } from "react-native";
+import { useTranslation } from "react-i18next";
 
 export function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => void }) {
+  const { t } = useTranslation();
   const [remaining, setRemaining] = useState(seconds);
   const [running, setRunning] = useState(true);
   const firedRef = useRef(false);
@@ -37,7 +39,7 @@ export function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => 
   return (
     <View className="rounded-2xl bg-slate-900 px-4 py-3">
       <Text className="text-center text-xs font-semibold uppercase tracking-wide text-slate-300">
-        Rest
+        {t("workout.restTimer.rest")}
       </Text>
       <Text className="text-center text-4xl font-bold text-white">
         {mm}:{String(ss).padStart(2, "0")}
@@ -49,8 +51,11 @@ export function RestTimer({ seconds, onDone }: { seconds: number; onDone: () => 
         <TimerBtn label="+30" onPress={() => setRemaining((r) => r + 30)} />
       </View>
       <View className="mt-2 flex-row justify-center gap-2">
-        <TimerBtn label={running ? "Pause" : "Resume"} onPress={() => setRunning((r) => !r)} />
-        <TimerBtn label="Skip" onPress={finish} />
+        <TimerBtn
+          label={running ? t("workout.restTimer.pause") : t("workout.restTimer.resume")}
+          onPress={() => setRunning((r) => !r)}
+        />
+        <TimerBtn label={t("workout.restTimer.skip")} onPress={finish} />
       </View>
     </View>
   );

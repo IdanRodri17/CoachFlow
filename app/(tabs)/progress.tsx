@@ -6,6 +6,7 @@
 // them via short-lived signed URLs.
 
 import { useState } from "react";
+import { useTranslation } from "react-i18next";
 import {
   ActivityIndicator,
   Image,
@@ -26,6 +27,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { DEFAULT_TIME_ZONE, todayISO } from "@/lib/dates";
 import { LineChart } from "@/components/LineChart";
+import { LTR_INPUT_STYLE } from "@/lib/i18n";
 
 const shortDate = (iso: string) =>
   new Intl.DateTimeFormat("en", { month: "short", day: "numeric", timeZone: DEFAULT_TIME_ZONE }).format(
@@ -38,6 +40,7 @@ const toNum = (v: string) => {
 };
 
 export default function ProgressScreen() {
+  const { t } = useTranslation();
   const { session, profile } = useAuth();
   const queryClient = useQueryClient();
 
@@ -88,7 +91,7 @@ export default function ProgressScreen() {
     setError(null);
     const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
     if (!perm.granted) {
-      setError("Photo library permission is needed to attach a photo.");
+      setError(t("progress.photoPermission"));
       return;
     }
     const res = await ImagePicker.launchImageLibraryAsync({
@@ -138,7 +141,7 @@ export default function ProgressScreen() {
 
   function handleSave() {
     if (toNum(weight) == null && !photo && toNum(waist) == null && toNum(chest) == null) {
-      setError("Add a weight (or a measurement / photo) first.");
+      setError(t("progress.addSomethingFirst"));
       return;
     }
     setError(null);
@@ -149,21 +152,21 @@ export default function ProgressScreen() {
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
         {/* Chart */}
-        <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Weight over time
+        <Text className="mb-2 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("progress.weightOverTime")}
         </Text>
         <View className="rounded-2xl border border-slate-200 p-3">
           <LineChart data={chartData} />
         </View>
 
         {/* New entry */}
-        <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Log today
+        <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("progress.logToday")}
         </Text>
         <View className="flex-row gap-2">
-          <Field label="Weight (kg)" value={weight} onChangeText={setWeight} />
-          <Field label="Waist (cm)" value={waist} onChangeText={setWaist} />
-          <Field label="Chest (cm)" value={chest} onChangeText={setChest} />
+          <Field label={t("progress.weightKg")} value={weight} onChangeText={setWeight} />
+          <Field label={t("progress.waistCm")} value={waist} onChangeText={setWaist} />
+          <Field label={t("progress.chestCm")} value={chest} onChangeText={setChest} />
         </View>
 
         <View className="mt-3 flex-row items-center gap-3">
@@ -172,14 +175,14 @@ export default function ProgressScreen() {
             onPress={pickPhoto}
           >
             <Text className="text-sm font-semibold text-slate-700">
-              {photo ? "Change photo" : "+ Add photo"}
+              {photo ? t("progress.changePhoto") : t("progress.addPhoto")}
             </Text>
           </Pressable>
           {photo ? <Image source={{ uri: photo.uri }} className="h-12 w-12 rounded-lg" /> : null}
         </View>
 
         {error || addEntry.error ? (
-          <Text className="mt-3 text-sm text-red-600">
+          <Text className="mt-3 w-full text-left text-sm text-red-600">
             {error ?? (addEntry.error as Error).message}
           </Text>
         ) : null}
@@ -192,13 +195,13 @@ export default function ProgressScreen() {
           {addEntry.isPending ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text className="text-base font-semibold text-white">Save entry</Text>
+            <Text className="text-base font-semibold text-white">{t("progress.saveEntry")}</Text>
           )}
         </Pressable>
 
         {/* History */}
-        <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          History
+        <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("progress.history")}
         </Text>
         {progress.isLoading ? (
           <ActivityIndicator />
@@ -221,7 +224,7 @@ export default function ProgressScreen() {
                   <View className="flex-1">
                     <Text className="text-sm font-semibold text-slate-900">{shortDate(e.date)}</Text>
                     <Text className="mt-0.5 text-base text-slate-700">
-                      {e.weight != null ? `${e.weight} kg` : "—"}
+                      {e.weight != null ? t("progress.weightValue", { value: e.weight }) : "—"}
                     </Text>
                     {m ? (
                       <Text className="mt-0.5 text-sm text-slate-500">
@@ -236,7 +239,7 @@ export default function ProgressScreen() {
             })}
           </View>
         ) : (
-          <Text className="text-sm text-slate-400">No entries yet — log your first weigh-in above.</Text>
+          <Text className="w-full text-left text-sm text-slate-400">{t("progress.noEntriesYet")}</Text>
         )}
       </ScrollView>
 
@@ -261,7 +264,9 @@ export default function ProgressScreen() {
                 {shortDate(viewingEntry.date)}
               </Text>
               <Text className="mt-1 text-sm text-slate-200">
-                {viewingEntry.weight != null ? `${viewingEntry.weight} kg` : "—"}
+                {viewingEntry.weight != null
+                  ? t("progress.weightValue", { value: viewingEntry.weight })
+                  : "—"}
                 {viewingEntry.measurements
                   ? ` · ${Object.entries(viewingEntry.measurements)
                       .map(([k, v]) => `${k}: ${v}`)
@@ -287,9 +292,10 @@ function Field({
 }) {
   return (
     <View className="flex-1">
-      <Text className="mb-1 text-xs text-slate-500">{label}</Text>
+      <Text className="mb-1 w-full text-left text-xs text-slate-500">{label}</Text>
       <TextInput
         className="rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900"
+        style={LTR_INPUT_STYLE}
         placeholder="—"
         placeholderTextColor="#cbd5e1"
         keyboardType="decimal-pad"

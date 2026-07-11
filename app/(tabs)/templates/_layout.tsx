@@ -3,13 +3,16 @@
 // so only this stack's headers show.
 
 import { Stack } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 export default function TemplatesStackLayout() {
+  const { t } = useTranslation();
+
   return (
     <Stack>
-      <Stack.Screen name="index" options={{ title: "Templates" }} />
-      <Stack.Screen name="new" options={{ title: "New template" }} />
-      <Stack.Screen name="[id]" options={{ title: "Edit template" }} />
+      <Stack.Screen name="index" options={{ title: t("templates.list.title") }} />
+      <Stack.Screen name="new" options={{ title: t("templates.list.newTitle") }} />
+      <Stack.Screen name="[id]" options={{ title: t("templates.list.editTitle") }} />
     </Stack>
   );
 }

@@ -17,14 +17,17 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { profileComplete, useAuth } from "@/lib/auth";
+import { directionalTextClassName } from "@/lib/i18n";
 
 type Role = "trainer" | "client";
 
 export default function OnboardingScreen() {
   const { session, profile, refreshProfile } = useAuth();
+  const { t } = useTranslation();
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<Role | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -66,16 +69,14 @@ export default function OnboardingScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white">
       <ScrollView contentContainerClassName="px-6 py-8">
-        <Text className="text-2xl font-bold text-slate-900">Welcome 👋</Text>
-        <Text className="mt-1 mb-6 text-base text-slate-500">
-          Let's set up your account.
-        </Text>
+        <Text className="w-full text-left text-2xl font-bold text-slate-900">{t("onboarding.welcome")}</Text>
+        <Text className="mt-1 mb-6 w-full text-left text-base text-slate-500">{t("onboarding.subtitle")}</Text>
 
         {/* Display name */}
-        <Text className="mb-2 text-sm font-medium text-slate-700">Your name</Text>
+        <Text className="mb-2 w-full text-left text-sm font-medium text-slate-700">{t("onboarding.nameLabel")}</Text>
         <TextInput
-          className="mb-6 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
-          placeholder="e.g. Idan"
+          className={`mb-6 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
+          placeholder={t("onboarding.namePlaceholder")}
           placeholderTextColor="#94a3b8"
           value={displayName}
           onChangeText={setDisplayName}
@@ -83,7 +84,7 @@ export default function OnboardingScreen() {
         />
 
         {/* Role */}
-        <Text className="mb-2 text-sm font-medium text-slate-700">I am a…</Text>
+        <Text className="mb-2 w-full text-left text-sm font-medium text-slate-700">{t("onboarding.roleLabel")}</Text>
         <View className="mb-6 flex-row gap-3">
           {(["trainer", "client"] as Role[]).map((r) => {
             const selected = role === r;
@@ -101,7 +102,7 @@ export default function OnboardingScreen() {
                     selected ? "text-white" : "text-slate-700"
                   }`}
                 >
-                  {r === "trainer" ? "Trainer" : "Client"}
+                  {r === "trainer" ? t("common.trainer") : t("common.client")}
                 </Text>
               </Pressable>
             );
@@ -113,16 +114,16 @@ export default function OnboardingScreen() {
           checked={acceptedTerms}
           disabled={busy}
           onToggle={() => setAcceptedTerms((v) => !v)}
-          label="I accept the Terms of Use."
+          label={t("onboarding.termsLabel")}
         />
         <Consent
           checked={acceptedHealth}
           disabled={busy}
           onToggle={() => setAcceptedHealth((v) => !v)}
-          label="I understand I should consult a physician before starting any exercise program."
+          label={t("onboarding.healthLabel")}
         />
 
-        {error ? <Text className="mt-4 text-sm text-red-600">{error}</Text> : null}
+        {error ? <Text className="mt-4 w-full text-left text-sm text-red-600">{error}</Text> : null}
 
         <Pressable
           className={`mt-8 items-center rounded-xl px-4 py-3 ${
@@ -134,7 +135,7 @@ export default function OnboardingScreen() {
           {busy ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text className="text-base font-semibold text-white">Continue</Text>
+            <Text className="text-base font-semibold text-white">{t("common.continue")}</Text>
           )}
         </Pressable>
       </ScrollView>

@@ -13,14 +13,17 @@ import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, Vie
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, Redirect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients, type RosterClient } from "@/lib/useRoster";
 import { formatDisplayDate, todayISO } from "@/lib/dates";
 import { buildWhatsAppReminderLink } from "@/lib/whatsapp";
+import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
 
 export default function ScheduleHomeScreen() {
+  const { t } = useTranslation();
   const { session, profile } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
@@ -72,17 +75,17 @@ export default function ScheduleHomeScreen() {
       }
       if (tplIds.length > 0) {
         const { data } = await supabase.from("workout_templates").select("id, name").in("id", tplIds);
-        data?.forEach((t) => tNames.set(t.id, t.name));
+        data?.forEach((tpl) => tNames.set(tpl.id, tpl.name));
       }
       return sws.map((s) => ({
         ...s,
         client_name: s.client_id
-          ? cNames.get(s.client_id) ?? "Client"
+          ? cNames.get(s.client_id) ?? t("schedule.home.client")
           : s.managed_client_id
-            ? mNames.get(s.managed_client_id) ?? "Client"
-            : "Client",
+            ? mNames.get(s.managed_client_id) ?? t("schedule.home.client")
+            : t("schedule.home.client"),
         client_phone: s.client_id ? cPhones.get(s.client_id) ?? null : s.managed_client_id ? mPhones.get(s.managed_client_id) ?? null : null,
-        template_name: s.template_id ? tNames.get(s.template_id) ?? "Workout" : "Workout",
+        template_name: s.template_id ? tNames.get(s.template_id) ?? t("schedule.home.workout") : t("schedule.home.workout"),
       }));
     },
   });
@@ -135,40 +138,40 @@ export default function ScheduleHomeScreen() {
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
         {/* Add an app client */}
-        <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Add a client (uses the app)
+        <Text className="mb-2 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("schedule.home.addAppClientTitle")}
         </Text>
         <AddRow
           value={email}
           onChangeText={setEmail}
-          placeholder="client@email.com"
+          placeholder={t("schedule.home.emailPlaceholder")}
           keyboardType="email-address"
           busy={addAppClient.isPending}
           onAdd={() => addAppClient.mutate(email.trim())}
         />
         {addAppClient.error ? (
-          <Text className="mt-2 text-sm text-red-600">{(addAppClient.error as Error).message}</Text>
+          <Text className="mt-2 w-full text-left text-sm text-red-600">{(addAppClient.error as Error).message}</Text>
         ) : null}
-        <Text className="mt-2 text-xs text-slate-400">They must have signed up in the app first.</Text>
+        <Text className="mt-2 w-full text-left text-xs text-slate-400">{t("schedule.home.addAppClientHint")}</Text>
 
         {/* Add an offline client */}
-        <Text className="mb-2 mt-6 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Add an offline client (no app)
+        <Text className="mb-2 mt-6 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("schedule.home.addOfflineClientTitle")}
         </Text>
         <AddRow
           value={offlineName}
           onChangeText={setOfflineName}
-          placeholder="Client name"
+          placeholder={t("schedule.home.clientNamePlaceholder")}
           busy={addOfflineClient.isPending}
           onAdd={() => addOfflineClient.mutate(offlineName.trim())}
         />
         {addOfflineClient.error ? (
-          <Text className="mt-2 text-sm text-red-600">{(addOfflineClient.error as Error).message}</Text>
+          <Text className="mt-2 w-full text-left text-sm text-red-600">{(addOfflineClient.error as Error).message}</Text>
         ) : null}
 
         {/* Roster */}
-        <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Your clients ({roster.data?.length ?? 0})
+        <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("schedule.home.yourClients", { count: roster.data?.length ?? 0 })}
         </Text>
         {roster.isLoading ? (
           <ActivityIndicator />
@@ -183,7 +186,7 @@ export default function ScheduleHomeScreen() {
             ))}
           </View>
         ) : (
-          <Text className="text-sm text-slate-400">No clients yet — add one above.</Text>
+          <Text className="w-full text-left text-sm text-slate-400">{t("schedule.home.noClientsYet")}</Text>
         )}
 
         {/* Schedule a workout */}
@@ -191,12 +194,12 @@ export default function ScheduleHomeScreen() {
           className="mt-7 items-center rounded-xl bg-slate-900 px-4 py-3 active:opacity-80"
           onPress={() => router.push("/schedule/new")}
         >
-          <Text className="text-base font-semibold text-white">Schedule a workout</Text>
+          <Text className="text-base font-semibold text-white">{t("schedule.home.scheduleWorkout")}</Text>
         </Pressable>
 
         {/* Upcoming */}
-        <Text className="mb-2 mt-7 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Upcoming
+        <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("schedule.home.upcoming")}
         </Text>
         {upcoming.isLoading ? (
           <ActivityIndicator />
@@ -206,7 +209,7 @@ export default function ScheduleHomeScreen() {
               const whatsappLink = buildWhatsAppReminderLink({
                 phone: s.client_phone,
                 clientName: s.client_name,
-                trainerName: profile?.display_name ?? "your trainer",
+                trainerName: profile?.display_name ?? t("schedule.home.yourTrainer"),
                 dateLabel: formatDisplayDate(s.scheduled_date),
                 timeLabel: s.scheduled_time ? s.scheduled_time.slice(0, 5) : null,
                 templateName: s.template_name,
@@ -220,7 +223,11 @@ export default function ScheduleHomeScreen() {
                         {s.client_name} · {formatDisplayDate(s.scheduled_date)}
                         {s.scheduled_time ? ` · ${s.scheduled_time.slice(0, 5)}` : ""}
                       </Text>
-                      {s.notes ? <Text className="mt-1 text-sm text-slate-400">“{s.notes}”</Text> : null}
+                      {s.notes ? (
+                        <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                          “{s.notes}”
+                        </Text>
+                      ) : null}
                     </Pressable>
                   </Link>
                   {whatsappLink ? (
@@ -228,7 +235,9 @@ export default function ScheduleHomeScreen() {
                       className="mt-2 items-center self-start rounded-lg border border-emerald-300 px-3 py-1.5 active:bg-emerald-50"
                       onPress={() => Linking.openURL(whatsappLink)}
                     >
-                      <Text className="text-xs font-semibold text-emerald-700">💬 Remind on WhatsApp</Text>
+                      <Text className="text-xs font-semibold text-emerald-700">
+                        {t("schedule.home.remindOnWhatsApp")}
+                      </Text>
                     </Pressable>
                   ) : null}
                 </View>
@@ -236,7 +245,7 @@ export default function ScheduleHomeScreen() {
             })}
           </View>
         ) : (
-          <Text className="text-sm text-slate-400">Nothing scheduled yet.</Text>
+          <Text className="w-full text-left text-sm text-slate-400">{t("schedule.home.nothingScheduled")}</Text>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -259,13 +268,18 @@ function AddRow({
   busy: boolean;
   onAdd: () => void;
 }) {
+  const { t } = useTranslation();
+  const isEmail = keyboardType === "email-address";
   return (
     <View className="flex-row gap-2">
       <TextInput
-        className="flex-1 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
+        className={`flex-1 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${
+          isEmail ? "" : directionalTextClassName()
+        }`}
+        style={isEmail ? LTR_INPUT_STYLE : undefined}
         placeholder={placeholder}
         placeholderTextColor="#94a3b8"
-        autoCapitalize={keyboardType === "email-address" ? "none" : "words"}
+        autoCapitalize={isEmail ? "none" : "words"}
         autoCorrect={false}
         keyboardType={keyboardType ?? "default"}
         value={value}
@@ -280,7 +294,7 @@ function AddRow({
         {busy ? (
           <ActivityIndicator color="#ffffff" />
         ) : (
-          <Text className="text-base font-semibold text-white">Add</Text>
+          <Text className="text-base font-semibold text-white">{t("schedule.home.add")}</Text>
         )}
       </Pressable>
     </View>
@@ -296,6 +310,7 @@ function RosterRow({
   client: RosterClient;
   onSavePhone: (phone: string) => void;
 }) {
+  const { t } = useTranslation();
   const [phone, setPhone] = useState(client.phone ?? "");
 
   return (
@@ -304,13 +319,14 @@ function RosterRow({
         <Text className="text-base font-medium text-slate-900">{client.name}</Text>
         {client.kind === "managed" ? (
           <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-            offline
+            {t("schedule.home.offline")}
           </Text>
         ) : null}
       </View>
       <TextInput
         className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900"
-        placeholder="Phone for WhatsApp (e.g. +9725...)"
+        style={LTR_INPUT_STYLE}
+        placeholder={t("schedule.home.phonePlaceholder")}
         placeholderTextColor="#94a3b8"
         keyboardType="phone-pad"
         value={phone}

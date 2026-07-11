@@ -13,12 +13,15 @@ import { Redirect, useLocalSearchParams } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { BADGE_INFO, type BadgeType } from "@/lib/badges";
+import { directionalTextClassName } from "@/lib/i18n";
 
 export default function ShareCardScreen() {
+  const { t } = useTranslation();
   const { clientId } = useLocalSearchParams<{ clientId: string }>();
   const { session, profile } = useAuth();
   const cardRef = useRef<View>(null);
@@ -80,7 +83,7 @@ export default function ShareCardScreen() {
       const uri = await captureRef(cardRef, { format: "png", quality: 0.95 });
       const available = await Sharing.isAvailableAsync();
       if (!available) {
-        setError("Sharing isn't available on this device.");
+        setError(t("shareCard.sharingUnavailable"));
         return;
       }
       await Sharing.shareAsync(uri, { mimeType: "image/png" });
@@ -102,7 +105,7 @@ export default function ShareCardScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text className="text-center text-sm text-red-600">
-          {card.error ? (card.error as Error).message : "Couldn't load your progress."}
+          {card.error ? (card.error as Error).message : t("shareCard.loadError")}
         </Text>
       </View>
     );
@@ -118,13 +121,13 @@ export default function ShareCardScreen() {
           <Text className="mt-1 text-center text-5xl">🔥</Text>
           <Text className="text-center text-4xl font-extrabold text-white">{d.streak}</Text>
           <Text className="text-center text-sm font-medium uppercase tracking-wide text-indigo-200">
-            day streak
+            {t("shareCard.dayStreak")}
           </Text>
 
           <View className="mt-6 items-center rounded-2xl bg-white/10 px-4 py-3">
             <Text className="text-3xl font-extrabold text-white">{d.totalWorkouts}</Text>
             <Text className="text-xs font-medium uppercase tracking-wide text-indigo-200">
-              workouts completed
+              {t("shareCard.workoutsCompleted")}
             </Text>
           </View>
 
@@ -144,7 +147,9 @@ export default function ShareCardScreen() {
               {d.trainerAvatar ? (
                 <Image source={{ uri: d.trainerAvatar }} className="h-6 w-6 rounded-full" />
               ) : null}
-              <Text className="text-xs font-medium text-indigo-200">Trained by {d.trainerName}</Text>
+              <Text className="text-xs font-medium text-indigo-200">
+                {t("shareCard.trainedBy", { name: d.trainerName })}
+              </Text>
             </View>
           ) : null}
         </View>
@@ -157,10 +162,12 @@ export default function ShareCardScreen() {
           {sharing ? (
             <ActivityIndicator color="#ffffff" />
           ) : (
-            <Text className="text-base font-semibold text-white">Share</Text>
+            <Text className="text-base font-semibold text-white">{t("shareCard.share")}</Text>
           )}
         </Pressable>
-        {error ? <Text className="mt-3 text-sm text-red-600">{error}</Text> : null}
+        {error ? (
+          <Text className={`mt-3 text-sm text-red-600 ${directionalTextClassName()}`}>{error}</Text>
+        ) : null}
       </View>
     </SafeAreaView>
   );

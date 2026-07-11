@@ -8,6 +8,7 @@
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -22,8 +23,11 @@ export default function EditTemplateScreen() {
   const { profile } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const { t } = useTranslation();
 
   if (profile && profile.role !== "trainer") return <Redirect href="/" />;
+
+  const exerciseFallback = t("templates.detail.exerciseFallback");
 
   // Load the template, its exercises (ordered), and the exercise names.
   const { data, isLoading, error } = useQuery({
@@ -44,7 +48,7 @@ export default function EditTemplateScreen() {
       if (teErr) throw teErr;
 
       // Map exercise ids -> names (one extra query keeps types simple).
-      const ids = tes.map((t) => t.exercise_id);
+      const ids = tes.map((te) => te.exercise_id);
       const names = new Map<string, string>();
       if (ids.length > 0) {
         const { data: exs, error: exErr } = await supabase
@@ -59,13 +63,13 @@ export default function EditTemplateScreen() {
         name: tpl.name,
         description: tpl.description,
         notes: tpl.notes,
-        items: tes.map((t) => ({
-          exercise_id: t.exercise_id,
-          exercise_name: names.get(t.exercise_id) ?? "Exercise",
-          target_sets: t.target_sets,
-          target_reps: t.target_reps,
-          target_weight: t.target_weight,
-          rest_seconds: t.rest_seconds,
+        items: tes.map((te) => ({
+          exercise_id: te.exercise_id,
+          exercise_name: names.get(te.exercise_id) ?? exerciseFallback,
+          target_sets: te.target_sets,
+          target_reps: te.target_reps,
+          target_weight: te.target_weight,
+          rest_seconds: te.rest_seconds,
         })),
       };
     },
@@ -118,9 +122,9 @@ export default function EditTemplateScreen() {
   });
 
   function confirmDelete() {
-    Alert.alert("Delete template", "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate() },
+    Alert.alert(t("templates.detail.deleteTitle"), t("templates.detail.deleteMessage"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("templates.detail.delete"), style: "destructive", onPress: () => deleteMutation.mutate() },
     ]);
   }
 
@@ -136,7 +140,7 @@ export default function EditTemplateScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text className="text-center text-sm text-red-600">
-          {error ? (error as Error).message : "Template not found."}
+          {error ? (error as Error).message : t("templates.detail.notFound")}
         </Text>
       </View>
     );
@@ -145,7 +149,7 @@ export default function EditTemplateScreen() {
   return (
     <TemplateBuilder
       initial={data}
-      submitLabel="Save changes"
+      submitLabel={t("templates.detail.saveChanges")}
       submitting={updateMutation.isPending}
       errorMessage={updateMutation.error ? (updateMutation.error as Error).message : null}
       onSubmit={(input) => updateMutation.mutate(input)}
@@ -155,7 +159,7 @@ export default function EditTemplateScreen() {
           disabled={deleteMutation.isPending}
           onPress={confirmDelete}
         >
-          <Text className="text-base font-semibold text-red-600">Delete template</Text>
+          <Text className="text-base font-semibold text-red-600">{t("templates.detail.deleteTemplate")}</Text>
         </Pressable>
       }
     />

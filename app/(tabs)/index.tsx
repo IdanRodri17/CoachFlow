@@ -9,6 +9,7 @@ import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-nati
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -23,6 +24,7 @@ function rosterKey(kind: "app" | "managed", refId: string) {
 
 export default function HomeScreen() {
   const { session, profile } = useAuth();
+  const { t } = useTranslation();
   const queryClient = useQueryClient();
   const isTrainer = profile?.role === "trainer";
   const trainerId = session?.user.id ?? "";
@@ -128,17 +130,19 @@ export default function HomeScreen() {
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 pt-6">
-        <Text className="text-2xl font-bold text-slate-900">
-          Hi {profile?.display_name ?? ""} 👋
+        <Text className="w-full text-left text-2xl font-bold text-slate-900">
+          {t("home.greeting", { name: profile?.display_name ?? "" })}
         </Text>
-        <Text className="mt-1 text-base text-slate-500">
-          {isTrainer ? "Trainer dashboard" : "Your upcoming workouts"}
+        <Text className="mt-1 w-full text-left text-base text-slate-500">
+          {isTrainer ? t("home.trainerSubtitle") : t("home.clientSubtitle")}
         </Text>
 
         {isTrainer ? (
           <View className="mt-6 pb-6">
             {dashboard.error ? (
-              <Text className="mb-3 text-sm text-red-600">{(dashboard.error as Error).message}</Text>
+              <Text className="mb-3 w-full text-left text-sm text-red-600">
+                {(dashboard.error as Error).message}
+              </Text>
             ) : null}
             {roster.isLoading || dashboard.isLoading ? (
               <ActivityIndicator />
@@ -159,30 +163,30 @@ export default function HomeScreen() {
                             <Text className="text-base font-semibold text-slate-900">{c.name}</Text>
                             {status?.completed_today ? (
                               <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                                ✓ Done today
+                                {t("home.doneToday")}
                               </Text>
                             ) : status?.is_overdue ? (
                               <Text className="rounded-full bg-red-100 px-2 py-0.5 text-xs font-semibold text-red-700">
-                                ⚠ Overdue
+                                {t("home.overdue")}
                               </Text>
                             ) : status?.has_workout_today ? (
                               <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-semibold text-amber-700">
-                                Due today
+                                {t("home.dueToday")}
                               </Text>
                             ) : (
                               <Text className="text-xs text-slate-400">—</Text>
                             )}
                           </View>
                           <View className="mt-1 flex-row items-center gap-2">
-                            <Text className="text-sm text-slate-500">🔥 {streak} streak</Text>
+                            <Text className="text-sm text-slate-500">{t("home.streak", { count: streak })}</Text>
                             {c.kind === "managed" ? (
                               <Text className="rounded-full bg-slate-100 px-2 py-0.5 text-xs font-medium text-slate-500">
-                                offline
+                                {t("home.offline")}
                               </Text>
                             ) : null}
                             {unpaidCount > 0 ? (
                               <Text className="rounded-full bg-yellow-100 px-2 py-0.5 text-xs font-semibold text-yellow-800">
-                                💰 {unpaidCount} unpaid
+                                {t("home.unpaid", { count: unpaidCount })}
                               </Text>
                             ) : null}
                           </View>
@@ -194,7 +198,7 @@ export default function HomeScreen() {
                           disabled={markComplete.isPending}
                           onPress={() => markComplete.mutate(status.actionable_id!)}
                         >
-                          <Text className="text-xs font-semibold text-slate-700">Mark complete</Text>
+                          <Text className="text-xs font-semibold text-slate-700">{t("home.markComplete")}</Text>
                         </Pressable>
                       ) : null}
                     </View>
@@ -203,10 +207,8 @@ export default function HomeScreen() {
               </View>
             ) : (
               <View className="items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
-                <Text className="text-center text-base font-medium text-slate-700">No clients yet</Text>
-                <Text className="mt-2 text-center text-sm text-slate-400">
-                  Add clients from the Schedule tab to see their status here.
-                </Text>
+                <Text className="text-center text-base font-medium text-slate-700">{t("home.noClientsYet")}</Text>
+                <Text className="mt-2 text-center text-sm text-slate-400">{t("home.noClientsHint")}</Text>
               </View>
             )}
           </View>
@@ -234,15 +236,15 @@ export default function HomeScreen() {
                       </Text>
                       {done ? (
                         <Text className="rounded-full bg-emerald-100 px-2 py-0.5 text-xs font-semibold text-emerald-700">
-                          Done ✓
+                          {t("home.done")}
                         </Text>
                       ) : withTrainer ? (
                         <Text className="rounded-full bg-indigo-600 px-2 py-0.5 text-xs font-bold text-white">
-                          💪 With trainer
+                          {t("home.withTrainer")}
                         </Text>
                       ) : isToday(s.scheduled_date) ? (
                         <Text className="rounded-full bg-slate-900 px-2 py-0.5 text-xs font-semibold text-white">
-                          Today
+                          {t("home.today")}
                         </Text>
                       ) : null}
                     </View>
@@ -272,12 +274,10 @@ export default function HomeScreen() {
           </View>
         ) : (
           <View className="mt-8 items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
-            <Text className="text-center text-base font-medium text-slate-700">
-              No workouts scheduled yet
+            <Text className="w-full text-center text-base font-medium text-slate-700">
+              {t("home.noWorkoutsYet")}
             </Text>
-            <Text className="mt-2 text-center text-sm text-slate-400">
-              Your trainer will assign your first workout soon.
-            </Text>
+            <Text className="mt-2 text-center text-sm text-slate-400">{t("home.noWorkoutsHint")}</Text>
           </View>
         )}
       </ScrollView>

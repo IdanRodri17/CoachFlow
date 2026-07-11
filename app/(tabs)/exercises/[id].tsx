@@ -8,13 +8,16 @@ import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "rea
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { ExerciseForm, type ExerciseInput } from "@/components/ExerciseForm";
 import { ExerciseVideo } from "@/components/ExerciseVideo";
+import { directionalTextClassName } from "@/lib/i18n";
 
 export default function ExerciseDetailScreen() {
+  const { t } = useTranslation();
   const { id } = useLocalSearchParams<{ id: string }>();
   const { profile } = useAuth();
   const isTrainer = profile?.role === "trainer";
@@ -58,9 +61,9 @@ export default function ExerciseDetailScreen() {
   });
 
   function confirmDelete() {
-    Alert.alert("Delete exercise", "This can't be undone.", [
-      { text: "Cancel", style: "cancel" },
-      { text: "Delete", style: "destructive", onPress: () => deleteMutation.mutate() },
+    Alert.alert(t("exercises.detail.deleteTitle"), t("exercises.detail.deleteMessage"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("exercises.detail.delete"), style: "destructive", onPress: () => deleteMutation.mutate() },
     ]);
   }
 
@@ -76,7 +79,7 @@ export default function ExerciseDetailScreen() {
     return (
       <View className="flex-1 items-center justify-center bg-white px-6">
         <Text className="text-center text-sm text-red-600">
-          {error ? (error as Error).message : "Exercise not found."}
+          {error ? (error as Error).message : t("exercises.detail.notFound")}
         </Text>
       </View>
     );
@@ -87,7 +90,7 @@ export default function ExerciseDetailScreen() {
     return (
       <ExerciseForm
         initial={exercise}
-        submitLabel="Save changes"
+        submitLabel={t("exercises.detail.saveChanges")}
         submitting={updateMutation.isPending}
         errorMessage={updateMutation.error ? (updateMutation.error as Error).message : null}
         onSubmit={(input) => updateMutation.mutate(input)}
@@ -98,7 +101,7 @@ export default function ExerciseDetailScreen() {
             disabled={deleteMutation.isPending}
             onPress={confirmDelete}
           >
-            <Text className="text-base font-semibold text-red-600">Delete exercise</Text>
+            <Text className="text-base font-semibold text-red-600">{t("exercises.detail.deleteExercise")}</Text>
           </Pressable>
         }
       />
@@ -111,18 +114,21 @@ export default function ExerciseDetailScreen() {
       <ScrollView contentContainerClassName="px-6 py-6">
         <ExerciseVideo url={exercise.video_url} />
 
-        <Text className="mt-4 text-2xl font-bold text-slate-900">{exercise.name}</Text>
+        <Text className={`mt-4 text-2xl font-bold text-slate-900 ${directionalTextClassName()}`}>{exercise.name}</Text>
         {exercise.muscle_group ? (
-          <Text className="mt-1 text-base text-slate-500">{exercise.muscle_group}</Text>
+          <Text className={`mt-1 text-base text-slate-500 ${directionalTextClassName()}`}>{exercise.muscle_group}</Text>
         ) : null}
 
         {exercise.description ? (
-          <Text className="mt-4 text-base leading-6 text-slate-700">{exercise.description}</Text>
+          <Text className={`mt-4 text-base leading-6 text-slate-700 ${directionalTextClassName()}`}>{exercise.description}</Text>
         ) : null}
 
         {exercise.default_sets || exercise.default_reps ? (
           <Text className="mt-4 text-sm text-slate-500">
-            Target: {exercise.default_sets ?? "—"} sets × {exercise.default_reps ?? "—"} reps
+            {t("exercises.detail.target", {
+              sets: exercise.default_sets ?? "—",
+              reps: exercise.default_reps ?? "—",
+            })}
           </Text>
         ) : null}
       </ScrollView>

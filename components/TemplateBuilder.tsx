@@ -21,8 +21,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
+import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
+import { directionalTextClassName, LTR_WRITING_DIRECTION_ONLY } from "@/lib/i18n";
 
 // --- payload handed back to the screen on save ---
 export type TemplateExerciseInput = {
@@ -91,6 +93,7 @@ export function TemplateBuilder({
   errorMessage?: string | null;
   footer?: React.ReactNode;
 }) {
+  const { t } = useTranslation();
   const keyCounter = useRef(0);
   const nextKey = () => String(keyCounter.current++);
 
@@ -147,11 +150,11 @@ export function TemplateBuilder({
 
   function handleSubmit() {
     if (name.trim().length === 0) {
-      setValidationError("Template name is required.");
+      setValidationError(t("templates.form.nameRequired"));
       return;
     }
     if (items.length === 0) {
-      setValidationError("Add at least one exercise.");
+      setValidationError(t("templates.form.addAtLeastOneExercise"));
       return;
     }
     setValidationError(null);
@@ -173,25 +176,25 @@ export function TemplateBuilder({
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
         {/* Template fields */}
-        <Field label="Template name *">
-          <Input value={name} onChangeText={setName} placeholder="e.g. Full Body A" editable={!submitting} />
+        <Field label={t("templates.form.templateNameLabel")}>
+          <Input value={name} onChangeText={setName} placeholder={t("templates.form.templateNamePlaceholder")} editable={!submitting} />
         </Field>
-        <Field label="Description">
-          <Input value={description} onChangeText={setDescription} placeholder="Who it's for, focus…" editable={!submitting} />
+        <Field label={t("templates.form.descriptionLabel")}>
+          <Input value={description} onChangeText={setDescription} placeholder={t("templates.form.descriptionPlaceholder")} editable={!submitting} />
         </Field>
-        <Field label="Notes (shown to the client later)">
-          <Input value={notes} onChangeText={setNotes} placeholder="e.g. Focus on form over weight." editable={!submitting} multiline />
+        <Field label={t("templates.form.notesLabel")}>
+          <Input value={notes} onChangeText={setNotes} placeholder={t("templates.form.notesPlaceholder")} editable={!submitting} multiline />
         </Field>
 
         {/* Exercises */}
-        <Text className="mb-2 mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          Exercises ({items.length})
+        <Text className="w-full text-left mb-2 mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
+          {t("templates.form.exercisesCount", { count: items.length })}
         </Text>
 
         {items.map((it, index) => (
           <View key={it.key} className="mb-3 rounded-xl border border-slate-200 bg-white p-3">
             <View className="mb-2 flex-row items-center justify-between">
-              <Text className="flex-1 text-base font-semibold text-slate-900">
+              <Text className="flex-1 text-left text-base font-semibold text-slate-900">
                 {index + 1}. {it.exercise_name}
               </Text>
               <View className="flex-row items-center gap-1">
@@ -201,10 +204,10 @@ export function TemplateBuilder({
               </View>
             </View>
             <View className="flex-row gap-2">
-              <Mini label="Sets" value={it.target_sets} onChangeText={(v) => updateItem(it.key, "target_sets", v)} editable={!submitting} />
-              <Mini label="Reps" value={it.target_reps} onChangeText={(v) => updateItem(it.key, "target_reps", v)} editable={!submitting} />
-              <Mini label="Weight" value={it.target_weight} onChangeText={(v) => updateItem(it.key, "target_weight", v)} editable={!submitting} decimal />
-              <Mini label="Rest s" value={it.rest_seconds} onChangeText={(v) => updateItem(it.key, "rest_seconds", v)} editable={!submitting} />
+              <Mini label={t("templates.form.setsLabel")} value={it.target_sets} onChangeText={(v) => updateItem(it.key, "target_sets", v)} editable={!submitting} />
+              <Mini label={t("templates.form.repsLabel")} value={it.target_reps} onChangeText={(v) => updateItem(it.key, "target_reps", v)} editable={!submitting} />
+              <Mini label={t("templates.form.weightLabel")} value={it.target_weight} onChangeText={(v) => updateItem(it.key, "target_weight", v)} editable={!submitting} decimal />
+              <Mini label={t("templates.form.restLabel")} value={it.rest_seconds} onChangeText={(v) => updateItem(it.key, "rest_seconds", v)} editable={!submitting} />
             </View>
           </View>
         ))}
@@ -214,11 +217,13 @@ export function TemplateBuilder({
           disabled={submitting}
           onPress={() => setPickerOpen(true)}
         >
-          <Text className="text-base font-semibold text-slate-700">+ Add exercise</Text>
+          <Text className="text-base font-semibold text-slate-700">{t("templates.form.addExercise")}</Text>
         </Pressable>
 
         {validationError || errorMessage ? (
-          <Text className="mb-3 mt-1 text-sm text-red-600">{validationError ?? errorMessage}</Text>
+          <Text className="w-full text-left mb-3 mt-1 text-sm text-red-600">
+            {validationError ?? errorMessage}
+          </Text>
         ) : null}
 
         <Pressable
@@ -255,6 +260,7 @@ function ExercisePickerModal({
   onClose: () => void;
   onPick: (ex: { id: string; name: string; default_sets: number | null; default_reps: number | null }) => void;
 }) {
+  const { t } = useTranslation();
   const { data, isLoading } = useQuery({
     queryKey: ["exercises"],
     queryFn: async () => {
@@ -269,9 +275,11 @@ function ExercisePickerModal({
     <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
       <SafeAreaView className="flex-1 bg-white">
         <View className="flex-row items-center justify-between border-b border-slate-200 px-6 py-4">
-          <Text className="text-lg font-bold text-slate-900">Pick an exercise</Text>
+          <Text className="flex-1 text-left text-lg font-bold text-slate-900">
+            {t("templates.form.pickExercise")}
+          </Text>
           <Pressable onPress={onClose} className="active:opacity-60">
-            <Text className="text-base font-semibold text-slate-500">Close</Text>
+            <Text className="text-base font-semibold text-slate-500">{t("common.cancel")}</Text>
           </Pressable>
         </View>
 
@@ -286,7 +294,7 @@ function ExercisePickerModal({
             contentContainerClassName="p-4 gap-2"
             ListEmptyComponent={
               <Text className="px-2 py-8 text-center text-sm text-slate-400">
-                No exercises in your library yet — add some in the Exercises tab first.
+                {t("templates.form.noExercisesInLibrary")}
               </Text>
             }
             renderItem={({ item }) => (
@@ -294,9 +302,9 @@ function ExercisePickerModal({
                 className="rounded-xl border border-slate-200 px-4 py-3 active:bg-slate-50"
                 onPress={() => onPick(item)}
               >
-                <Text className="text-base font-semibold text-slate-900">{item.name}</Text>
+                <Text className="w-full text-left text-base font-semibold text-slate-900">{item.name}</Text>
                 {item.muscle_group ? (
-                  <Text className="mt-0.5 text-sm text-slate-500">{item.muscle_group}</Text>
+                  <Text className="w-full text-left mt-0.5 text-sm text-slate-500">{item.muscle_group}</Text>
                 ) : null}
               </Pressable>
             )}
@@ -311,7 +319,7 @@ function ExercisePickerModal({
 function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <View className="mb-4">
-      <Text className="mb-2 text-sm font-medium text-slate-700">{label}</Text>
+      <Text className="w-full text-left mb-2 text-sm font-medium text-slate-700">{label}</Text>
       {children}
     </View>
   );
@@ -321,7 +329,7 @@ function Input(props: React.ComponentProps<typeof TextInput>) {
   return (
     <TextInput
       placeholderTextColor="#94a3b8"
-      className="rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900"
+      className={`rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
       {...props}
     />
   );
@@ -340,6 +348,7 @@ function Mini({
         placeholder="—"
         keyboardType={decimal ? "decimal-pad" : "number-pad"}
         className="rounded-lg border border-slate-300 px-2 py-2 text-center text-base text-slate-900"
+        style={LTR_WRITING_DIRECTION_ONLY}
         {...props}
       />
     </View>
