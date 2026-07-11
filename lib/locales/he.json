@@ -5,7 +5,8 @@
     "continue": "המשך",
     "signOut": "התנתק",
     "trainer": "מאמן",
-    "client": "מתאמן"
+    "client": "מתאמן",
+    "add": "הוסף"
   },
   "tabs": {
     "home": "בית",
@@ -42,7 +43,10 @@
     "trainerSubtitle": "לוח בקרה למאמן",
     "clientSubtitle": "האימונים הקרובים שלך",
     "noClientsYet": "אין עדיין מתאמנים",
-    "noClientsHint": "הוסף מתאמנים מלשונית לוח הזמנים כדי לראות את הסטטוס שלהם כאן.",
+    "noClientsHint": "הוסף מתאמנים כדי לראות את הסטטוס שלהם כאן.",
+    "yourClients": "המתאמנים שלך",
+    "manageClients": "‹ ניהול מתאמנים",
+    "addClientsCta": "+ הוספת מתאמן",
     "noWorkoutsYet": "אין עדיין אימונים מתוזמנים",
     "noWorkoutsHint": "המאמן שלך יקצה לך את האימון הראשון בקרוב.",
     "doneToday": "✓ בוצע היום",
@@ -154,19 +158,12 @@
       "title": "לוח זמנים",
       "scheduleWorkout": "קביעת אימון",
       "editWorkout": "עריכת אימון",
-      "addAppClientTitle": "הוספת מתאמן (משתמש באפליקציה)",
-      "emailPlaceholder": "client@email.com",
-      "addAppClientHint": "המתאמן חייב להיות רשום כבר לאפליקציה.",
-      "addOfflineClientTitle": "הוספת מתאמן אופליין (בלי אפליקציה)",
-      "clientNamePlaceholder": "שם המתאמן",
-      "yourClients": "המתאמנים שלך ({{count}})",
-      "noClientsYet": "עדיין אין מתאמנים — הוסיפו אחד למעלה.",
-      "upcoming": "בקרוב",
-      "nothingScheduled": "עדיין לא נקבע כלום.",
+      "weekView": "שבוע",
+      "monthView": "חודש",
+      "todayBtn": "היום",
+      "nothingScheduled": "לא נקבע כלום.",
       "remindOnWhatsApp": "💬 תזכורת בוואטסאפ",
-      "add": "הוספה",
       "offline": "אופליין",
-      "phonePlaceholder": "טלפון לוואטסאפ (למשל +9725...)",
       "client": "מתאמן",
       "workout": "אימון",
       "yourTrainer": "המאמן שלך"
@@ -212,6 +209,17 @@
       "workoutNotFound": "האימון לא נמצא.",
       "saveChanges": "שמור שינויים"
     }
+  },
+  "clients": {
+    "title": "מתאמנים",
+    "addAppClientTitle": "הוספת מתאמן (משתמש באפליקציה)",
+    "emailPlaceholder": "client@email.com",
+    "addAppClientHint": "המתאמן חייב להיות רשום כבר לאפליקציה.",
+    "addOfflineClientTitle": "הוספת מתאמן אופליין (בלי אפליקציה)",
+    "clientNamePlaceholder": "שם המתאמן",
+    "yourClients": "המתאמנים שלך ({{count}})",
+    "noClientsYet": "עדיין אין מתאמנים — הוסיפו אחד למעלה.",
+    "phonePlaceholder": "טלפון לוואטסאפ (למשל +9725...)"
   },
   "progress": {
     "photoPermission": "צריך הרשאה לגלריית התמונות כדי לצרף תמונה.",

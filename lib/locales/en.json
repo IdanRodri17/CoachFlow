@@ -5,7 +5,8 @@
     "continue": "Continue",
     "signOut": "Sign out",
     "trainer": "Trainer",
-    "client": "Client"
+    "client": "Client",
+    "add": "Add"
   },
   "tabs": {
     "home": "Home",
@@ -42,7 +43,10 @@
     "trainerSubtitle": "Trainer dashboard",
     "clientSubtitle": "Your upcoming workouts",
     "noClientsYet": "No clients yet",
-    "noClientsHint": "Add clients from the Schedule tab to see their status here.",
+    "noClientsHint": "Add clients to see their status here.",
+    "yourClients": "Your clients",
+    "manageClients": "Manage clients ›",
+    "addClientsCta": "+ Add a client",
     "noWorkoutsYet": "No workouts scheduled yet",
     "noWorkoutsHint": "Your trainer will assign your first workout soon.",
     "doneToday": "✓ Done today",
@@ -154,19 +158,12 @@
       "title": "Schedule",
       "scheduleWorkout": "Schedule a workout",
       "editWorkout": "Edit workout",
-      "addAppClientTitle": "Add a client (uses the app)",
-      "emailPlaceholder": "client@email.com",
-      "addAppClientHint": "They must have signed up in the app first.",
-      "addOfflineClientTitle": "Add an offline client (no app)",
-      "clientNamePlaceholder": "Client name",
-      "yourClients": "Your clients ({{count}})",
-      "noClientsYet": "No clients yet — add one above.",
-      "upcoming": "Upcoming",
-      "nothingScheduled": "Nothing scheduled yet.",
+      "weekView": "Week",
+      "monthView": "Month",
+      "todayBtn": "Today",
+      "nothingScheduled": "Nothing scheduled.",
       "remindOnWhatsApp": "💬 Remind on WhatsApp",
-      "add": "Add",
       "offline": "offline",
-      "phonePlaceholder": "Phone for WhatsApp (e.g. +9725...)",
       "client": "Client",
       "workout": "Workout",
       "yourTrainer": "your trainer"
@@ -212,6 +209,17 @@
       "workoutNotFound": "Workout not found.",
       "saveChanges": "Save changes"
     }
+  },
+  "clients": {
+    "title": "Clients",
+    "addAppClientTitle": "Add a client (uses the app)",
+    "emailPlaceholder": "client@email.com",
+    "addAppClientHint": "They must have signed up in the app first.",
+    "addOfflineClientTitle": "Add an offline client (no app)",
+    "clientNamePlaceholder": "Client name",
+    "yourClients": "Your clients ({{count}})",
+    "noClientsYet": "No clients yet — add one above.",
+    "phonePlaceholder": "Phone for WhatsApp (e.g. +9725...)"
   },
   "progress": {
     "photoPermission": "Photo library permission is needed to attach a photo.",

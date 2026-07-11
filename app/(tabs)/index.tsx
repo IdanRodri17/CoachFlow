@@ -205,6 +205,16 @@ export default function HomeScreen() {
               </Pressable>
             </Link>
 
+            {/* V14: client management lives on its own screen now, off Schedule. */}
+            <View className="mb-3 flex-row items-center justify-between">
+              <Text className="text-left text-sm font-semibold text-slate-700">{t("home.yourClients")}</Text>
+              <Link href="/clients" asChild>
+                <Pressable className="active:opacity-70">
+                  <Text className="text-left text-xs font-semibold text-slate-500">{t("home.manageClients")}</Text>
+                </Pressable>
+              </Link>
+            </View>
+
             {dashboard.error ? (
               <Text className="mb-3 w-full text-left text-sm text-red-600">
                 {(dashboard.error as Error).message}
@@ -275,6 +285,11 @@ export default function HomeScreen() {
               <View className="items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
                 <Text className="text-center text-base font-medium text-slate-700">{t("home.noClientsYet")}</Text>
                 <Text className="mt-2 text-center text-sm text-slate-400">{t("home.noClientsHint")}</Text>
+                <Link href="/clients" asChild>
+                  <Pressable className="mt-4 rounded-xl bg-slate-900 px-4 py-2.5 active:opacity-80">
+                    <Text className="text-sm font-semibold text-white">{t("home.addClientsCta")}</Text>
+                  </Pressable>
+                </Link>
               </View>
             )}
           </View>
