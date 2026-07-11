@@ -23,6 +23,8 @@ export type Database = {
           avatar_url: string | null;
           accepted_terms_at: string | null;
           accepted_health_disclaimer_at: string | null;
+          // V12b (0012): intake questionnaire; null = not filled in yet.
+          intake: Json | null;
           created_at: string;
         };
         Insert: {
@@ -33,6 +35,7 @@ export type Database = {
           avatar_url?: string | null;
           accepted_terms_at?: string | null;
           accepted_health_disclaimer_at?: string | null;
+          intake?: Json | null;
           created_at?: string;
         };
         Update: {
@@ -43,6 +46,7 @@ export type Database = {
           avatar_url?: string | null;
           accepted_terms_at?: string | null;
           accepted_health_disclaimer_at?: string | null;
+          intake?: Json | null;
           created_at?: string;
         };
         Relationships: [];

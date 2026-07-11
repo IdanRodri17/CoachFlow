@@ -29,6 +29,8 @@ export default function TabsLayout() {
   // Not signed in -> sign-in. Signed in but not onboarded -> onboarding.
   if (!session) return <Redirect href="/(auth)/sign-in" />;
   if (!profileComplete(profile)) return <Redirect href="/(auth)/onboarding" />;
+  // V12b: clients answer the intake questionnaire once before using the app.
+  if (profile?.role === "client" && profile.intake == null) return <Redirect href="/intake" />;
 
   const isTrainer = profile?.role === "trainer";
 

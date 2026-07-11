@@ -45,6 +45,8 @@ type Detail =
       name: string;
       streak: number;
       status: WorkoutStatus | null;
+      // V12b: intake questionnaire answers; null until the client fills it in.
+      intake: Record<string, string> | null;
       logs: {
         id: string;
         scheduledWorkoutId: string;
@@ -88,7 +90,7 @@ export default function ClientDetailScreen() {
 
       const [nameRes, streakRes, statusRes] = await Promise.all([
         kind === "app"
-          ? supabase.from("profiles").select("display_name").eq("id", refId).single()
+          ? supabase.from("profiles").select("display_name, intake").eq("id", refId).single()
           : supabase.from("managed_clients").select("name").eq("id", refId).single(),
         supabase.from("client_streaks").select("*").eq("trainer_id", trainerId).eq(streakCol, refId).maybeSingle(),
         supabase
@@ -216,6 +218,8 @@ export default function ClientDetailScreen() {
         name,
         streak,
         status,
+        intake:
+          "intake" in nameRes.data! ? ((nameRes.data.intake as Record<string, string> | null) ?? null) : null,
         logs: logs.map((l) => ({
           id: l.id,
           scheduledWorkoutId: l.scheduled_workout_id,
@@ -534,6 +538,40 @@ export default function ClientDetailScreen() {
               ) : (
                 <Text className="mt-1 w-full text-left text-sm text-slate-400">
                   {t("dashboard.checkin.noneYet")}
+                </Text>
+              )}
+            </View>
+
+            {/* V12b: intake questionnaire answers (filled in once by the client). */}
+            <View className="mt-7 rounded-2xl border border-slate-200 p-4">
+              <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {t("dashboard.intake.title")}
+              </Text>
+              {d.kind === "app" && d.intake != null ? (
+                (["goals", "injuries", "equipment", "experience"] as const).some(
+                  // typeof guard: intake is client-writable jsonb — never render non-strings.
+                  (k) => typeof d.intake![k] === "string" && d.intake![k],
+                ) ? (
+                  (["goals", "injuries", "equipment", "experience"] as const).map((k) =>
+                    typeof d.intake![k] === "string" && d.intake![k] ? (
+                      <View key={k} className="mt-2">
+                        <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
+                          {t(`intake.${k}`)}
+                        </Text>
+                        <Text className="mt-0.5 w-full text-left text-sm text-slate-700">
+                          {k === "experience" ? t(`intake.${d.intake![k]}`) : d.intake![k]}
+                        </Text>
+                      </View>
+                    ) : null,
+                  )
+                ) : (
+                  <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                    {t("dashboard.intake.nothingShared")}
+                  </Text>
+                )
+              ) : (
+                <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                  {t("dashboard.intake.noneYet")}
                 </Text>
               )}
             </View>

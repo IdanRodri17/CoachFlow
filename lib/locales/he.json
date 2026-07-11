@@ -340,7 +340,27 @@
     "notDone": "לא הושלם",
     "nothingScheduledYet": "עדיין לא נקבע אימון.",
     "paid": "💰 שולם",
-    "markPaid": "סמן כשולם"
+    "markPaid": "סמן כשולם",
+    "intake": {
+      "title": "שאלון היכרות",
+      "noneYet": "השאלון עדיין לא מולא.",
+      "nothingShared": "לא שותף מידע."
+    }
+  },
+  "intake": {
+    "title": "קצת עליך",
+    "subtitle": "זה עוזר למאמן לבנות עבורך את התוכנית המתאימה. כל השדות רשות.",
+    "goals": "מטרות",
+    "goalsPlaceholder": "למשל: ירידה במשקל, עלייה במסת שריר, חיזוק",
+    "injuries": "פציעות או מגבלות",
+    "injuriesPlaceholder": "למשל: כאבי גב תחתון, רגישות בברך",
+    "equipment": "ציוד זמין",
+    "equipmentPlaceholder": "למשל: חדר כושר מלא, משקולות בבית, ללא ציוד",
+    "experience": "ניסיון באימונים",
+    "beginner": "מתחיל/ה",
+    "intermediate": "בינוני/ת",
+    "advanced": "מתקדם/ת",
+    "save": "שמירה"
   },
   "shareCard": {
     "sharingUnavailable": "שיתוף לא זמין במכשיר הזה.",

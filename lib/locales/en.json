@@ -340,7 +340,27 @@
     "notDone": "Not done",
     "nothingScheduledYet": "Nothing scheduled yet.",
     "paid": "💰 Paid",
-    "markPaid": "Mark paid"
+    "markPaid": "Mark paid",
+    "intake": {
+      "title": "Intake questionnaire",
+      "noneYet": "Hasn't filled in the questionnaire yet.",
+      "nothingShared": "Nothing shared."
+    }
+  },
+  "intake": {
+    "title": "A bit about you",
+    "subtitle": "This helps your trainer build the right plan for you. Everything is optional.",
+    "goals": "Goals",
+    "goalsPlaceholder": "e.g. lose weight, build muscle, get stronger",
+    "injuries": "Injuries or limitations",
+    "injuriesPlaceholder": "e.g. lower back pain, sensitive knee",
+    "equipment": "Available equipment",
+    "equipmentPlaceholder": "e.g. full gym, dumbbells at home, none",
+    "experience": "Training experience",
+    "beginner": "Beginner",
+    "intermediate": "Intermediate",
+    "advanced": "Advanced",
+    "save": "Save"
   },
   "shareCard": {
     "sharingUnavailable": "Sharing isn't available on this device.",
