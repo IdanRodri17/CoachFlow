@@ -154,7 +154,9 @@ Each version is a clean, shippable increment ending in a smoke test → `feat(vN
 
 Same working agreement as V1–V12: one step per session, smallest change, smoke test → commit → push. Exact build prompts live in `CLAUDE_CODE_PLAYBOOK.md` under "Post-1.0 roadmap".
 
-**V13 — Trainer Cash-Flow Dashboard.** `packages.price_per_session` (per-client, nullable — old builds unaffected). The trainer's Home gains a money card above the roster: **earned this month** (this month's completed sessions × that client's price), **projected month-end** (earned + remaining scheduled-this-month sessions × price), and **unpaid** (completed-but-unpaid × price). All month boundaries in Asia/Jerusalem; every figure derived in a `security_invoker` SQL view (`trainer_monthly_money`) using the subject_key pattern so app and offline clients both count — **never stored, never hardcoded** (§4.1 discipline). Clients with no price set are surfaced as a visible gap ("no price set"), not silently under-counted. Price editing lives in the existing session-package card on client detail. *(Gives the trainer real control of his cash flow at a glance.)*
+**V13 — Trainer Cash-Flow Dashboard.** `packages.price_per_session` (per-client, nullable — old builds unaffected). The trainer's Home gains a money card above the roster: **earned this month** (this month's completed sessions × that client's price), **projected month-end** (earned + remaining scheduled-this-month sessions × price), and **unpaid** (completed-but-unpaid × price). All month boundaries in Asia/Jerusalem; every figure derived in a `security_invoker` SQL view (`trainer_monthly_money`, **one row per month** — current + history, so V13b needs no new SQL) using the subject_key pattern so app and offline clients both count — **never stored, never hardcoded** (§4.1 discipline). Clients with no price set are surfaced as a visible gap ("no price set"), not silently under-counted. Price editing lives in the existing session-package card on client detail. *(Gives the trainer real control of his cash flow at a glance.)*
+
+**V13b — Monthly Money Summary (all clients).** The Home money card is tappable and opens a Money screen: month by month (most recent first, up to 12 back), the aggregate across **all** clients — sessions completed, earned, collected (paid), outstanding (unpaid). Reads the same `trainer_monthly_money` view; months with no activity are skipped; no new tables, no stored totals. Per-client breakdown / export is deliberately out of scope for now (revisit via §8 if needed). *(Answers "how did last month actually go?" in one glance.)*
 
 **V14 — Schedule-First Calendar.** The Schedule tab becomes the trainer's daily driver and single source of "what's next": a **weekly strip view** and a **monthly grid view** (dot markers per day; selecting a day lists its workouts below, colored by the derived scheduled/completed/missed rules of §4.1), defaulting to the current week — replacing today's flat list. Client management moves out of the way: add-app-client, add-offline-client and the roster list relocate to a dedicated **Clients** screen reached from the trainer Home. Every existing capability (shift a day, notes, paid toggle, drill into a client) stays reachable from the day view. RTL-aware from day one.
 
@@ -198,6 +200,7 @@ Same working agreement as V1–V12: one step per session, smallest change, smoke
 | Intake questionnaire | V12 |
 | Group leaderboard | dropped from V12 → §8 |
 | Cash-flow dashboard (earned / projected / unpaid) | V13 |
+| Monthly money summary, all clients (history view) | V13b |
 | Weekly + monthly calendar views | V14 |
 | Dedicated Clients screen (roster + add-client moved off Schedule) | V14 |
 | Device calendar sync (iPhone/Google, one-way) | V14b |

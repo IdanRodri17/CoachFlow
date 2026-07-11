@@ -270,11 +270,21 @@ Same rules as V1–V12: one step per session, read `docs/SRS.md §5.1` first, sm
 **Files (≤2 + migration):** `supabase/migrations/0014_money.sql`, `app/(tabs)/index.tsx` (money card) + `app/dashboard/[refId].tsx` (price field in the existing session-package card)
 
 **Prompt:**
-> Migration `0014_money.sql`: add nullable `price_per_session numeric` to `packages`, plus a `security_invoker` view `trainer_monthly_money` returning per-trainer figures for the current month in Asia/Jerusalem (`(now() at time zone 'Asia/Jerusalem')::date`, never `current_date`): `earned` (this month's completed sessions × that client's price), `projected` (earned + remaining scheduled-this-month sessions × price), `unpaid` (completed & not-paid sessions × price), and `clients_without_price` (count), using the subject_key pattern (`coalesce(client_id::text, 'm:' || managed_client_id::text)`) so app and offline clients both count. In the app: a price input (numeric, LTR_INPUT_STYLE) in the session-package card on client detail, and a money card at the top of the trainer Home above the roster showing earned / projected / unpaid (₪) with a small hint when some clients have no price set. All figures come from the view — never computed twice, never stored.
+> Migration `0014_money.sql`: add nullable `price_per_session numeric` to `packages`, plus a `security_invoker` view `trainer_monthly_money` returning **one row per trainer per month** (month key from `scheduled_date` truncated in Asia/Jerusalem — `(now() at time zone 'Asia/Jerusalem')::date` semantics, never `current_date`): `sessions_completed`, `earned` (completed sessions that month × that client's price), `paid_amount` (completed & paid × price), `unpaid` (completed & not-paid × price), `projected` (earned + remaining scheduled-that-month × price — only meaningful for the current month), and `clients_without_price` (count), using the subject_key pattern (`coalesce(client_id::text, 'm:' || managed_client_id::text)`) so app and offline clients both count. In the app: a price input (numeric, LTR_INPUT_STYLE) in the session-package card on client detail, and a money card at the top of the trainer Home above the roster reading the CURRENT month's row: earned / projected / unpaid (₪) with a small hint when some clients have no price set. All figures come from the view — never computed twice, never stored.
 
 **Smoke test:** Set a price for one client → complete a workout this month → Home shows earned = 1 × price and unpaid rises until you mark it paid; schedule two more workouts later this month → projected = earned + 2 × price; a second client without a price shows the "no price set" hint and doesn't distort totals. Regenerate types (`npm run db:types` or hand-edit) and `npx tsc --noEmit` is clean.
 
 **On green:** `git commit -m "feat(v13): trainer cash-flow dashboard"` && `git push`
+
+### V13b — Monthly money summary (all clients)
+**Files (≤2):** `app/money.tsx` (new), `app/(tabs)/index.tsx` (make the money card tappable)
+
+**Prompt:**
+> Make the Home money card tappable, opening a new trainer-only Money screen (`app/money.tsx`) that lists month by month (most recent first, up to 12 back plus the current month) the aggregate across ALL clients from the same `trainer_monthly_money` view: localized month name, sessions completed, earned, collected (paid), outstanding (unpaid), in ₪. Months with no activity are skipped; the current month's row is visually highlighted. No new SQL, no per-client breakdown (deliberately out of scope). RTL-aware per the repo conventions; month names via Intl.DateTimeFormat with the app locale and Asia/Jerusalem.
+
+**Smoke test:** With activity in two different months (backdate one completed workout via the SQL Editor), the Money screen shows both months with sums matching the view; marking a workout paid moves its amount from outstanding to collected on refetch; an empty month in between doesn't render a row.
+
+**On green:** `git commit -m "feat(v13b): monthly money summary"` && `git push`
 
 ### V14 — Schedule-first calendar
 **Files (≤2):** `app/(tabs)/schedule/index.tsx` (rebuilt as calendar), `app/clients.tsx` (new — roster + add-client moved here) + a Home entry point to it
