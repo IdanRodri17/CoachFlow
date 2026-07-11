@@ -14,7 +14,7 @@
     "templates": "Templates",
     "schedule": "Schedule",
     "progress": "Progress",
-    "checkin": "Check-in",
+    "nutrition": "Nutrition",
     "profile": "Profile"
   },
   "signIn": {
@@ -77,6 +77,8 @@
     "badges": "Badges",
     "noBadgesYet": "Complete a workout to start earning badges.",
     "shareProgress": "Share my progress",
+    "nutritionPlan": "Nutrition plan from your trainer",
+    "nutritionPlanNoneYet": "Your trainer hasn't shared a nutrition plan yet.",
     "language": "Language"
   },
   "exercises": {
@@ -346,6 +348,17 @@
       "noneYet": "No notes yet.",
       "deleteTitle": "Delete note",
       "deleteMessage": "This can't be undone."
+    },
+    "nutrition": {
+      "title": "AI nutrition assistant",
+      "calories": "Calories",
+      "protein": "Protein (g)",
+      "carbs": "Carbs (g)",
+      "fat": "Fat (g)",
+      "preferences": "Preferences (optional)",
+      "preferencesPlaceholder": "e.g. vegetarian, kosher, no nuts",
+      "suggest": "Suggest a meal plan",
+      "lastSaved": "Last saved plan"
     },
     "weightOverTime": "Weight over time",
     "recentLogs": "Recent logs",

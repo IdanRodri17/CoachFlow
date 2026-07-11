@@ -74,7 +74,7 @@ type Detail =
     };
 
 export default function ClientDetailScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { refId, kind: kindParam } = useLocalSearchParams<{ refId: string; kind?: string }>();
   const kind: "app" | "managed" = kindParam === "managed" ? "managed" : "app";
   const { session, profile } = useAuth();
@@ -416,6 +416,77 @@ export default function ClientDetailScreen() {
     ]);
   }
 
+  // AI nutrition assistant (V15). The edge function only calls Claude and
+  // returns text — saving is a normal RLS-protected insert from here, same
+  // as every other write in this app; both client kinds supported.
+  const [calorieInput, setCalorieInput] = useState("");
+  const [proteinInput, setProteinInput] = useState("");
+  const [carbsInput, setCarbsInput] = useState("");
+  const [fatInput, setFatInput] = useState("");
+  const [preferencesInput, setPreferencesInput] = useState("");
+  const [suggestedPlan, setSuggestedPlan] = useState<string | null>(null);
+
+  const latestNutritionPlan = useQuery({
+    queryKey: ["nutrition-plan", kind, refId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("nutrition_plans")
+        .select("*")
+        .eq("trainer_id", trainerId)
+        .eq(streakCol, refId)
+        .order("created_at", { ascending: false })
+        .limit(1)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const suggestNutrition = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.functions.invoke("nutrition-suggest", {
+        body: {
+          calories: Number.parseFloat(calorieInput),
+          protein_g: Number.parseFloat(proteinInput),
+          carbs_g: Number.parseFloat(carbsInput),
+          fat_g: Number.parseFloat(fatInput),
+          preferences: preferencesInput.trim() || undefined,
+          locale: i18n.language,
+        },
+      });
+      if (error) throw error;
+      if (data?.error) throw new Error(data.error);
+      return data.plan_markdown as string;
+    },
+    onSuccess: (planMarkdown) => setSuggestedPlan(planMarkdown),
+  });
+
+  const saveNutritionPlan = useMutation({
+    mutationFn: async () => {
+      if (!suggestedPlan) return;
+      const targets = {
+        calories: Number.parseFloat(calorieInput),
+        protein_g: Number.parseFloat(proteinInput),
+        carbs_g: Number.parseFloat(carbsInput),
+        fat_g: Number.parseFloat(fatInput),
+        preferences: preferencesInput.trim() || null,
+      };
+      const { error } =
+        kind === "app"
+          ? await supabase
+              .from("nutrition_plans")
+              .insert({ trainer_id: trainerId, client_id: refId, targets, plan_markdown: suggestedPlan })
+          : await supabase
+              .from("nutrition_plans")
+              .insert({ trainer_id: trainerId, managed_client_id: refId, targets, plan_markdown: suggestedPlan });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      setSuggestedPlan(null);
+      queryClient.invalidateQueries({ queryKey: ["nutrition-plan", kind, refId] });
+    },
+  });
+
   if (detail.isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -577,38 +648,98 @@ export default function ClientDetailScreen() {
           </View>
         </View>
 
+        {/* V15: AI nutrition assistant — both client kinds (offline clients
+            just can't see the read-only view on their own side). Promoted
+            above check-in/intake/notes so the trainer's most-used tool is
+            the first thing after the session-package card. */}
+        <View className="mt-7 rounded-2xl border border-slate-200 p-4">
+          <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+            {t("dashboard.nutrition.title")}
+          </Text>
+
+          <View className="mt-3 flex-row flex-wrap gap-2">
+            <NutritionField
+              label={t("dashboard.nutrition.calories")}
+              value={calorieInput}
+              onChangeText={setCalorieInput}
+            />
+            <NutritionField
+              label={t("dashboard.nutrition.protein")}
+              value={proteinInput}
+              onChangeText={setProteinInput}
+            />
+            <NutritionField label={t("dashboard.nutrition.carbs")} value={carbsInput} onChangeText={setCarbsInput} />
+            <NutritionField label={t("dashboard.nutrition.fat")} value={fatInput} onChangeText={setFatInput} />
+          </View>
+
+          <Text className="mb-1 mt-3 w-full text-left text-xs text-slate-500">
+            {t("dashboard.nutrition.preferences")}
+          </Text>
+          <TextInput
+            className={`rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 ${directionalTextClassName()}`}
+            placeholder={t("dashboard.nutrition.preferencesPlaceholder")}
+            placeholderTextColor="#94a3b8"
+            value={preferencesInput}
+            onChangeText={setPreferencesInput}
+          />
+
+          <Pressable
+            className="mt-3 items-center self-start rounded-lg bg-slate-900 px-4 py-2.5 active:opacity-80"
+            disabled={
+              suggestNutrition.isPending ||
+              !calorieInput.trim() ||
+              !proteinInput.trim() ||
+              !carbsInput.trim() ||
+              !fatInput.trim()
+            }
+            onPress={() => suggestNutrition.mutate()}
+          >
+            {suggestNutrition.isPending ? (
+              <ActivityIndicator color="#ffffff" size="small" />
+            ) : (
+              <Text className="text-sm font-semibold text-white">{t("dashboard.nutrition.suggest")}</Text>
+            )}
+          </Pressable>
+          {suggestNutrition.error ? (
+            <Text className="mt-2 w-full text-left text-xs text-red-600">
+              {(suggestNutrition.error as Error).message}
+            </Text>
+          ) : null}
+
+          {suggestedPlan ? (
+            <View className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <Text className="w-full text-left text-sm text-slate-800">{suggestedPlan}</Text>
+              <Pressable
+                className="mt-3 items-center self-start rounded-lg bg-emerald-600 px-4 py-2 active:opacity-80"
+                disabled={saveNutritionPlan.isPending}
+                onPress={() => saveNutritionPlan.mutate()}
+              >
+                {saveNutritionPlan.isPending ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text className="text-sm font-semibold text-white">{t("common.save")}</Text>
+                )}
+              </Pressable>
+              {saveNutritionPlan.error ? (
+                <Text className="mt-2 w-full text-left text-xs text-red-600">
+                  {(saveNutritionPlan.error as Error).message}
+                </Text>
+              ) : null}
+            </View>
+          ) : latestNutritionPlan.data ? (
+            <View className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
+              <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
+                {t("dashboard.nutrition.lastSaved")}
+              </Text>
+              <Text className="mt-1 w-full text-left text-sm text-slate-800">
+                {latestNutritionPlan.data.plan_markdown}
+              </Text>
+            </View>
+          ) : null}
+        </View>
+
         {d.kind === "app" ? (
           <>
-            <View className="mt-7 rounded-2xl border border-slate-200 p-4">
-              <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-                {t("dashboard.checkin.title")}
-              </Text>
-              {latestCheckin.data ? (
-                <>
-                  <Text className="mt-1 text-sm text-slate-500">
-                    {t("dashboard.checkin.weekOf", { date: formatDisplayDate(latestCheckin.data.week_start) })}
-                  </Text>
-                  <Text className="mt-1 text-sm text-slate-700">
-                    {t("dashboard.checkin.summary", {
-                      sleep: latestCheckin.data.sleep,
-                      energy: latestCheckin.data.energy,
-                      soreness: latestCheckin.data.soreness,
-                      adherence: latestCheckin.data.adherence,
-                    })}
-                  </Text>
-                  {latestCheckin.data.note ? (
-                    <Text className="mt-1 w-full text-left text-sm text-slate-400">
-                      “{latestCheckin.data.note}”
-                    </Text>
-                  ) : null}
-                </>
-              ) : (
-                <Text className="mt-1 w-full text-left text-sm text-slate-400">
-                  {t("dashboard.checkin.noneYet")}
-                </Text>
-              )}
-            </View>
-
             {/* V12b: intake questionnaire answers (filled in once by the client). */}
             <View className="mt-7 rounded-2xl border border-slate-200 p-4">
               <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
@@ -739,6 +870,44 @@ export default function ClientDetailScreen() {
                 )}
               </View>
             </View>
+          </>
+        ) : null}
+
+        {d.kind === "app" ? (
+          <>
+            {/* Check-in moved here (from right after session-package) so it
+                sits with the rest of the progress/monitoring data — weight
+                chart, recent logs, PRs — rather than the reference/tool
+                cards above (intake, notes, nutrition). */}
+            <View className="mt-7 rounded-2xl border border-slate-200 p-4">
+              <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {t("dashboard.checkin.title")}
+              </Text>
+              {latestCheckin.data ? (
+                <>
+                  <Text className="mt-1 text-sm text-slate-500">
+                    {t("dashboard.checkin.weekOf", { date: formatDisplayDate(latestCheckin.data.week_start) })}
+                  </Text>
+                  <Text className="mt-1 text-sm text-slate-700">
+                    {t("dashboard.checkin.summary", {
+                      sleep: latestCheckin.data.sleep,
+                      energy: latestCheckin.data.energy,
+                      soreness: latestCheckin.data.soreness,
+                      adherence: latestCheckin.data.adherence,
+                    })}
+                  </Text>
+                  {latestCheckin.data.note ? (
+                    <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                      “{latestCheckin.data.note}”
+                    </Text>
+                  ) : null}
+                </>
+              ) : (
+                <Text className="mt-1 w-full text-left text-sm text-slate-400">
+                  {t("dashboard.checkin.noneYet")}
+                </Text>
+              )}
+            </View>
 
             <Text className="mb-2 mt-7 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
               {t("dashboard.weightOverTime")}
@@ -848,6 +1017,31 @@ export default function ClientDetailScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function NutritionField({
+  label,
+  value,
+  onChangeText,
+}: {
+  label: string;
+  value: string;
+  onChangeText: (v: string) => void;
+}) {
+  return (
+    <View className="min-w-[70px] flex-1">
+      <Text className="w-full text-left text-xs text-slate-500">{label}</Text>
+      <TextInput
+        className="mt-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
+        style={LTR_INPUT_STYLE}
+        placeholder="0"
+        placeholderTextColor="#94a3b8"
+        keyboardType="decimal-pad"
+        value={value}
+        onChangeText={onChangeText}
+      />
+    </View>
   );
 }
 

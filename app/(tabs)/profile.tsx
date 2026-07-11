@@ -8,7 +8,7 @@
 // V12a: language toggle (i18next + RTL — see lib/i18n.ts).
 
 import { Link } from "expo-router";
-import { ActivityIndicator, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -56,7 +56,7 @@ export default function ProfileScreen() {
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
-      <View className="flex-1 px-6 pt-6">
+      <ScrollView contentContainerClassName="px-6 pt-6 pb-10">
         <Text className="w-full text-left text-2xl font-bold text-slate-900">{t("profile.title")}</Text>
 
         <View className="mt-6 gap-4">
@@ -146,7 +146,7 @@ export default function ProfileScreen() {
 
         {/* Dev-only quick switch between trainer/client (hidden in production). */}
         <DevPanel />
-      </View>
+      </ScrollView>
     </SafeAreaView>
   );
 }

@@ -514,6 +514,37 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V15: 0015_nutrition.sql ---
+      nutrition_plans: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          client_id: string | null;
+          managed_client_id: string | null;
+          targets: Json;
+          plan_markdown: string;
+          created_at: string;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
+          targets: Json;
+          plan_markdown: string;
+          created_at?: string;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
+          targets?: Json;
+          plan_markdown?: string;
+          created_at?: string;
+        };
+        Relationships: [];
+      };
     };
     Views: {
       // --- V8: 0008_dashboard_views.sql ---

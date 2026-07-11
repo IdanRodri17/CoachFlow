@@ -5,20 +5,46 @@
 // via AsyncStorage so it survives app restarts, independent of auth — no
 // profile row is needed to have a language preference.
 //
-// RTL note: React Native only fully re-mirrors layouts after a JS reload
-// once I18nManager.forceRTL() flips the direction. promptReload() handles
-// that via DevSettings.reload() — but ONLY in dev/EAS builds. In Expo Go the
-// runtime forceRTL() call is a guaranteed no-op: Expo Go's kernel
-// (ExperienceRTLManager) rewrites RN's RTL prefs from the manifest's
-// extra.supportsRTL/forcesRTL on EVERY project load, before JS runs
-// (docs: "Expo Go resets RTL preferences when opening the launcher or
-// individual projects"). With extra.supportsRTL=true in app.json, Expo Go
-// follows the DEVICE language (Hebrew device → RTL); in-app direction
-// switching needs a dev build. A production EAS build would use
-// expo-updates' reloadAsync() instead of DevSettings.reload().
+// RTL note (V12a, current): I18nManager.isRTL is a NATIVE flag Expo Go
+// forcibly re-syncs to the PHONE's system language on every project open —
+// I18nManager.forceRTL() is a guaranteed no-op there (Expo Go's kernel,
+// ExperienceRTLManager, overwrites the same RTL prefs before JS runs; see
+// PR expo/expo#19634 and open issues #39752/#32976/#26532 on this exact
+// SDK/RN combo — unresolved across 5+ SDK cycles, not something we can fix
+// from app code). So isRTL()/directionalTextClassName() below read
+// i18next.language directly instead — changes the instant setLocale() calls
+// changeLanguage(), no native flag or reload involved.
+//
+// The rest of the app's mirroring (plain <View>/flex-row layout, <Text>
+// textAlign auto-swap) is driven by React Native's Yoga layout engine, which
+// resolves direction PER NODE from an explicit `direction` style — inherited
+// from whichever ancestor sets it, completely independent of I18nManager and
+// NOT touched by Expo Go's native-pref reset (verified against this
+// project's actual installed react-native/@react-navigation source — see
+// memory/expo-go-rtl-limitation.md). app/_layout.tsx sets `direction:
+// isRTL() ? "rtl" : "ltr"` on a plain View wrapping the app content (and on
+// React Navigation's LocaleDirContext, which the tab bar reads) so the whole
+// tree mirrors from i18next.language, live, in Expo Go, no reload.
+//
+// IMPORTANT: an earlier attempt at this appeared to break scrolling/tab
+// navigation/button taps app-wide and was reverted — but the actual cause
+// was unrelated: app/(tabs)/profile.tsx had no ScrollView at all, so the
+// (unbounded-length) V15 nutrition plan text pushed its buttons off-screen
+// with no way to reach them, independent of anything here. That's fixed now
+// (profile.tsx has a real ScrollView; the long content moved to its own
+// screen), so this fix is back in place. If real interactivity issues show
+// up again, verify they're not screen-specific layout bugs before assuming
+// this mechanism is at fault — it's been traced end-to-end against the
+// actual RN/Yoga source and never independently disproven.
+//
+// forceRTL()/allowRTL() are still called below (harmless, isExpoGo-guarded)
+// because they still matter for the small slice of native-only chrome Yoga
+// doesn't touch (status bar, native TextInput caret direction) — but ONLY
+// in a real dev-client/EAS build, where Expo Go's reset doesn't apply.
 
 import { Alert, DevSettings, I18nManager } from "react-native";
 import AsyncStorage from "@react-native-async-storage/async-storage";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 import * as Localization from "expo-localization";
 import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
@@ -30,6 +56,14 @@ export type SupportedLocale = "en" | "he";
 export const SUPPORTED_LOCALES: SupportedLocale[] = ["en", "he"];
 const RTL_LOCALES: SupportedLocale[] = ["he"];
 const STORAGE_KEY = "coachflow.locale";
+
+// In Expo Go, I18nManager.forceRTL() is a guaranteed no-op (see the file-header
+// note below) — so a reload can NEVER reconcile a saved-locale/RTL mismatch
+// there. Without this guard, restoreSavedLocale()/setLocale() would show the
+// restart prompt, the user restarts, the same mismatch is detected again, and
+// it loops forever. Only attempt the forceRTL+reload dance outside Expo Go
+// (dev client / EAS build), where it genuinely works.
+const isExpoGo = Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 function isSupportedLocale(v: string | null | undefined): v is SupportedLocale {
   return v === "en" || v === "he";
@@ -69,6 +103,8 @@ export async function restoreSavedLocale(): Promise<void> {
   if (!isSupportedLocale(saved) || saved === i18next.language) return;
 
   await i18next.changeLanguage(saved);
+  if (isExpoGo) return; // Can't reconcile RTL here — see isExpoGo comment above.
+
   const shouldBeRTL = RTL_LOCALES.includes(saved);
   if (I18nManager.isRTL !== shouldBeRTL) {
     I18nManager.forceRTL(shouldBeRTL);
@@ -80,6 +116,7 @@ export async function restoreSavedLocale(): Promise<void> {
 export async function setLocale(locale: SupportedLocale): Promise<void> {
   await i18next.changeLanguage(locale);
   await AsyncStorage.setItem(STORAGE_KEY, locale);
+  if (isExpoGo) return; // Can't reconcile RTL here — see isExpoGo comment above.
 
   const shouldBeRTL = RTL_LOCALES.includes(locale);
   if (I18nManager.isRTL !== shouldBeRTL) {
@@ -89,14 +126,25 @@ export async function setLocale(locale: SupportedLocale): Promise<void> {
 }
 
 /**
- * True once the app is actually running RTL (only changes after the reload
- * setLocale/restoreSavedLocale triggers, so it's safe to read at render time
- * — no hook needed). Use this to align free-typed text fields (names, notes,
- * descriptions) with the current language; leave phone/email/OTP/numeric
- * inputs and anything already centered alone (see LTR_TEXT_STYLE below).
+ * True when the CURRENT APP LANGUAGE (not the device, not I18nManager) is
+ * RTL — changes instantly on setLocale()/restoreSavedLocale(), no reload
+ * needed. Safe to read at render time (i18next.language is a live, always-
+ * current property) as long as the calling component also calls
+ * useTranslation() somewhere, so it re-renders when the language changes.
+ * Use this to align free-typed text fields (names, notes, descriptions)
+ * with the current language; leave phone/email/OTP/numeric inputs and
+ * anything already centered alone (see LTR_TEXT_STYLE below).
  */
 export function isRTL(): boolean {
-  return I18nManager.isRTL;
+  return isSupportedLocale(i18next.language) && RTL_LOCALES.includes(i18next.language);
+}
+
+/** "rtl" | "ltr" for the current app language — set as the root `direction`
+ * style (app/_layout.tsx) so Yoga mirrors flex-row layout and Text
+ * textAlign auto-swap for the WHOLE app, independent of I18nManager.isRTL.
+ * Also the value to hand to React Navigation's LocaleDirContext.Provider. */
+export function layoutDirection(): "ltr" | "rtl" {
+  return isRTL() ? "rtl" : "ltr";
 }
 
 /** className to append to a **TextInput ONLY** that should follow the current

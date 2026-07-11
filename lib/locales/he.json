@@ -14,7 +14,7 @@
     "templates": "תבניות",
     "schedule": "לוח זמנים",
     "progress": "התקדמות",
-    "checkin": "צ'ק-אין",
+    "nutrition": "תזונה",
     "profile": "פרופיל"
   },
   "signIn": {
@@ -77,6 +77,8 @@
     "badges": "תגים",
     "noBadgesYet": "השלם אימון כדי להתחיל לצבור תגים.",
     "shareProgress": "שתף את ההתקדמות שלי",
+    "nutritionPlan": "תפריט תזונה מהמאמן/ת",
+    "nutritionPlanNoneYet": "המאמן/ת עדיין לא שיתפ/ה תפריט תזונה.",
     "language": "שפה"
   },
   "exercises": {
@@ -346,6 +348,17 @@
       "noneYet": "עדיין אין הערות.",
       "deleteTitle": "מחיקת הערה",
       "deleteMessage": "לא ניתן לבטל פעולה זו."
+    },
+    "nutrition": {
+      "title": "יועץ תזונה חכם",
+      "calories": "קלוריות",
+      "protein": "חלבון (גרם)",
+      "carbs": "פחמימות (גרם)",
+      "fat": "שומן (גרם)",
+      "preferences": "העדפות (רשות)",
+      "preferencesPlaceholder": "למשל: צמחוני, כשר, ללא אגוזים",
+      "suggest": "הצע תפריט יומי",
+      "lastSaved": "התפריט האחרון שנשמר"
     },
     "weightOverTime": "משקל לאורך זמן",
     "recentLogs": "יומני אימונים אחרונים",

@@ -49,14 +49,14 @@ export default function TabsLayout() {
         name="schedule"
         options={{ title: t("tabs.schedule"), headerShown: false, href: isTrainer ? undefined : null }}
       />
-      {/* Progress + Check-in are client-only. */}
+      {/* Progress + Nutrition are client-only. */}
       <Tabs.Screen
         name="progress"
         options={{ title: t("tabs.progress"), href: isTrainer ? null : undefined }}
       />
       <Tabs.Screen
-        name="checkin"
-        options={{ title: t("tabs.checkin"), href: isTrainer ? null : undefined }}
+        name="nutrition"
+        options={{ title: t("tabs.nutrition"), href: isTrainer ? null : undefined }}
       />
       <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
     </Tabs>
