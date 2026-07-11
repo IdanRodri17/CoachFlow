@@ -258,4 +258,60 @@ Paste the prompt for the current step into Claude Code, let it work, run the smo
 ---
 
 ## After V12
-You have a shippable app. Tag it (`git tag v1.0-feature-complete`) and move to `DEPLOYMENT.md` for the store submissions. Future work (push, HealthKit, etc.) lives in SRS §8 as V13+.
+You have a shippable app. Tag it (`git tag v1.0-feature-complete`) and move to `DEPLOYMENT.md` for the store submissions. The post-1.0 roadmap (V13–V16) is specified below and in SRS §5.1; anything beyond it lives in SRS §8.
+
+---
+
+## Post-1.0 roadmap (V13–V16)
+
+Same rules as V1–V12: one step per session, read `docs/SRS.md §5.1` first, smallest change, stop before committing for the smoke test. Migration numbers continue from the repo's current max (0013 as of this writing) — renumber if the sequence has moved on.
+
+### V13 — Trainer cash-flow dashboard
+**Files (≤2 + migration):** `supabase/migrations/0014_money.sql`, `app/(tabs)/index.tsx` (money card) + `app/dashboard/[refId].tsx` (price field in the existing session-package card)
+
+**Prompt:**
+> Migration `0014_money.sql`: add nullable `price_per_session numeric` to `packages`, plus a `security_invoker` view `trainer_monthly_money` returning per-trainer figures for the current month in Asia/Jerusalem (`(now() at time zone 'Asia/Jerusalem')::date`, never `current_date`): `earned` (this month's completed sessions × that client's price), `projected` (earned + remaining scheduled-this-month sessions × price), `unpaid` (completed & not-paid sessions × price), and `clients_without_price` (count), using the subject_key pattern (`coalesce(client_id::text, 'm:' || managed_client_id::text)`) so app and offline clients both count. In the app: a price input (numeric, LTR_INPUT_STYLE) in the session-package card on client detail, and a money card at the top of the trainer Home above the roster showing earned / projected / unpaid (₪) with a small hint when some clients have no price set. All figures come from the view — never computed twice, never stored.
+
+**Smoke test:** Set a price for one client → complete a workout this month → Home shows earned = 1 × price and unpaid rises until you mark it paid; schedule two more workouts later this month → projected = earned + 2 × price; a second client without a price shows the "no price set" hint and doesn't distort totals. Regenerate types (`npm run db:types` or hand-edit) and `npx tsc --noEmit` is clean.
+
+**On green:** `git commit -m "feat(v13): trainer cash-flow dashboard"` && `git push`
+
+### V14 — Schedule-first calendar
+**Files (≤2):** `app/(tabs)/schedule/index.tsx` (rebuilt as calendar), `app/clients.tsx` (new — roster + add-client moved here) + a Home entry point to it
+
+**Prompt:**
+> Rebuild the trainer Schedule tab as a calendar-first screen: a toggle between a weekly strip and a monthly grid (dot markers on days that have workouts; selecting a day lists that day's workouts below, colored by the derived scheduled/completed/missed rules — missed is derived on read, never stored). Default to today's week; all week/month boundaries via lib/dates (Asia/Jerusalem), never raw UTC. Move "add app client", "add offline client" and the "your clients" roster off this tab into a new Clients screen (`app/clients.tsx`) opened from a button on the trainer Home beside the roster header. Keep every existing capability (shift day, per-workout notes, paid toggle, drill into client) reachable from the day view. RTL-aware from the start: the week strip and month grid must mirror correctly under Hebrew (test both languages); Text alignment per the repo convention (literal `text-left` = logical start).
+
+**Smoke test:** Weekly view shows this week with dots on scheduled days; tapping a day shows its workouts with correct colors (past uncompleted = missed-red); month view matches; add-client and roster now live on the Clients screen and are gone from Schedule; everything still works in Hebrew RTL (strip flows right-to-left).
+
+**On green:** `git commit -m "feat(v14): schedule-first weekly and monthly calendar"` && `git push`
+
+### V14b — Device calendar sync (bonus, optional)
+**Files (≤2):** `lib/deviceCalendar.ts` (new), `app/(tabs)/profile.tsx` (toggle) — plus hook calls where workouts are created/moved/deleted
+
+**Prompt:**
+> Add opt-in one-way device-calendar sync using `expo-calendar` (check the exact SDK-54 API at docs.expo.dev/versions/v54.0.0/sdk/calendar/ first). A Profile toggle ("Sync to my calendar", trainer only) that, when enabled, requests calendar permission, creates a dedicated "CoachFlow" calendar, and mirrors the trainer's scheduled workouts into it: create/update/delete events when workouts are created, moved, or deleted (title = client name + template, date + optional time). The app remains the source of truth — never read device events back. Keep the mapping (workout id → event id) and the calendar id in AsyncStorage; nothing new in the DB. If permission is denied, the toggle turns itself off with a friendly explanation.
+
+**Smoke test:** Enable the toggle → schedule a workout → it appears in the iPhone/Google calendar; move it a day in the app → the event moves; delete it → the event disappears; disable the toggle → no further events are created.
+
+**On green:** `git commit -m "feat(v14b): one-way device calendar sync"` && `git push`
+
+### V15 — AI nutrition assistant
+**Files (≤2 + migration + function):** `supabase/migrations/0015_nutrition.sql`, `supabase/functions/nutrition-suggest/index.ts`, `app/dashboard/[refId].tsx` (nutrition section) + client read-only view
+
+**Prompt:**
+> Migration `0015_nutrition.sql`: `nutrition_plans` (id, trainer_id, client_id nullable, managed_client_id nullable, targets jsonb, plan_markdown text, created_at) with RLS: trainer full access to own rows, app client can select rows where client_id = auth.uid(). New Edge Function `nutrition-suggest` (Deno, same structure as send-reminders): body {calories, protein_g, carbs_g, fat_g, preferences?, locale} → calls the Claude API (read the current Anthropic API docs before writing; default model claude-sonnet-5, or claude-haiku-4-5 if cost matters; ANTHROPIC_API_KEY as a function secret — never in the app) with a system prompt requesting a one-day meal plan hitting the targets, per-meal macro estimates, in the requested language (he/en), ending with a fixed "כלליות בלבד — לא ייעוץ רפואי או דיאטני" / "general suggestions — not medical or dietetic advice" line. In the app: a Nutrition section on the trainer's client-detail page — numeric target inputs (LTR_INPUT_STYLE), a Suggest button that calls the function, renders the plan, and a Save button writing to nutrition_plans; the client sees their latest saved plan read-only (e.g. from Profile). Add the tsconfig exclude if needed (supabase/functions is already excluded).
+
+**Smoke test:** Enter 2200 kcal / 160p / 220c / 70f + "vegetarian" in Hebrew → a sensible Hebrew day plan with macro estimates and the disclaimer appears in under ~15s; Save → reopening the client shows the saved plan; the client account sees the same plan read-only; the API key appears nowhere in the app bundle (grep).
+
+**On green:** `git commit -m "feat(v15): ai nutrition assistant via edge function"` && `git push`
+
+### V16 — Client retention radar
+**Files (≤2 + migration):** `supabase/migrations/0016_client_risk.sql`, `app/(tabs)/index.tsx` (at-risk card)
+
+**Prompt:**
+> Migration `0016_client_risk.sql`: a `security_invoker` view `client_risk` flagging, per trainer and subject_key, `at_risk` with a `reason`: 'missed_streak' (the client's 2 most recent past scheduled workouts are both derived-missed — scheduled_date before today Asia/Jerusalem and not completed) or 'gone_quiet' (no completed workout in the last 10 days despite at least one completed in the 30 days before that). Derived on read only — no stored flags, no cron (same discipline as streaks, SRS §4.1). On the trainer Home, add an "at-risk" card above the roster (only when non-empty) listing flagged clients with a reason chip; tapping a row opens the client detail; for app clients with a phone, reuse lib/whatsapp's deep link for a one-tap nudge button.
+
+**Smoke test:** A client with two past uncompleted scheduled workouts shows in the card with the missed-streak reason; a client who trained 3 weeks ago but not in the last 10 days shows gone-quiet; completing a workout clears them on refetch; a brand-new client with no history is NOT flagged.
+
+**On green:** `git commit -m "feat(v16): client retention radar"` && `git push`
