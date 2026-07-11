@@ -488,6 +488,8 @@ export type Database = {
           managed_client_id: string | null;
           total_sessions: number;
           used_sessions: number;
+          // V13 (0014): what the trainer charges per session; null = not set yet.
+          price_per_session: number | null;
           created_at: string;
         };
         Insert: {
@@ -497,6 +499,7 @@ export type Database = {
           managed_client_id?: string | null;
           total_sessions?: number;
           used_sessions?: number;
+          price_per_session?: number | null;
           created_at?: string;
         };
         Update: {
@@ -506,6 +509,7 @@ export type Database = {
           managed_client_id?: string | null;
           total_sessions?: number;
           used_sessions?: number;
+          price_per_session?: number | null;
           created_at?: string;
         };
         Relationships: [];
@@ -537,6 +541,20 @@ export type Database = {
           next_scheduled_id: string | null;
           next_scheduled_date: string | null;
           next_scheduled_time: string | null;
+        };
+        Relationships: [];
+      };
+      // --- V13: 0014_money.sql ---
+      trainer_monthly_money: {
+        Row: {
+          trainer_id: string;
+          month: string;
+          sessions_completed: number;
+          earned: number;
+          paid_amount: number;
+          unpaid: number;
+          projected: number;
+          clients_without_price: number;
         };
         Relationships: [];
       };

@@ -54,7 +54,14 @@
     "markComplete": "סמן כהושלם",
     "today": "היום",
     "withTrainer": "💪 עם המאמן",
-    "done": "בוצע ✓"
+    "done": "בוצע ✓",
+    "money": {
+      "title": "החודש",
+      "earned": "הרווחת",
+      "projected": "צפי",
+      "unpaid": "לתשלום",
+      "priceGapHint": "ל-{{count}} מתאמנים לא הוגדר מחיר"
+    }
   },
   "profile": {
     "title": "פרופיל",
@@ -308,7 +315,11 @@
       "notSetUp": "עדיין לא הוגדרה חבילה.",
       "totalPlaceholder": "סה\"כ",
       "updateTotal": "עדכן סה\"כ",
-      "setTotal": "הגדר סה\"כ"
+      "setTotal": "הגדר סה\"כ",
+      "pricePerSession": "₪{{price}} לאימון",
+      "priceNotSet": "עדיין לא הוגדר מחיר.",
+      "pricePlaceholder": "מחיר",
+      "setPrice": "הגדר מחיר"
     },
     "checkin": {
       "title": "צ'ק-אין אחרון",

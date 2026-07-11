@@ -22,14 +22,36 @@ function rosterKey(kind: "app" | "managed", refId: string) {
   return kind === "app" ? refId : `m:${refId}`;
 }
 
+function formatMoney(value: number, locale: string) {
+  return new Intl.NumberFormat(locale === "he" ? "he" : "en").format(Math.round(value));
+}
+
 export default function HomeScreen() {
   const { session, profile } = useAuth();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const queryClient = useQueryClient();
   const isTrainer = profile?.role === "trainer";
   const trainerId = session?.user.id ?? "";
 
   const roster = useRosterClients(trainerId, { enabled: isTrainer && !!session });
+
+  // V13: cash-flow card — reads the CURRENT month's row from the
+  // trainer_monthly_money view (0014_money.sql), never computed in app code.
+  const currentMonthKey = `${todayISO().slice(0, 7)}-01`;
+  const money = useQuery({
+    queryKey: ["trainer-monthly-money", currentMonthKey],
+    enabled: isTrainer && !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("trainer_monthly_money")
+        .select("*")
+        .eq("trainer_id", trainerId)
+        .eq("month", currentMonthKey)
+        .maybeSingle();
+      if (error) throw error;
+      return data;
+    },
+  });
 
   const dashboard = useQuery({
     queryKey: ["dashboard-status"],
@@ -139,6 +161,42 @@ export default function HomeScreen() {
 
         {isTrainer ? (
           <View className="mt-6 pb-6">
+            <View className="mb-4 rounded-2xl border border-slate-200 p-4">
+              <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+                {t("home.money.title")}
+              </Text>
+              {money.isLoading ? (
+                <ActivityIndicator className="mt-3" />
+              ) : money.error ? (
+                <Text className="mt-2 w-full text-left text-xs text-red-600">
+                  {(money.error as Error).message}
+                </Text>
+              ) : (
+                <>
+                  <View className="mt-3 flex-row gap-4">
+                    <MoneyStat
+                      label={t("home.money.earned")}
+                      value={formatMoney(money.data?.earned ?? 0, i18n.language)}
+                    />
+                    <MoneyStat
+                      label={t("home.money.projected")}
+                      value={formatMoney(money.data?.projected ?? 0, i18n.language)}
+                    />
+                    <MoneyStat
+                      label={t("home.money.unpaid")}
+                      value={formatMoney(money.data?.unpaid ?? 0, i18n.language)}
+                      accent
+                    />
+                  </View>
+                  {money.data && money.data.clients_without_price > 0 ? (
+                    <Text className="mt-3 w-full text-left text-xs text-amber-600">
+                      {t("home.money.priceGapHint", { count: money.data.clients_without_price })}
+                    </Text>
+                  ) : null}
+                </>
+              )}
+            </View>
+
             {dashboard.error ? (
               <Text className="mb-3 w-full text-left text-sm text-red-600">
                 {(dashboard.error as Error).message}
@@ -282,6 +340,17 @@ export default function HomeScreen() {
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+function MoneyStat({ label, value, accent }: { label: string; value: string; accent?: boolean }) {
+  return (
+    <View className="flex-1">
+      <Text className="w-full text-left text-xs text-slate-400">{label}</Text>
+      <Text className={`mt-0.5 w-full text-left text-base font-semibold ${accent ? "text-red-600" : "text-slate-900"}`}>
+        ₪{value}
+      </Text>
+    </View>
   );
 }
 

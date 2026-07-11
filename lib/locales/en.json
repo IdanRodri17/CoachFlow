@@ -54,7 +54,14 @@
     "markComplete": "Mark complete",
     "today": "Today",
     "withTrainer": "💪 With trainer",
-    "done": "Done ✓"
+    "done": "Done ✓",
+    "money": {
+      "title": "This month",
+      "earned": "Earned",
+      "projected": "Projected",
+      "unpaid": "Unpaid",
+      "priceGapHint": "{{count}} client(s) with no price set"
+    }
   },
   "profile": {
     "title": "Profile",
@@ -308,7 +315,11 @@
       "notSetUp": "No package set up yet.",
       "totalPlaceholder": "Total",
       "updateTotal": "Update total",
-      "setTotal": "Set total"
+      "setTotal": "Set total",
+      "pricePerSession": "₪{{price}} per session",
+      "priceNotSet": "No price set yet.",
+      "pricePlaceholder": "Price",
+      "setPrice": "Set price"
     },
     "checkin": {
       "title": "Latest check-in",

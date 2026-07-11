@@ -272,6 +272,9 @@ export default function ClientDetailScreen() {
   // only ever edits total_sessions here.
   const streakCol = kind === "app" ? "client_id" : "managed_client_id";
   const [totalSessionsInput, setTotalSessionsInput] = useState("");
+  // V13: what this client is charged per session; only editable, never blank-submitted
+  // (an empty field leaves price_per_session untouched — see savePrice below).
+  const [priceInput, setPriceInput] = useState("");
 
   const packageQuery = useQuery({
     queryKey: ["package", kind, refId],
@@ -308,6 +311,33 @@ export default function ClientDetailScreen() {
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: ["package", kind, refId] }),
+  });
+
+  const savePrice = useMutation({
+    mutationFn: async (price: number) => {
+      if (packageQuery.data) {
+        const { error } = await supabase
+          .from("packages")
+          .update({ price_per_session: price })
+          .eq("id", packageQuery.data.id);
+        if (error) throw error;
+      } else if (kind === "app") {
+        const { error } = await supabase
+          .from("packages")
+          .insert({ trainer_id: trainerId, client_id: refId, price_per_session: price });
+        if (error) throw error;
+      } else {
+        const { error } = await supabase
+          .from("packages")
+          .insert({ trainer_id: trainerId, managed_client_id: refId, price_per_session: price });
+        if (error) throw error;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["package", kind, refId] });
+      queryClient.invalidateQueries({ queryKey: ["trainer-monthly-money"] });
+      setPriceInput("");
+    },
   });
 
   // Latest weekly check-in (V10) — app clients only (self-reported).
@@ -508,6 +538,43 @@ export default function ClientDetailScreen() {
               {(savePackage.error as Error).message}
             </Text>
           ) : null}
+
+          <View className="mt-4 border-t border-slate-100 pt-4">
+            <Text className="w-full text-left text-xs text-slate-500">
+              {packageQuery.data?.price_per_session != null
+                ? t("dashboard.sessionPackage.pricePerSession", { price: packageQuery.data.price_per_session })
+                : t("dashboard.sessionPackage.priceNotSet")}
+            </Text>
+            <View className="mt-2 flex-row items-center gap-2">
+              <TextInput
+                className="w-24 rounded-lg border border-slate-300 px-3 py-2 text-base text-slate-900"
+                style={LTR_INPUT_STYLE}
+                placeholder={t("dashboard.sessionPackage.pricePlaceholder")}
+                placeholderTextColor="#94a3b8"
+                keyboardType="decimal-pad"
+                value={priceInput}
+                onChangeText={setPriceInput}
+              />
+              <Pressable
+                className="items-center justify-center rounded-lg bg-slate-900 px-4 py-2.5 active:opacity-80"
+                disabled={savePrice.isPending || priceInput.trim() === ""}
+                onPress={() => savePrice.mutate(Number.parseFloat(priceInput))}
+              >
+                {savePrice.isPending ? (
+                  <ActivityIndicator color="#ffffff" size="small" />
+                ) : (
+                  <Text className="text-sm font-semibold text-white">
+                    {t("dashboard.sessionPackage.setPrice")}
+                  </Text>
+                )}
+              </Pressable>
+            </View>
+            {savePrice.error ? (
+              <Text className="mt-2 w-full text-left text-xs text-red-600">
+                {(savePrice.error as Error).message}
+              </Text>
+            ) : null}
+          </View>
         </View>
 
         {d.kind === "app" ? (
