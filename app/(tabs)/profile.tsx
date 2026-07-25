@@ -6,11 +6,15 @@
 // V9 (client only): earned badges + a "Share progress" card (app/share-card).
 // V10 (client only): sessions remaining, if the trainer has set up a package.
 // V12a: language toggle (i18next + RTL — see lib/i18n.ts).
+// Deployment prep: delete-account — required by Apple/Google for any app with
+// login (docs/DEPLOYMENT.md §7). Calls the delete-account edge function
+// (service-role only, never in the app) which deletes the auth user; every
+// owned row cascades away via the schema's on-delete-cascade FKs.
 
 import { Link } from "expo-router";
-import { ActivityIndicator, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useQuery } from "@tanstack/react-query";
+import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
@@ -53,6 +57,21 @@ export default function ProfileScreen() {
       return data;
     },
   });
+
+  const deleteAccount = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.functions.invoke("delete-account");
+      if (error) throw error;
+    },
+    onSuccess: () => signOut(),
+  });
+
+  function confirmDeleteAccount() {
+    Alert.alert(t("profile.deleteAccountTitle"), t("profile.deleteAccountMessage"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("profile.deleteAccount"), style: "destructive", onPress: () => deleteAccount.mutate() },
+    ]);
+  }
 
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
@@ -143,6 +162,23 @@ export default function ProfileScreen() {
         >
           <Text className="text-base font-semibold text-red-600">{t("common.signOut")}</Text>
         </Pressable>
+
+        <Pressable
+          className="mt-3 items-center rounded-xl px-4 py-3 active:opacity-70"
+          disabled={deleteAccount.isPending}
+          onPress={confirmDeleteAccount}
+        >
+          {deleteAccount.isPending ? (
+            <ActivityIndicator color="#f87171" />
+          ) : (
+            <Text className="text-sm font-medium text-red-400">{t("profile.deleteAccount")}</Text>
+          )}
+        </Pressable>
+        {deleteAccount.error ? (
+          <Text className="mt-2 w-full text-left text-sm text-red-600">
+            {(deleteAccount.error as Error).message}
+          </Text>
+        ) : null}
 
         {/* Dev-only quick switch between trainer/client (hidden in production). */}
         <DevPanel />

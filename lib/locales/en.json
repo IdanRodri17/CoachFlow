@@ -84,7 +84,10 @@
     "shareProgress": "Share my progress",
     "nutritionPlan": "Nutrition plan from your trainer",
     "nutritionPlanNoneYet": "Your trainer hasn't shared a nutrition plan yet.",
-    "language": "Language"
+    "language": "Language",
+    "deleteAccount": "Delete my account",
+    "deleteAccountTitle": "Delete account",
+    "deleteAccountMessage": "This permanently deletes your account and all of its data — workouts, progress, messages, everything. This can't be undone."
   },
   "exercises": {
     "list": {

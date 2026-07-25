@@ -84,7 +84,10 @@
     "shareProgress": "שתף את ההתקדמות שלי",
     "nutritionPlan": "תפריט תזונה מהמאמן/ת",
     "nutritionPlanNoneYet": "המאמן/ת עדיין לא שיתפ/ה תפריט תזונה.",
-    "language": "שפה"
+    "language": "שפה",
+    "deleteAccount": "מחיקת החשבון שלי",
+    "deleteAccountTitle": "מחיקת חשבון",
+    "deleteAccountMessage": "פעולה זו תמחק לצמיתות את החשבון שלך ואת כל הנתונים שלו — אימונים, התקדמות, הודעות, הכול. לא ניתן לבטל פעולה זו."
   },
   "exercises": {
     "list": {
