@@ -18,13 +18,20 @@
 -- clients have no email to remind. Queried only by the send-reminders edge
 -- function using the service role key, so no RLS grant to authenticated here.
 --
+-- SECURITY: `security_invoker = true` on both views below was MISSING in the
+-- original V11 version of this file, which meant they ran with definer
+-- (postgres) rights and RLS never applied — anyone holding the anon key could
+-- read every trainer's rows. Fixed in 0017_reminder_views_rls.sql and patched
+-- here too so re-running this file can't reintroduce it. Do not remove.
+--
 -- Re-runnable.
 
 alter table public.scheduled_workouts add column if not exists reminded_at timestamptz;
 alter table public.trainer_clients add column if not exists contact_phone text;
 alter table public.managed_clients add column if not exists phone text;
 
-create or replace view public.due_reminders as
+create or replace view public.due_reminders
+with (security_invoker = true) as
 select
   sw.id,
   sw.trainer_id,
@@ -52,7 +59,8 @@ where sw.status = 'scheduled'
 -- trainer_clients.contact_phone or managed_clients.phone) itself.
 alter table public.scheduled_workouts add column if not exists sms_reminded_at timestamptz;
 
-create or replace view public.due_sms_reminders as
+create or replace view public.due_sms_reminders
+with (security_invoker = true) as
 select
   sw.id,
   sw.trainer_id,

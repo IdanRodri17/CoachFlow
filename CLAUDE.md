@@ -56,6 +56,11 @@ submission.
   range lag. Keep it until the ecosystem tightens its ranges.
 - **Expo SDK 54** (pinned to match the test phone's Expo Go, which caps at SDK
   54). Don't bump the SDK without checking the device's Expo Go still supports it.
+- **Every view declares `with (security_invoker = true)`** and explicitly
+  grants only the roles that need it (`revoke all ... from anon, authenticated`
+  when only edge functions read it). Supabase auto-grants new `public` objects
+  to `anon`/`authenticated`, and a non-invoker view bypasses RLS — `0011`'s
+  reminder views leaked every trainer's schedule this way until `0017`.
 
 ### Supabase tooling (run after creating the project)
 
