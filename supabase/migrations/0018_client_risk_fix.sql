@@ -1,23 +1,22 @@
--- 0016_client_risk.sql — V16: client retention radar.
+-- 0018_client_risk_fix.sql — bug fix for V16's client_risk view.
 --
--- Flags, per (trainer, subject_key), an at-risk client with a reason —
--- derived on read only (SRS §4.1 discipline: no stored flags, no cron, same
--- as client_streaks in 0008_dashboard_views.sql). "Missed" reuses the exact
--- locked definition: status <> 'completed' and scheduled_date < today
--- (Asia/Jerusalem) — a workout scheduled for today is never "missed" even if
--- not yet done.
+-- THE BUG (in the original 0016_client_risk.sql): the recent_past CTE selected
+-- workouts with `scheduled_date <= today`, but the missed_streak test required
+-- `scheduled_date < today` (the locked SRS §4.1 rule — a workout dated today
+-- isn't missed yet). So if a client had a workout scheduled for TODAY, that
+-- row took rn=1, could never satisfy the missed test, `bool_and` collapsed to
+-- false, and the client was silently NOT flagged — even when their two most
+-- recent genuinely-past workouts were both missed. The radar went quiet
+-- exactly when the client was most at risk.
 --
---   - 'missed_streak': the subject's 2 most recent STRICTLY-PAST scheduled
---     workouts both exist and are both derived-missed. A subject with fewer
---     than 2 such workouts (including brand-new clients with no history) is
---     never flagged this way. A workout dated today is ignored entirely here —
---     it isn't missed yet, and it must not displace a genuinely-missed one.
---   - 'gone_quiet': no completed workout in the last 10 days, despite at
---     least one completed workout in the 30 days before that (days 11-40
---     ago) — i.e. they were active a month ago and have since stopped.
+-- THE FIX: restrict recent_past to STRICTLY past workouts. The `scheduled_date
+-- < today` term inside bool_and then becomes redundant and is dropped, so
+-- "missed" reduces to "not completed" — which is correct, because every row
+-- reaching that point is already past.
 --
--- security_invoker = true so a trainer only ever sees rows their existing
--- scheduled_workouts RLS already lets them see — no new policies needed.
+-- 0016_client_risk.sql has been patched with the same change so a fresh
+-- environment (npm run db:seed) builds the correct view from the start; this
+-- migration exists so an ALREADY-APPLIED database gets fixed too.
 --
 -- Re-runnable.
 
@@ -45,11 +44,6 @@ recent_past as (
       order by sw.scheduled_date desc, sw.id desc
     ) as rn
   from public.scheduled_workouts sw, today
-  -- STRICTLY past. Using <= here was a bug (fixed in 0018): a workout dated
-  -- TODAY would take rn=1, and since a today-dated workout can never satisfy
-  -- the "missed" test (missed requires scheduled_date < today, SRS §4.1),
-  -- bool_and collapsed to false and the client was silently NOT flagged —
-  -- exactly when they were most at risk.
   where sw.scheduled_date < today.value
 ),
 missed_streak as (
@@ -59,8 +53,6 @@ missed_streak as (
   group by trainer_id, subject_key
   having
     count(*) = 2
-    -- recent_past is already strictly-past, so "missed" here is just
-    -- "not completed" (SRS §4.1: missed = past AND not completed).
     and bool_and(status <> 'completed')
 ),
 gone_quiet as (
