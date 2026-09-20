@@ -54,8 +54,11 @@ submission.
   auto-adds the worklets Babel plugin — do not add it manually.
 - **`.npmrc` sets `legacy-peer-deps=true`** to absorb React 19 / Expo SDK peer
   range lag. Keep it until the ecosystem tightens its ranges.
-- **Expo SDK 54** (pinned to match the test phone's Expo Go, which caps at SDK
-  54). Don't bump the SDK without checking the device's Expo Go still supports it.
+- **Expo SDK 57** (upgraded 2026-09-19 from 54 because Expo Go on the iPhone
+  auto-updated past it). Until there's a development build (playbook Step 1),
+  the test device's Expo Go dictates the SDK: when Expo Go updates, expect to
+  upgrade again (`npx expo install expo@^N` → `npx expo install --fix` →
+  `npx expo-doctor` → `tsc --noEmit` → `npx expo export --platform ios`).
 - **Every view declares `with (security_invoker = true)`** and explicitly
   grants only the roles that need it (`revoke all ... from anon, authenticated`
   when only edge functions read it). Supabase auto-grants new `public` objects

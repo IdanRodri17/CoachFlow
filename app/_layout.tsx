@@ -12,8 +12,10 @@
 //      events for the app, not just a layout container, so the actual RTL fix
 //      lives one level in, on a plain View, so only VISUAL Yoga mirroring is
 //      affected, never gesture hit-testing.
-//   4. LocaleDirContext.Provider — React Navigation reads this (not
-//      I18nManager) for its own left/right decisions (e.g. the tab bar).
+//   4. LocaleProvider — expo-router's navigation chrome (e.g. the tab bar)
+//      reads this context (not I18nManager) for its own left/right decisions.
+//      Since SDK 56 expo-router no longer depends on @react-navigation/*, so
+//      this replaced the old `LocaleDirContext.Provider` import from there.
 //   5. QueryClientProvider — TanStack Query (server-state cache).
 //   6. AuthProvider        — our session + profile context (lib/auth.tsx).
 //   7. <Stack />           — the root navigator. Individual route groups
@@ -24,8 +26,7 @@ import "@/lib/i18n";
 
 import { useEffect } from "react";
 import { View } from "react-native";
-import { Stack } from "expo-router";
-import { LocaleDirContext } from "@react-navigation/native";
+import { LocaleProvider, Stack } from "expo-router";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -59,9 +60,9 @@ export default function RootLayout() {
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
-              <LocaleDirContext.Provider value={dir}>
+              <LocaleProvider direction={dir}>
                 <Stack screenOptions={{ headerShown: false }} />
-              </LocaleDirContext.Provider>
+              </LocaleProvider>
             </AuthProvider>
           </QueryClientProvider>
         </SafeAreaProvider>
