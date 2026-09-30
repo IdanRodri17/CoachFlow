@@ -29,8 +29,14 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 //
 // V18a: SMS login. Supabase Auth has no SMS4Free provider, so the codes go out
 // through the Send SMS auth hook (supabase/functions/send-sms-hook — its header
-// lists the dashboard setup). "email" stays available as the fallback mode; the
-// dev quick-switch (DevPanel) uses email+password and doesn't read this flag.
+// lists the dashboard setup).
+//
+// V18c: SMS is the ONLY way in. The dev email+password quick-switch is gone
+// (its password shipped inside the release bundle), and the Email provider is
+// disabled in the dashboard. For testing both roles without real SMS, use
+// Supabase's test phone numbers (Authentication → Providers → Phone → test
+// OTPs) — fixed codes that live in the dashboard, never in this bundle. The
+// "email" branch below stays only as a dormant fallback.
 export const AUTH_MODE: "email" | "sms" = "sms";
 
 /**

@@ -26,7 +26,6 @@ import { Redirect } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { AUTH_MODE, profileComplete, sendOtp, toE164IL, useAuth, verifyOtp } from "@/lib/auth";
-import { DevPanel } from "@/components/DevPanel";
 import { LTR_INPUT_STYLE, LTR_WRITING_DIRECTION_ONLY } from "@/lib/i18n";
 
 // Auth error codes that mean "slow down" rather than "something's wrong".
@@ -174,9 +173,6 @@ export default function SignInScreen() {
               </Text>
             </Pressable>
           ) : null}
-
-          {/* Dev-only quick switch (hidden in production builds). */}
-          <DevPanel />
         </View>
       </KeyboardAvoidingView>
     </SafeAreaView>

@@ -21,7 +21,6 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { BADGE_INFO, type BadgeType } from "@/lib/badges";
 import { SUPPORTED_LOCALES, setLocale, type SupportedLocale } from "@/lib/i18n";
-import { DevPanel } from "@/components/DevPanel";
 
 const LOCALE_LABELS: Record<SupportedLocale, string> = { en: "English", he: "עברית" };
 
@@ -225,9 +224,6 @@ export default function ProfileScreen() {
             {(deleteAccount.error as Error).message}
           </Text>
         ) : null}
-
-        {/* Dev-only quick switch between trainer/client (hidden in production). */}
-        <DevPanel />
       </ScrollView>
     </SafeAreaView>
   );
