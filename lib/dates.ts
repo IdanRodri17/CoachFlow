@@ -98,11 +98,18 @@ export function weekdayOf(dateISO: string): number {
   return new Date(`${dateISO}T12:00:00Z`).getUTCDay();
 }
 
-/** Returns the "YYYY-MM-DD" that is `months` calendar months after the date. */
+/**
+ * Returns the "YYYY-MM-DD" that is `months` calendar months after the date,
+ * clamped to the target month's last day: 31 Jan + 1 month = 28/29 Feb.
+ * (Date.UTC alone would spill the overflow into the next month — 3 March —
+ * which made "repeat for N months" from the 29th–31st run a few days long.)
+ */
 export function addMonths(dateISO: string, months: number): string {
   const [y, m, d] = dateISO.split("-").map(Number);
-  // Date.UTC rolls month overflow into the year automatically.
-  return new Date(Date.UTC(y, m - 1 + months, d, 12, 0, 0)).toISOString().slice(0, 10);
+  // Day 0 of the following month is the target month's last day. Date.UTC
+  // rolls month overflow into the year automatically.
+  const lastDay = new Date(Date.UTC(y, m + months, 0)).getUTCDate();
+  return new Date(Date.UTC(y, m - 1 + months, Math.min(d, lastDay), 12, 0, 0)).toISOString().slice(0, 10);
 }
 
 /**
