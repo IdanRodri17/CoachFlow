@@ -335,6 +335,16 @@ function RosterRow({
           </Text>
         ) : null}
       </View>
+      {/* V18 reachability, derived on read (nothing stored): login is
+          SMS-only, so a saved phone is the one thing that decides whether
+          reminders can reach this client. */}
+      <Text
+        className={`mt-1 self-start rounded-full px-2 py-0.5 text-xs font-semibold ${
+          savedPhone ? "bg-emerald-50 text-emerald-700" : "bg-amber-50 text-amber-700"
+        }`}
+      >
+        {savedPhone ? t("clients.reachableSms") : t("clients.unreachable")}
+      </Text>
       <View className="mt-2 flex-row items-center gap-2">
         <TextInput
           className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900"

@@ -248,7 +248,9 @@
     "clientNamePlaceholder": "Client name",
     "yourClients": "Your clients ({{count}})",
     "noClientsYet": "No clients yet — add one above.",
-    "phonePlaceholder": "Phone for reminders, e.g. 050-1234567"
+    "phonePlaceholder": "Phone for reminders, e.g. 050-1234567",
+    "reachableSms": "SMS reminders on",
+    "unreachable": "No phone — gets no reminders"
   },
   "join": {
     "title": "Join your trainer",

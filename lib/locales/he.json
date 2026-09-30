@@ -248,7 +248,9 @@
     "clientNamePlaceholder": "שם המתאמן",
     "yourClients": "המתאמנים שלך ({{count}})",
     "noClientsYet": "עדיין אין מתאמנים — הוסיפו אחד למעלה.",
-    "phonePlaceholder": "טלפון לתזכורות, למשל 050-1234567"
+    "phonePlaceholder": "טלפון לתזכורות, למשל 050-1234567",
+    "reachableSms": "תזכורות SMS פעילות",
+    "unreachable": "אין טלפון — לא מקבל תזכורות"
   },
   "join": {
     "title": "הצטרפות למאמן שלך",

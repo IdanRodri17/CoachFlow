@@ -46,7 +46,8 @@
 // (same code path as the cron job), then read the JSON summary with
 // `select status_code, content from net._http_response order by created desc limit 1;`.
 // Run twice to confirm the second run sends zero. The Dashboard "Invoke"
-// button can't send the header and correctly gets 401.
+// button can't send the header and correctly gets 401. Every attempt is
+// recorded in public.reminder_log (0023).
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -172,6 +173,26 @@ Deno.serve(async (req) => {
   let failed = 0;
   const errors: string[] = [];
 
+  // V18 (0023): one reminder_log row per send attempt, success or failure, so
+  // "did it go out and what did SMS4Free say?" is a query, not a guess. A
+  // logging failure is reported in the summary but never blocks the send.
+  async function logAttempt(
+    row: DueSmsReminder,
+    recipient: string,
+    providerStatus: string | null,
+    error: string | null,
+  ) {
+    const { error: logErr } = await supabase.from("reminder_log").insert({
+      scheduled_workout_id: row.id,
+      channel: "sms",
+      kind: row.kind,
+      recipient,
+      provider_status: providerStatus,
+      error,
+    });
+    if (logErr) errors.push(`${row.id}: failed to write reminder_log (${logErr.message})`);
+  }
+
   for (const row of due) {
     // Resolve the stamp column BEFORE sending — see the same guard in
     // send-reminders. An unmarked SMS is re-sent on every cron tick, and
@@ -228,17 +249,21 @@ Deno.serve(async (req) => {
         if (updateErr) {
           failed++;
           errors.push(`${row.id}: sent but failed to mark ${column} (${updateErr.message})`);
+          await logAttempt(row, phone, String(result.status), `sent, but failed to mark ${column}: ${updateErr.message}`);
           continue;
         }
         sent++;
+        await logAttempt(row, phone, String(result.status), null);
       } else {
         failed++;
         const reason = STATUS_MESSAGES[result.status] ?? result.message ?? `unknown status ${result.status}`;
         errors.push(`${row.id}: SMS4Free status ${result.status} (${reason})`);
+        await logAttempt(row, phone, String(result.status), reason);
       }
     } catch (e) {
       failed++;
       errors.push(`${row.id}: ${(e as Error).message}`);
+      await logAttempt(row, phone, null, (e as Error).message);
     }
   }
 
