@@ -31,14 +31,22 @@
 // sms4free.co.il, using the same sender number — this verifies the sender.
 // Skipping this makes every API call fail with status -6.
 //
-// CRON SETUP: same options and same hourly cadence as send-reminders
-// (Dashboard Cron, or pg_cron + pg_net) — just point at this function's URL
-// instead/as well. Hourly is safe here for the same reason: the view gates the
-// send time, and the stamp columns make repeat ticks no-ops. That matters more
-// on this channel, since every SMS costs money.
+// CRON (V18): scheduled hourly by pg_cron in the checked-in migration
+// 0022_reminder_cron.sql (job "send-sms-reminders-hourly"). Hourly is safe:
+// the view gates the send time, and the stamp columns make repeat ticks
+// no-ops — which matters on this channel, since every SMS costs money.
 //
-// MANUAL SMOKE TEST: invoke directly, same as send-reminders. Response is a
-// JSON summary; run twice to confirm the second run sends zero.
+// AUTH (V18): only that job may start a run. It sends an x-cron-secret header,
+// checked below against Vault via verify_cron_secret() (0022), so the secret
+// never leaves the database and isn't duplicated as a function secret.
+// DEPLOY WITH --no-verify-jwt: this check replaces the gateway's JWT check,
+// which anyone holding the public anon key would pass.
+//
+// MANUAL SMOKE TEST: from the SQL Editor, `select public.invoke_sms_reminders();`
+// (same code path as the cron job), then read the JSON summary with
+// `select status_code, content from net._http_response order by created desc limit 1;`.
+// Run twice to confirm the second run sends zero. The Dashboard "Invoke"
+// button can't send the header and correctly gets 401.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
@@ -99,7 +107,7 @@ function json(body: unknown, status = 200): Response {
   return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
 }
 
-Deno.serve(async (_req) => {
+Deno.serve(async (req) => {
   const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
   const serviceRoleKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
   const apiKey = Deno.env.get("SMS4FREE_API_KEY");
@@ -107,11 +115,18 @@ Deno.serve(async (_req) => {
   const pass = Deno.env.get("SMS4FREE_PASS");
   const sender = Deno.env.get("SMS4FREE_SENDER");
 
+  const supabase = createClient(supabaseUrl, serviceRoleKey);
+
+  // Only the pg_cron job (or invoke_sms_reminders() by hand) gets past here.
+  const { data: authorized, error: authErr } = await supabase.rpc("verify_cron_secret", {
+    p_secret: req.headers.get("x-cron-secret") ?? "",
+  });
+  if (authErr) return json({ error: `cron secret check failed: ${authErr.message}` }, 500);
+  if (!authorized) return json({ error: "Forbidden" }, 401);
+
   if (!apiKey || !user || !pass || !sender) {
     return json({ error: "SMS4FREE_API_KEY / SMS4FREE_USER / SMS4FREE_PASS / SMS4FREE_SENDER secrets are not all set." }, 500);
   }
-
-  const supabase = createClient(supabaseUrl, serviceRoleKey);
 
   const { data: due, error: dueErr } = await supabase
     .from("due_sms_reminders")
