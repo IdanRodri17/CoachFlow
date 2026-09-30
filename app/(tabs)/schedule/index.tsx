@@ -87,7 +87,13 @@ export default function ScheduleHomeScreen() {
   const rangeEnd = mode === "week" ? weekDays[6] : monthDays[monthDays.length - 1];
 
   const workouts = useQuery({
-    queryKey: ["scheduled-trainer-range", rangeStart, rangeEnd],
+    // The "scheduled-trainer" PREFIX is load-bearing: six mutations across the
+    // app invalidate ["scheduled-trainer"], and TanStack matches partially, by
+    // element. V14 renamed this key to "scheduled-trainer-range", which is a
+    // different first element — so none of those six matched and the calendar
+    // never refreshed after scheduling/editing/deleting. Keep the range in
+    // later elements, never fused into the first one.
+    queryKey: ["scheduled-trainer", "range", rangeStart, rangeEnd],
     queryFn: async (): Promise<Workout[]> => {
       const { data, error } = await supabase
         .from("scheduled_workouts")
@@ -106,7 +112,10 @@ export default function ScheduleHomeScreen() {
 
   const templateIds = [...new Set((workouts.data ?? []).map((w) => w.template_id).filter(Boolean) as string[])];
   const templates = useQuery({
-    queryKey: ["templates-by-ids", templateIds.join(",")],
+    // Same prefix rule as the workouts key above: template mutations invalidate
+    // ["templates"], and a first element of "templates-by-ids" never matches
+    // it — so a renamed template kept showing its old name here.
+    queryKey: ["templates", "by-ids", templateIds.join(",")],
     enabled: templateIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase.from("workout_templates").select("id, name").in("id", templateIds);
