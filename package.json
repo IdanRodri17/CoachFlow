@@ -35,7 +35,9 @@
     "@types/react": "~19.2.4",
     "babel-preset-expo": "~57.0.0",
     "tailwindcss": "^3.4.19",
-    "typescript": "~6.0.3"
+    "typescript": "~6.0.3",
+    "vite": "^8.3.1",
+    "vitest": "^5.0.3"
   },
   "scripts": {
     "start": "expo start",
@@ -43,7 +45,9 @@
     "ios": "expo start --ios",
     "web": "expo start --web",
     "db:types": "supabase gen types typescript --linked > lib/database.types.ts",
-    "db:seed": "supabase db reset"
+    "db:seed": "supabase db reset",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
   },
   "private": true
 }

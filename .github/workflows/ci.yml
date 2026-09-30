@@ -1,0 +1,36 @@
+# .github/workflows/ci.yml — V19 (Step 2): every push and pull request must
+# type-check and pass the unit tests before it reaches the phone.
+#
+# `npm ci` honours the committed .npmrc (legacy-peer-deps=true), so installs
+# resolve exactly as they do locally. The date tests pin their own clock and
+# assert in Asia/Jerusalem, so the runner's UTC time zone doesn't matter.
+
+name: CI
+
+on:
+  push:
+  pull_request:
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      - name: Type-check
+        run: npm run typecheck
+
+      - name: Unit tests
+        run: npm test
