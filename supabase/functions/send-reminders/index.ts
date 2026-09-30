@@ -1,10 +1,16 @@
-// supabase/functions/send-reminders/index.ts — V11: 24h-ahead email reminders.
+// supabase/functions/send-reminders/index.ts — V11 email reminders, V17
+// day-before + morning-of scheduling.
 //
-// Runs on a schedule (see "CRON SETUP" below). Finds scheduled_workouts due
-// within the next 24h (Asia/Jerusalem — computed server-side by the
-// due_reminders view in 0011_reminders.sql, never the function's own clock)
-// that haven't been reminded yet, emails the client via Resend, and stamps
-// reminded_at so a second run never double-sends.
+// Runs on a schedule (see "CRON SETUP" below). Reads due_reminders
+// (0019_reminder_scheduling.sql), which decides BOTH which workouts are due
+// and what time of day is appropriate to tell someone — all in Asia/Jerusalem,
+// server-side, never this function's clock. Each row arrives tagged with a
+// `kind`:
+//   'day_before' — session is tomorrow; the view only exposes it from 18:00.
+//   'morning_of' — session is today;    the view only exposes it from 07:00.
+// The two are tracked in separate columns (reminded_at / morning_reminded_at),
+// stamped after a successful send so no run ever double-sends, and so one
+// timing failing never suppresses the other.
 //
 // App clients only — offline/managed clients have no email on file.
 //
@@ -20,7 +26,13 @@
 //
 // CRON SETUP (pick one):
 //   1. Dashboard: Edge Functions -> send-reminders -> Cron -> add a schedule,
-//      e.g. "0 * * * *" (hourly is plenty — the reminder window is 24h wide).
+//      e.g. "0 * * * *". Hourly is the right cadence and is SAFE: the view's
+//      own time gates decide when a message may go out, and the stamp columns
+//      make every later tick a no-op. Running hourly just means each reminder
+//      lands within an hour of its 18:00 / 07:00 gate. (Do NOT try to encode
+//      the send times in the cron expression instead — pg_cron is UTC and
+//      Israel shifts between UTC+2 and UTC+3, so a fixed hour would drift
+//      across DST. Let the view hold the local-time logic.)
 //   2. SQL (pg_cron + pg_net — enable both under Database -> Extensions),
 //      run once in the SQL editor:
 //        select cron.schedule(
@@ -44,6 +56,8 @@
 
 import { createClient } from "npm:@supabase/supabase-js@2";
 
+type ReminderKind = "day_before" | "morning_of";
+
 type DueReminder = {
   id: string;
   trainer_id: string;
@@ -51,6 +65,14 @@ type DueReminder = {
   template_id: string | null;
   scheduled_date: string;
   scheduled_time: string | null;
+  kind: ReminderKind;
+};
+
+// V17: the view emits both timings; each stamps its own column so one never
+// suppresses the other (see 0019_reminder_scheduling.sql).
+const REMINDED_COLUMN: Record<ReminderKind, string> = {
+  day_before: "reminded_at",
+  morning_of: "morning_reminded_at",
 };
 
 const TIME_ZONE = "Asia/Jerusalem";
@@ -125,12 +147,39 @@ Deno.serve(async (_req) => {
       continue;
     }
 
+    // Resolve the stamp column BEFORE sending. row.kind comes from the view,
+    // and .returns<>() is only a compile-time assertion — if these functions
+    // are ever deployed against a database where 0019 hasn't been applied, the
+    // old views have no `kind`, the lookup yields undefined, and the update
+    // would PATCH a column literally named "undefined". Doing it after the
+    // send means the mail goes out and is never marked, so every subsequent
+    // cron tick re-sends it. Fail before spending anything.
+    const column = REMINDED_COLUMN[row.kind];
+    if (!column) {
+      failed++;
+      errors.push(`${row.id}: unknown reminder kind "${row.kind}" — is migration 0019 applied?`);
+      continue;
+    }
+
     const clientName = nameById.get(row.client_id) ?? "there";
     const trainerName = nameById.get(row.trainer_id) ?? "your trainer";
     const templateName = row.template_id ? (templateNameById.get(row.template_id) ?? "your workout") : "your workout";
     const dateLabel = formatDate(row.scheduled_date);
     const timeLabel = row.scheduled_time ? row.scheduled_time.slice(0, 5) : null;
-    const when = timeLabel ? `${dateLabel} at ${timeLabel}` : dateLabel;
+    // "today at 07:30" reads better than "Mon, Mar 3 at 07:30" on the morning
+    // itself; the day-before message still needs the explicit date.
+    const when =
+      row.kind === "morning_of"
+        ? timeLabel
+          ? `today at ${timeLabel}`
+          : "today"
+        : timeLabel
+          ? `${dateLabel} at ${timeLabel}`
+          : dateLabel;
+    const subject =
+      row.kind === "morning_of"
+        ? `Today: ${templateName} ${when}`
+        : `Reminder: ${templateName} ${when}`;
 
     try {
       const res = await fetch("https://api.resend.com/emails", {
@@ -142,7 +191,7 @@ Deno.serve(async (_req) => {
         body: JSON.stringify({
           from: fromEmail,
           to: email,
-          subject: `Reminder: ${templateName} ${when}`,
+          subject,
           html: `<p>Hi ${clientName},</p><p>Just a reminder — you have <strong>${templateName}</strong> ${when} with ${trainerName}.</p><p>See you then! 💪</p>`,
         }),
       });
@@ -154,11 +203,11 @@ Deno.serve(async (_req) => {
 
       const { error: updateErr } = await supabase
         .from("scheduled_workouts")
-        .update({ reminded_at: new Date().toISOString() })
+        .update({ [column]: new Date().toISOString() })
         .eq("id", row.id);
       if (updateErr) {
         failed++;
-        errors.push(`${row.id}: sent but failed to mark reminded_at (${updateErr.message})`);
+        errors.push(`${row.id}: sent but failed to mark ${column} (${updateErr.message})`);
         continue;
       }
       sent++;

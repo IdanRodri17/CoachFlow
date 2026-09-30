@@ -71,8 +71,12 @@ type AuthContextValue = {
   loading: boolean;
   session: Session | null;
   profile: Profile | null;
-  /** Re-fetch the profile row (call after onboarding writes it). */
+  /** Re-fetch the profile row (call after onboarding writes it). Re-enters the
+   * global loading state — use patchProfile for in-place settings changes. */
   refreshProfile: () => Promise<void>;
+  /** Merge an already-persisted change into the cached profile, without
+   * re-entering the loading state (so the tab navigator isn't remounted). */
+  patchProfile: (patch: Partial<Profile>) => void;
   signOut: () => Promise<void>;
 };
 
@@ -86,15 +90,31 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [profileResolved, setProfileResolved] = useState(false);
 
   // Fetch the current user's profile row (RLS returns only their own).
+  //
+  // On a read ERROR we deliberately keep whatever profile we already had. The
+  // old code did `setProfile(data ?? null)` unconditionally, so one flaky
+  // request collapsed profile to null — and since profileComplete(null) is
+  // false, (tabs)/_layout.tsx would eject a fully-onboarded user to the
+  // onboarding screen, with no way back until app restart (this effect only
+  // re-runs on session change).
   const loadProfile = useCallback(async (userId: string) => {
     setProfileResolved(false);
-    const { data } = await supabase
+    const { data, error } = await supabase
       .from("profiles")
       .select("*")
       .eq("id", userId)
       .maybeSingle();
-    setProfile(data ?? null);
+    if (!error) setProfile(data ?? null);
     setProfileResolved(true);
+  }, []);
+
+  // Merge a known-saved change into the cached profile WITHOUT re-entering the
+  // loading state. refreshProfile() flips profileResolved to false, which makes
+  // AuthContext.loading true, which makes (tabs)/_layout.tsx replace the whole
+  // navigator with a spinner — remounting every tab and losing their state.
+  // That's the right trade on login, but far too heavy for a settings toggle.
+  const patchProfile = useCallback((patch: Partial<Profile>) => {
+    setProfile((prev) => (prev ? { ...prev, ...patch } : prev));
   }, []);
 
   // On mount: read any persisted session, then listen for login/logout changes.
@@ -130,6 +150,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     refreshProfile: async () => {
       if (session?.user) await loadProfile(session.user.id);
     },
+    patchProfile,
     signOut: async () => {
       await supabase.auth.signOut();
     },

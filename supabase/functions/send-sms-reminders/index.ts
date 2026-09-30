@@ -6,10 +6,13 @@
 // contact_phone) and offline/managed clients (managed_clients.phone), since
 // SMS only needs a phone number, not an account.
 //
-// Runs on the same 24h/Asia-Jerusalem due window as send-reminders, tracked
-// independently via sms_reminded_at (0011_reminders.sql) — a client with
-// both an email and a phone gets both reminders; either channel being
-// unavailable never blocks the other.
+// Runs on the same windows as send-reminders — day-before from 18:00 and
+// morning-of from 07:00 Asia/Jerusalem, both decided server-side by the
+// due_sms_reminders view (0019_reminder_scheduling.sql) and tagged on each row
+// as `kind`. Tracked independently of email via sms_reminded_at /
+// morning_sms_reminded_at: a client with both an email and a phone gets both
+// reminders, and either channel or timing being unavailable never blocks the
+// others.
 //
 // SECRETS (set once: `supabase secrets set NAME=value`):
 //   SMS4FREE_API_KEY — from your SMS4Free dashboard's API page.
@@ -28,13 +31,18 @@
 // sms4free.co.il, using the same sender number — this verifies the sender.
 // Skipping this makes every API call fail with status -6.
 //
-// CRON SETUP: same options as send-reminders (Dashboard Cron, or pg_cron +
-// pg_net) — just point at this function's URL instead/as well.
+// CRON SETUP: same options and same hourly cadence as send-reminders
+// (Dashboard Cron, or pg_cron + pg_net) — just point at this function's URL
+// instead/as well. Hourly is safe here for the same reason: the view gates the
+// send time, and the stamp columns make repeat ticks no-ops. That matters more
+// on this channel, since every SMS costs money.
 //
 // MANUAL SMOKE TEST: invoke directly, same as send-reminders. Response is a
 // JSON summary; run twice to confirm the second run sends zero.
 
 import { createClient } from "npm:@supabase/supabase-js@2";
+
+type ReminderKind = "day_before" | "morning_of";
 
 type DueSmsReminder = {
   id: string;
@@ -44,6 +52,14 @@ type DueSmsReminder = {
   template_id: string | null;
   scheduled_date: string;
   scheduled_time: string | null;
+  kind: ReminderKind;
+};
+
+// V17: the view emits both timings; each stamps its own column so one never
+// suppresses the other (see 0019_reminder_scheduling.sql).
+const SMS_REMINDED_COLUMN: Record<ReminderKind, string> = {
+  day_before: "sms_reminded_at",
+  morning_of: "morning_sms_reminded_at",
 };
 
 // SMS4Free's status codes (from their API docs): >0 = sent to N recipients,
@@ -142,6 +158,16 @@ Deno.serve(async (_req) => {
   const errors: string[] = [];
 
   for (const row of due) {
+    // Resolve the stamp column BEFORE sending — see the same guard in
+    // send-reminders. An unmarked SMS is re-sent on every cron tick, and
+    // unlike email each one costs money.
+    const column = SMS_REMINDED_COLUMN[row.kind];
+    if (!column) {
+      failed++;
+      errors.push(`${row.id}: unknown reminder kind "${row.kind}" — is migration 0019 applied?`);
+      continue;
+    }
+
     const clientName = row.client_id
       ? (appNameById.get(row.client_id) ?? "there")
       : (managedById.get(row.managed_client_id!)?.name ?? "there");
@@ -159,7 +185,16 @@ Deno.serve(async (_req) => {
     const templateName = row.template_id ? (templateNameById.get(row.template_id) ?? "your workout") : "your workout";
     const dateLabel = formatDate(row.scheduled_date);
     const timeLabel = row.scheduled_time ? row.scheduled_time.slice(0, 5) : null;
-    const when = timeLabel ? `${dateLabel} at ${timeLabel}` : dateLabel;
+    // On the morning itself "today at 07:30" reads better than repeating the
+    // date; the day-before message still needs it spelled out.
+    const when =
+      row.kind === "morning_of"
+        ? timeLabel
+          ? `today at ${timeLabel}`
+          : "today"
+        : timeLabel
+          ? `${dateLabel} at ${timeLabel}`
+          : dateLabel;
     const message = `Hi ${clientName}! Reminder: "${templateName}" ${when} with ${trainerName}. See you then!`;
 
     try {
@@ -173,11 +208,11 @@ Deno.serve(async (_req) => {
       if (result.status > 0) {
         const { error: updateErr } = await supabase
           .from("scheduled_workouts")
-          .update({ sms_reminded_at: new Date().toISOString() })
+          .update({ [column]: new Date().toISOString() })
           .eq("id", row.id);
         if (updateErr) {
           failed++;
-          errors.push(`${row.id}: sent but failed to mark sms_reminded_at (${updateErr.message})`);
+          errors.push(`${row.id}: sent but failed to mark ${column} (${updateErr.message})`);
           continue;
         }
         sent++;

@@ -12,7 +12,7 @@
 // owned row cascades away via the schema's on-delete-cascade FKs.
 
 import { Link } from "expo-router";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -26,9 +26,10 @@ import { DevPanel } from "@/components/DevPanel";
 const LOCALE_LABELS: Record<SupportedLocale, string> = { en: "English", he: "עברית" };
 
 export default function ProfileScreen() {
-  const { profile, session, signOut } = useAuth();
+  const { profile, session, signOut, patchProfile } = useAuth();
   const { t, i18n } = useTranslation();
   const isClient = profile?.role === "client";
+  const isTrainer = profile?.role === "trainer";
 
   const badges = useQuery({
     queryKey: ["badges", session?.user.id],
@@ -56,6 +57,23 @@ export default function ProfileScreen() {
       if (error) throw error;
       return data;
     },
+  });
+
+  // V17: trainer-only opt-out for the morning digest email. Writes straight
+  // through profiles_update_own — 0013's guard trigger only protects role and
+  // the consent stamps, so no new policy is needed.
+  const setDigest = useMutation({
+    mutationFn: async (enabled: boolean) => {
+      const { error } = await supabase
+        .from("profiles")
+        .update({ daily_digest_enabled: enabled })
+        .eq("id", session!.user.id);
+      if (error) throw error;
+      return enabled;
+    },
+    // patchProfile, NOT refreshProfile — the latter re-enters the global
+    // loading state and remounts the entire tab navigator (see lib/auth.tsx).
+    onSuccess: (enabled) => patchProfile({ daily_digest_enabled: enabled }),
   });
 
   const deleteAccount = useMutation({
@@ -127,6 +145,34 @@ export default function ProfileScreen() {
                   <Text className="text-base font-semibold text-white">{t("profile.shareProgress")}</Text>
                 </Pressable>
               </Link>
+            ) : null}
+          </View>
+        ) : null}
+
+        {isTrainer ? (
+          <View className="mt-6">
+            <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
+              {t("profile.notifications")}
+            </Text>
+            <View className="mt-2 flex-row items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3">
+              <View className="flex-1">
+                <Text className="text-left text-sm font-medium text-slate-700">
+                  {t("profile.dailyDigest")}
+                </Text>
+                <Text className="mt-0.5 text-left text-xs text-slate-400">
+                  {t("profile.dailyDigestHint")}
+                </Text>
+              </View>
+              <Switch
+                value={profile?.daily_digest_enabled ?? true}
+                disabled={setDigest.isPending}
+                onValueChange={(v) => setDigest.mutate(v)}
+              />
+            </View>
+            {setDigest.error ? (
+              <Text className="mt-2 w-full text-left text-sm text-red-600">
+                {(setDigest.error as Error).message}
+              </Text>
             ) : null}
           </View>
         ) : null}

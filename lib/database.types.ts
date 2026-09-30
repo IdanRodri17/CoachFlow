@@ -25,6 +25,8 @@ export type Database = {
           accepted_health_disclaimer_at: string | null;
           // V12b (0012): intake questionnaire; null = not filled in yet.
           intake: Json | null;
+          // V17 (0019): trainer opt-out for the morning daily digest.
+          daily_digest_enabled: boolean;
           created_at: string;
         };
         Insert: {
@@ -36,6 +38,7 @@ export type Database = {
           accepted_terms_at?: string | null;
           accepted_health_disclaimer_at?: string | null;
           intake?: Json | null;
+          daily_digest_enabled?: boolean;
           created_at?: string;
         };
         Update: {
@@ -47,6 +50,7 @@ export type Database = {
           accepted_terms_at?: string | null;
           accepted_health_disclaimer_at?: string | null;
           intake?: Json | null;
+          daily_digest_enabled?: boolean;
           created_at?: string;
         };
         Relationships: [];
@@ -203,6 +207,9 @@ export type Database = {
           // --- V11: 0011_reminders.sql ---
           reminded_at: string | null;
           sms_reminded_at: string | null;
+          // V17 (0019): morning-of sends, tracked separately from the day-before ones.
+          morning_reminded_at: string | null;
+          morning_sms_reminded_at: string | null;
         };
         Insert: {
           id?: string;
@@ -219,6 +226,8 @@ export type Database = {
           paid?: boolean;
           reminded_at?: string | null;
           sms_reminded_at?: string | null;
+          morning_reminded_at?: string | null;
+          morning_sms_reminded_at?: string | null;
         };
         Update: {
           id?: string;
@@ -235,6 +244,8 @@ export type Database = {
           paid?: boolean;
           reminded_at?: string | null;
           sms_reminded_at?: string | null;
+          morning_reminded_at?: string | null;
+          morning_sms_reminded_at?: string | null;
         };
         Relationships: [];
       };
@@ -597,6 +608,22 @@ export type Database = {
           managed_client_id: string | null;
           subject_key: string;
           reason: string;
+        };
+        Relationships: [];
+      };
+      // --- V17: 0019_reminder_scheduling.sql ---
+      // Read only by the send-trainer-digest edge function (service role), not
+      // by the app — typed here so the function's .returns<> stays honest.
+      trainer_daily_digest: {
+        Row: {
+          trainer_id: string;
+          scheduled_workout_id: string;
+          client_id: string | null;
+          managed_client_id: string | null;
+          template_id: string | null;
+          scheduled_date: string;
+          scheduled_time: string | null;
+          status: string;
         };
         Relationships: [];
       };
