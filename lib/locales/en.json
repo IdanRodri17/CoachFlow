@@ -75,7 +75,9 @@
       "title": "At risk",
       "missedStreak": "Missed last 2",
       "goneQuiet": "Gone quiet"
-    }
+    },
+    "joinTrainerTitle": "Join your trainer",
+    "joinTrainerHint": "Got an invite code from your trainer? Tap here to enter it."
   },
   "profile": {
     "title": "Profile",
@@ -247,6 +249,14 @@
     "yourClients": "Your clients ({{count}})",
     "noClientsYet": "No clients yet — add one above.",
     "phonePlaceholder": "Phone for reminders, e.g. 050-1234567"
+  },
+  "join": {
+    "title": "Join your trainer",
+    "subtitle": "Enter the 6-character code your trainer sent you on WhatsApp.",
+    "joinButton": "Join",
+    "notNow": "Not now",
+    "invalidCode": "This code is wrong, already used, or expired. Ask your trainer to send a new one.",
+    "failed": "Couldn’t connect. Check your connection and try again."
   },
   "progress": {
     "photoPermission": "Photo library permission is needed to attach a photo.",

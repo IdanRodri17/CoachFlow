@@ -1,6 +1,7 @@
 // app/(tabs)/index.tsx — the Home tab (route: /).
 //
-// Client: a greeting + their UPCOMING scheduled workouts (date + template name).
+// Client: a greeting + their UPCOMING scheduled workouts (date + template name),
+// plus a "Join your trainer" card (V18b) until they are linked to one.
 // Trainer: the dashboard (V8) — roster with did-today / streak / due-overdue,
 // each row drilling into app/dashboard/[refId].tsx. All derived numbers (missed,
 // streak) come from the SQL views in 0008_dashboard_views.sql, never computed here.
@@ -150,6 +151,22 @@ export default function HomeScreen() {
     },
   });
 
+  // V18b: does this client have a trainer yet? If not, Home offers the invite
+  // code screen (app/join.tsx). RLS (trainer_clients_client_read) returns only
+  // the client's own links.
+  const trainerLinks = useQuery({
+    queryKey: ["my-trainer-links", session?.user.id],
+    enabled: !isTrainer && !!session,
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from("trainer_clients")
+        .select("id", { count: "exact", head: true })
+        .eq("client_id", session!.user.id);
+      if (error) throw error;
+      return count ?? 0;
+    },
+  });
+
   // Client can nudge a workout's date a day at a time (for training on their own
   // schedule). RLS lets a client update their own scheduled workouts.
   const shift = useMutation({
@@ -174,6 +191,15 @@ export default function HomeScreen() {
         <Text className="mt-1 w-full text-left text-base text-slate-500">
           {isTrainer ? t("home.trainerSubtitle") : t("home.clientSubtitle")}
         </Text>
+
+        {!isTrainer && trainerLinks.data === 0 ? (
+          <Link href="/join" asChild>
+            <Pressable className="mt-6 rounded-2xl border-2 border-emerald-500 bg-emerald-50 p-4 active:opacity-80">
+              <Text className="w-full text-left text-base font-bold text-emerald-900">{t("home.joinTrainerTitle")}</Text>
+              <Text className="mt-1 w-full text-left text-sm text-emerald-800">{t("home.joinTrainerHint")}</Text>
+            </Pressable>
+          </Link>
+        ) : null}
 
         {isTrainer ? (
           <View className="mt-6 pb-6">
