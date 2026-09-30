@@ -230,17 +230,23 @@
   "clients": {
     "title": "Clients",
     "addAppClientTitle": "Invite a client (uses the app)",
+    "inviteNamePlaceholder": "Who is it for? (optional)",
     "inviteButton": "Invite a client on WhatsApp",
     "inviteHint": "They get a code to enter in the app. Nothing is shared with you until they do.",
     "pendingInvites": "Waiting to join",
     "inviteExpires": "Code {{code}} · valid until {{date}}",
     "resendInvite": "Send again",
-    "inviteMessage": "Hi! You're invited to train with me on CoachFlow 💪\n1. Install CoachFlow and sign in with your phone number\n2. Enter this invite code: {{code}}\nThe code is valid for 7 days.\n— {{trainerName}}",
+    "inviteGreeting": "Hi!",
+    "inviteGreetingNamed": "Hi {{name}}!",
+    "inviteMessage": "{{greeting}} You're invited to train with me on CoachFlow 💪\n1. Install CoachFlow and sign in with your phone number\n2. Enter this invite code: {{code}}\nThe code is valid for 7 days.\n— {{trainerName}}",
+    "phoneSaved": "Saved ✓",
+    "invalidPhone": "Enter an Israeli mobile number, e.g. 050-1234567.",
+    "phoneSaveFailed": "Couldn't save. Check your connection and try again.",
     "addOfflineClientTitle": "Add an offline client (no app)",
     "clientNamePlaceholder": "Client name",
     "yourClients": "Your clients ({{count}})",
     "noClientsYet": "No clients yet — add one above.",
-    "phonePlaceholder": "Phone for WhatsApp (e.g. +9725...)"
+    "phonePlaceholder": "Phone for reminders, e.g. 050-1234567"
   },
   "progress": {
     "photoPermission": "Photo library permission is needed to attach a photo.",

@@ -20,7 +20,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth";
+import { toE164IL, useAuth } from "@/lib/auth";
 import { useRosterClients, type RosterClient } from "@/lib/useRoster";
 import { formatDisplayDate, toDateString } from "@/lib/dates";
 import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
@@ -29,6 +29,7 @@ export default function ClientsScreen() {
   const { t, i18n } = useTranslation();
   const { session, profile } = useAuth();
   const queryClient = useQueryClient();
+  const [inviteName, setInviteName] = useState("");
   const [offlineName, setOfflineName] = useState("");
 
   if (profile && profile.role !== "trainer") return <Redirect href="/" />;
@@ -44,7 +45,7 @@ export default function ClientsScreen() {
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_invites")
-        .select("id, code, expires_at")
+        .select("id, code, label, expires_at")
         .is("used_at", null)
         .gt("expires_at", new Date().toISOString())
         .order("created_at", { ascending: false });
@@ -53,8 +54,9 @@ export default function ClientsScreen() {
     },
   });
 
-  function sendInviteOnWhatsApp(code: string) {
+  function sendInviteOnWhatsApp(code: string, label: string | null) {
     const message = t("clients.inviteMessage", {
+      greeting: label ? t("clients.inviteGreetingNamed", { name: label }) : t("clients.inviteGreeting"),
       code,
       trainerName: profile?.display_name ?? "",
     });
@@ -64,14 +66,17 @@ export default function ClientsScreen() {
   }
 
   const createInvite = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.rpc("create_invite");
+    mutationFn: async (label: string) => {
+      // 0021: the optional name is display-only — it tells the trainer who a
+      // pending code is for; the client's real name comes from their profile.
+      const { data, error } = await supabase.rpc("create_invite", { p_label: label || null });
       if (error) throw error;
       return data;
     },
     onSuccess: (invite) => {
       queryClient.invalidateQueries({ queryKey: ["client-invites"] });
-      sendInviteOnWhatsApp(invite.code);
+      setInviteName("");
+      sendInviteOnWhatsApp(invite.code, invite.label);
     },
   });
 
@@ -94,21 +99,22 @@ export default function ClientsScreen() {
     },
   });
 
-  // Trainer-entered contact phone (V11) — powers "Remind on WhatsApp" on the
-  // Schedule tab, since neither auth mode exposes a client's real phone here.
+  // Trainer-entered contact phone (V11) — powers SMS reminders and "Remind on
+  // WhatsApp". Clients who joined by invite get it prefilled (accept_invite).
+  // `phone` arrives already validated and in local 05X… form, or null to clear.
   const savePhone = useMutation({
-    mutationFn: async ({ client, phone }: { client: RosterClient; phone: string }) => {
+    mutationFn: async ({ client, phone }: { client: RosterClient; phone: string | null }) => {
       if (client.kind === "app") {
         const { error } = await supabase
           .from("trainer_clients")
-          .update({ contact_phone: phone || null })
+          .update({ contact_phone: phone })
           .eq("trainer_id", trainerId)
           .eq("client_id", client.refId);
         if (error) throw error;
       } else {
         const { error } = await supabase
           .from("managed_clients")
-          .update({ phone: phone || null })
+          .update({ phone })
           .eq("id", client.refId);
         if (error) throw error;
       }
@@ -125,10 +131,21 @@ export default function ClientsScreen() {
         <Text className="mb-2 mt-6 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
           {t("clients.addAppClientTitle")}
         </Text>
+        <TextInput
+          className={`mb-2 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
+          placeholder={t("clients.inviteNamePlaceholder")}
+          placeholderTextColor="#94a3b8"
+          autoCapitalize="words"
+          autoCorrect={false}
+          maxLength={60}
+          value={inviteName}
+          onChangeText={setInviteName}
+          editable={!createInvite.isPending}
+        />
         <Pressable
           className="items-center rounded-xl bg-emerald-600 px-4 py-3 active:opacity-80"
           disabled={createInvite.isPending}
-          onPress={() => createInvite.mutate()}
+          onPress={() => createInvite.mutate(inviteName.trim())}
         >
           {createInvite.isPending ? (
             <ActivityIndicator color="#ffffff" />
@@ -148,6 +165,9 @@ export default function ClientsScreen() {
             </Text>
             {invites.data.map((inv) => (
               <View key={inv.id} className="rounded-xl border border-dashed border-slate-300 px-4 py-3">
+                {inv.label ? (
+                  <Text className="w-full text-left text-base font-semibold text-slate-900">{inv.label}</Text>
+                ) : null}
                 <Text className="w-full text-left text-sm text-slate-700">
                   {t("clients.inviteExpires", {
                     code: inv.code,
@@ -160,7 +180,7 @@ export default function ClientsScreen() {
                 <View className="mt-2 flex-row gap-2">
                   <Pressable
                     className="rounded-lg border border-emerald-300 px-3 py-1.5 active:bg-emerald-50"
-                    onPress={() => sendInviteOnWhatsApp(inv.code)}
+                    onPress={() => sendInviteOnWhatsApp(inv.code, inv.label)}
                   >
                     <Text className="text-xs font-semibold text-emerald-700">{t("clients.resendInvite")}</Text>
                   </Pressable>
@@ -206,7 +226,7 @@ export default function ClientsScreen() {
               <RosterRow
                 key={`${c.kind}-${c.refId}`}
                 client={c}
-                onSavePhone={(phone) => savePhone.mutate({ client: c, phone })}
+                onSavePhone={(phone) => savePhone.mutateAsync({ client: c, phone })}
               />
             ))}
           </View>
@@ -261,17 +281,49 @@ function AddRow({
   );
 }
 
-// A roster row with an inline-editable contact phone (V11 — powers "Remind
-// on WhatsApp"). Local state per row so editing one doesn't affect others.
+// A roster row with an editable contact phone (V11 — powers SMS reminders and
+// "Remind on WhatsApp"). Local state per row so editing one doesn't affect
+// others.
+//
+// V18b fix: it used to save only in onEndEditing, and the iOS phone-pad has
+// no return key — so a typed number often never reached the server and
+// nothing said so. Now an explicit Save button appears as soon as the number
+// changes, the number is validated and stored in one local form (05X…), and
+// the row says "Saved" or why it didn't.
 function RosterRow({
   client,
   onSavePhone,
 }: {
   client: RosterClient;
-  onSavePhone: (phone: string) => void;
+  onSavePhone: (phone: string | null) => Promise<void>;
 }) {
   const { t } = useTranslation();
   const [phone, setPhone] = useState(client.phone ?? "");
+  const [savedPhone, setSavedPhone] = useState(client.phone ?? "");
+  const [status, setStatus] = useState<"idle" | "saving" | "saved" | "invalid" | "error">("idle");
+  const dirty = phone.trim() !== savedPhone;
+
+  async function save() {
+    const raw = phone.trim();
+    let normalized: string | null = null;
+    if (raw) {
+      const e164 = toE164IL(raw);
+      if (!e164) {
+        setStatus("invalid");
+        return;
+      }
+      normalized = `0${e164.slice(4)}`;
+    }
+    setStatus("saving");
+    try {
+      await onSavePhone(normalized);
+      setPhone(normalized ?? "");
+      setSavedPhone(normalized ?? "");
+      setStatus("saved");
+    } catch {
+      setStatus("error");
+    }
+  }
 
   return (
     <View className="rounded-xl border border-slate-200 px-4 py-3">
@@ -283,18 +335,36 @@ function RosterRow({
           </Text>
         ) : null}
       </View>
-      <TextInput
-        className="mt-2 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900"
-        style={LTR_INPUT_STYLE}
-        placeholder={t("clients.phonePlaceholder")}
-        placeholderTextColor="#94a3b8"
-        keyboardType="phone-pad"
-        value={phone}
-        onChangeText={setPhone}
-        onEndEditing={() => {
-          if (phone.trim() !== (client.phone ?? "")) onSavePhone(phone.trim());
-        }}
-      />
+      <View className="mt-2 flex-row items-center gap-2">
+        <TextInput
+          className="flex-1 rounded-lg border border-slate-300 px-3 py-1.5 text-sm text-slate-900"
+          style={LTR_INPUT_STYLE}
+          placeholder={t("clients.phonePlaceholder")}
+          placeholderTextColor="#94a3b8"
+          keyboardType="phone-pad"
+          textContentType="telephoneNumber"
+          value={phone}
+          onChangeText={(v) => {
+            setPhone(v);
+            setStatus("idle");
+          }}
+          editable={status !== "saving"}
+        />
+        {status === "saving" ? (
+          <ActivityIndicator />
+        ) : dirty ? (
+          <Pressable className="rounded-lg bg-slate-900 px-3 py-1.5 active:opacity-80" onPress={save}>
+            <Text className="text-sm font-semibold text-white">{t("common.save")}</Text>
+          </Pressable>
+        ) : status === "saved" ? (
+          <Text className="text-xs font-semibold text-emerald-600">{t("clients.phoneSaved")}</Text>
+        ) : null}
+      </View>
+      {status === "invalid" ? (
+        <Text className="mt-1 w-full text-left text-xs text-red-600">{t("clients.invalidPhone")}</Text>
+      ) : status === "error" ? (
+        <Text className="mt-1 w-full text-left text-xs text-red-600">{t("clients.phoneSaveFailed")}</Text>
+      ) : null}
     </View>
   );
 }

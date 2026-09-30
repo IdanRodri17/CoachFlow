@@ -230,17 +230,23 @@
   "clients": {
     "title": "מתאמנים",
     "addAppClientTitle": "הזמנת מתאמן (משתמש באפליקציה)",
+    "inviteNamePlaceholder": "למי ההזמנה? (לא חובה)",
     "inviteButton": "הזמנת מתאמן בוואטסאפ",
     "inviteHint": "המתאמן יקבל קוד להזנה באפליקציה. שום מידע לא משותף איתך עד שיזין אותו.",
     "pendingInvites": "ממתינים להצטרפות",
     "inviteExpires": "קוד {{code}} · בתוקף עד {{date}}",
     "resendInvite": "שליחה שוב",
-    "inviteMessage": "היי! הוזמנת להתאמן איתי ב-CoachFlow 💪\n1. התקינו את CoachFlow והתחברו עם מספר הטלפון\n2. הזינו את קוד ההזמנה: {{code}}\nהקוד בתוקף ל-7 ימים.\n— {{trainerName}}",
+    "inviteGreeting": "היי!",
+    "inviteGreetingNamed": "היי {{name}}!",
+    "inviteMessage": "{{greeting}} הוזמנת להתאמן איתי ב-CoachFlow 💪\n1. התקינו את CoachFlow והתחברו עם מספר הטלפון\n2. הזינו את קוד ההזמנה: {{code}}\nהקוד בתוקף ל-7 ימים.\n— {{trainerName}}",
+    "phoneSaved": "נשמר ✓",
+    "invalidPhone": "הזינו מספר נייד ישראלי, לדוגמה 050-1234567.",
+    "phoneSaveFailed": "השמירה נכשלה. בדקו את החיבור ונסו שוב.",
     "addOfflineClientTitle": "הוספת מתאמן אופליין (בלי אפליקציה)",
     "clientNamePlaceholder": "שם המתאמן",
     "yourClients": "המתאמנים שלך ({{count}})",
     "noClientsYet": "עדיין אין מתאמנים — הוסיפו אחד למעלה.",
-    "phonePlaceholder": "טלפון לוואטסאפ (למשל +9725...)"
+    "phonePlaceholder": "טלפון לתזכורות, למשל 050-1234567"
   },
   "progress": {
     "photoPermission": "צריך הרשאה לגלריית התמונות כדי לצרף תמונה.",

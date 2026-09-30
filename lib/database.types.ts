@@ -200,6 +200,8 @@ export type Database = {
           expires_at: string;
           used_at: string | null;
           used_by: string | null;
+          // 0021: who the invite is for (display only).
+          label: string | null;
         };
         Insert: {
           id?: string;
@@ -209,6 +211,7 @@ export type Database = {
           expires_at?: string;
           used_at?: string | null;
           used_by?: string | null;
+          label?: string | null;
         };
         Update: {
           id?: string;
@@ -218,6 +221,7 @@ export type Database = {
           expires_at?: string;
           used_at?: string | null;
           used_by?: string | null;
+          label?: string | null;
         };
         Relationships: [];
       };
@@ -670,7 +674,7 @@ export type Database = {
       };
       // V18b: the calling trainer gets a fresh single-use invite code.
       create_invite: {
-        Args: Record<PropertyKey, never>;
+        Args: { p_label?: string | null };
         Returns: Database["public"]["Tables"]["client_invites"]["Row"];
       };
       // V18b: links the calling client to the code's trainer; returns the trainer id.
