@@ -14,6 +14,9 @@
 // reminders, and either channel or timing being unavailable never blocks the
 // others.
 //
+// LANGUAGE (V18): Hebrew by default, English for app clients whose profile
+// locale is 'en'; each text is kept to one paid SMS segment (buildReminder).
+//
 // SECRETS (set once: `supabase secrets set NAME=value`):
 //   SMS4FREE_API_KEY — from your SMS4Free dashboard's API page.
 //   SMS4FREE_USER    — the mobile number you log into sms4free.co.il with.
@@ -83,15 +86,54 @@ const STATUS_MESSAGES: Record<number, string> = {
   [-6]: "sender number needs verification (send one SMS manually from the SMS4Free site first)",
 };
 
-const TIME_ZONE = "Asia/Jerusalem";
+type Locale = "he" | "en";
 
-function formatDate(dateISO: string): string {
-  return new Intl.DateTimeFormat("en", {
-    weekday: "short",
-    month: "short",
-    day: "numeric",
-    timeZone: TIME_ZONE,
-  }).format(new Date(`${dateISO}T12:00:00Z`));
+// First word only: "Dana Cohen" → "Dana". Shorter SMS, and how a trainer
+// actually addresses a client.
+function firstName(name: string | null | undefined): string | null {
+  const first = name?.trim().split(/\s+/)[0];
+  return first ? first : null;
+}
+
+// One paid SMS segment is 160 GSM-7 characters, but only 70 UTF-16 units as
+// soon as the text contains anything outside GSM — which every Hebrew
+// message does. (Printable ASCII is used as a close-enough stand-in for GSM-7.)
+function fitsOneSms(msg: string): boolean {
+  return /^[\x20-\x7E\n]*$/.test(msg) ? msg.length <= 160 : msg.length <= 70;
+}
+
+// V18 (B3): reminders in the client's language — Hebrew unless an app client
+// chose English in the app; offline clients have no app, so Hebrew (the
+// default market). day_before rows are always for TOMORROW and morning_of
+// rows for TODAY (0019's view guarantees it), so the texts say so instead of
+// spelling a date. Candidates run longest-first; the first one that fits a
+// single segment is sent, so a long template name can't double the cost.
+function buildReminder(
+  locale: Locale,
+  kind: ReminderKind,
+  p: { client: string | null; trainer: string | null; template: string | null; time: string | null },
+): string {
+  const candidates: string[] = [];
+  if (locale === "he") {
+    const day = kind === "morning_of" ? "היום" : "מחר";
+    const when = p.time ? `${day} ב-${p.time}` : day;
+    const withTrainer = p.trainer ? ` עם ${p.trainer}` : "";
+    const workout = p.template ? `"${p.template}"` : "אימון";
+    if (p.client) candidates.push(`היי ${p.client}! תזכורת: ${workout} ${when}${withTrainer}. נתראה!`);
+    candidates.push(`תזכורת: ${workout} ${when}${withTrainer}`);
+    candidates.push(`תזכורת: אימון ${when}${withTrainer}`);
+    candidates.push(`תזכורת: אימון ${when}`);
+  } else {
+    const day = kind === "morning_of" ? "today" : "tomorrow";
+    const when = p.time ? `${day} at ${p.time}` : day;
+    const withTrainer = p.trainer ? ` with ${p.trainer}` : "";
+    const workout = p.template ? `"${p.template}"` : "your workout";
+    if (p.client) candidates.push(`Hi ${p.client}! Reminder: ${workout} ${when}${withTrainer}. See you then!`);
+    candidates.push(`Reminder: ${workout} ${when}${withTrainer}`);
+    candidates.push(`Reminder: workout ${when}${withTrainer}`);
+    candidates.push(`Reminder: workout ${when}`);
+  }
+  return candidates.find(fitsOneSms) ?? candidates[candidates.length - 1];
 }
 
 // SMS4Free expects Israeli local format (0XXXXXXXXX) — normalize whatever
@@ -144,8 +186,8 @@ Deno.serve(async (req) => {
   const [trainerProfilesRes, appNamesRes, appPhonesRes, managedRes, templatesRes] = await Promise.all([
     supabase.from("profiles").select("id, display_name").in("id", trainerIds),
     appClientIds.length > 0
-      ? supabase.from("profiles").select("id, display_name").in("id", appClientIds)
-      : Promise.resolve({ data: [] as { id: string; display_name: string }[], error: null }),
+      ? supabase.from("profiles").select("id, display_name, locale").in("id", appClientIds)
+      : Promise.resolve({ data: [] as { id: string; display_name: string; locale: string }[], error: null }),
     appClientIds.length > 0
       ? supabase.from("trainer_clients").select("client_id, contact_phone").in("client_id", appClientIds)
       : Promise.resolve({ data: [] as { client_id: string; contact_phone: string | null }[], error: null }),
@@ -164,6 +206,7 @@ Deno.serve(async (req) => {
 
   const trainerNameById = new Map((trainerProfilesRes.data ?? []).map((p) => [p.id, p.display_name]));
   const appNameById = new Map((appNamesRes.data ?? []).map((p) => [p.id, p.display_name]));
+  const appLocaleById = new Map((appNamesRes.data ?? []).map((p) => [p.id, p.locale]));
   const appPhoneById = new Map((appPhonesRes.data ?? []).map((r) => [r.client_id, r.contact_phone]));
   const managedById = new Map((managedRes.data ?? []).map((m) => [m.id, m]));
   const templateNameById = new Map((templatesRes.data ?? []).map((t) => [t.id, t.name]));
@@ -205,8 +248,9 @@ Deno.serve(async (req) => {
     }
 
     const clientName = row.client_id
-      ? (appNameById.get(row.client_id) ?? "there")
-      : (managedById.get(row.managed_client_id!)?.name ?? "there");
+      ? appNameById.get(row.client_id)
+      : managedById.get(row.managed_client_id!)?.name;
+    const locale: Locale = row.client_id && appLocaleById.get(row.client_id) === "en" ? "en" : "he";
     const rawPhone = row.client_id
       ? appPhoneById.get(row.client_id)
       : managedById.get(row.managed_client_id!)?.phone;
@@ -217,21 +261,12 @@ Deno.serve(async (req) => {
       continue;
     }
 
-    const trainerName = trainerNameById.get(row.trainer_id) ?? "your trainer";
-    const templateName = row.template_id ? (templateNameById.get(row.template_id) ?? "your workout") : "your workout";
-    const dateLabel = formatDate(row.scheduled_date);
-    const timeLabel = row.scheduled_time ? row.scheduled_time.slice(0, 5) : null;
-    // On the morning itself "today at 07:30" reads better than repeating the
-    // date; the day-before message still needs it spelled out.
-    const when =
-      row.kind === "morning_of"
-        ? timeLabel
-          ? `today at ${timeLabel}`
-          : "today"
-        : timeLabel
-          ? `${dateLabel} at ${timeLabel}`
-          : dateLabel;
-    const message = `Hi ${clientName}! Reminder: "${templateName}" ${when} with ${trainerName}. See you then!`;
+    const message = buildReminder(locale, row.kind, {
+      client: firstName(clientName),
+      trainer: firstName(trainerNameById.get(row.trainer_id)),
+      template: row.template_id ? (templateNameById.get(row.template_id) ?? null) : null,
+      time: row.scheduled_time ? row.scheduled_time.slice(0, 5) : null,
+    });
 
     try {
       const res = await fetch("https://api.sms4free.co.il/ApiSMS/v2/SendSMS", {
