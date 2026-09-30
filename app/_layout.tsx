@@ -20,6 +20,13 @@
 //   6. AuthProvider        — our session + profile context (lib/auth.tsx).
 //   7. <Stack />           — the root navigator. Individual route groups
 //      ((auth), (tabs)) decide for themselves who is allowed in, using <Redirect>.
+//
+// D19a: the design's three font families (docs/design/DESIGN.md §2.2) load
+// here with useFonts while the splash screen stays up. Runtime loading because
+// Expo Go can't use expo-font's build-time plugin. Each weight is imported
+// from its own subpath: the package roots require every weight's .ttf, and
+// Metro doesn't tree-shake, so that would bundle 28 files instead of 7. The
+// map keys are the fontFamily names tailwind.config.js uses.
 
 import "../global.css";
 import "@/lib/i18n";
@@ -27,6 +34,15 @@ import "@/lib/i18n";
 import { useEffect } from "react";
 import { View } from "react-native";
 import { LocaleProvider, Stack } from "expo-router";
+import * as SplashScreen from "expo-splash-screen";
+import { useFonts } from "expo-font";
+import { Karantina_700Bold } from "@expo-google-fonts/karantina/700Bold";
+import { BarlowCondensed_600SemiBold } from "@expo-google-fonts/barlow-condensed/600SemiBold";
+import { BarlowCondensed_700Bold } from "@expo-google-fonts/barlow-condensed/700Bold";
+import { IBMPlexSansHebrew_400Regular } from "@expo-google-fonts/ibm-plex-sans-hebrew/400Regular";
+import { IBMPlexSansHebrew_500Medium } from "@expo-google-fonts/ibm-plex-sans-hebrew/500Medium";
+import { IBMPlexSansHebrew_600SemiBold } from "@expo-google-fonts/ibm-plex-sans-hebrew/600SemiBold";
+import { IBMPlexSansHebrew_700Bold } from "@expo-google-fonts/ibm-plex-sans-hebrew/700Bold";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
@@ -34,6 +50,10 @@ import { useTranslation } from "react-i18next";
 
 import { layoutDirection, restoreSavedLocale } from "@/lib/i18n";
 import { AuthProvider } from "@/lib/auth";
+
+// Keep the splash up until the fonts are in (hidden in RootLayout below).
+// Module scope, per the SDK 57 docs, so it runs before the first render.
+SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
   defaultOptions: {
@@ -48,11 +68,33 @@ export default function RootLayout() {
   useTranslation();
   const dir = layoutDirection();
 
+  const [fontsLoaded, fontError] = useFonts({
+    Karantina_700Bold,
+    BarlowCondensed_600SemiBold,
+    BarlowCondensed_700Bold,
+    IBMPlexSansHebrew_400Regular,
+    IBMPlexSansHebrew_500Medium,
+    IBMPlexSansHebrew_600SemiBold,
+    IBMPlexSansHebrew_700Bold,
+  });
+  const fontsSettled = fontsLoaded || !!fontError;
+
   // Applies a previously-chosen language (Profile > Language) if it differs
   // from the device-locale default lib/i18n started with.
   useEffect(() => {
     restoreSavedLocale();
   }, []);
+
+  // A font that fails to load must not lock the app behind the splash: text
+  // then falls back to the system font, and the reason goes to the dev log.
+  useEffect(() => {
+    if (!fontsSettled) return;
+    if (fontError && __DEV__) console.warn("[fonts] failed to load:", fontError.message);
+    SplashScreen.hide();
+  }, [fontsSettled, fontError]);
+
+  // After every hook (rules of hooks): nothing renders until the fonts settle.
+  if (!fontsSettled) return null;
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
