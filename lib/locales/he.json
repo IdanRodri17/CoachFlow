@@ -23,11 +23,15 @@
     "subtitlePhone": "התחבר עם מספר הטלפון שלך",
     "subtitleCode": "הזן את הקוד ששלחנו אל {{identifier}}",
     "emailPlaceholder": "you@example.com",
-    "phonePlaceholder": "+972…",
+    "phonePlaceholder": "050-1234567",
     "sendCode": "שלח קוד",
     "verifyAndContinue": "אמת והמשך",
     "useDifferentEmail": "השתמש באימייל אחר",
-    "useDifferentNumber": "השתמש במספר אחר"
+    "useDifferentNumber": "השתמש במספר אחר",
+    "invalidPhone": "הזן מספר נייד ישראלי, לדוגמה 050-1234567.",
+    "invalidCode": "הקוד שגוי או שפג תוקפו. נסה שוב או בקש קוד חדש.",
+    "sendFailed": "לא הצלחנו לשלוח את הקוד. נסה שוב בעוד רגע.",
+    "tooManyAttempts": "יותר מדי ניסיונות. המתן דקה ונסה שוב."
   },
   "onboarding": {
     "welcome": "ברוכים הבאים 👋",

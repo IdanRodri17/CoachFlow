@@ -1,10 +1,15 @@
 // app/(auth)/sign-in.tsx — the OTP sign-in screen (route: /(auth)/sign-in).
 //
 // Two phases in one screen:
-//   Phase "enter" — type your email, we send a one-time passcode (OTP).
-//   Phase "code"  — type the 6-digit code from the email, we verify it.
+//   Phase "enter" — type your phone (or email, in email mode), we send a
+//                   one-time passcode (OTP).
+//   Phase "code"  — type the code from the SMS (or email), we verify it.
 // On success Supabase creates a session; the route guards below + the (tabs)
 // guard then send you to onboarding (new user) or straight into the app.
+//
+// V18a: phone numbers are normalized to E.164 before they reach Auth (see
+// toE164IL), the code field opts into the OS one-time-code autofill, and
+// Auth's English errors are shown as translated lines (raw text → dev log).
 
 import { useState } from "react";
 import {
@@ -20,15 +25,21 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
 import { useTranslation } from "react-i18next";
 
-import { AUTH_MODE, profileComplete, sendOtp, useAuth, verifyOtp } from "@/lib/auth";
+import { AUTH_MODE, profileComplete, sendOtp, toE164IL, useAuth, verifyOtp } from "@/lib/auth";
 import { DevPanel } from "@/components/DevPanel";
 import { LTR_INPUT_STYLE, LTR_WRITING_DIRECTION_ONLY } from "@/lib/i18n";
+
+// Auth error codes that mean "slow down" rather than "something's wrong".
+const RATE_LIMIT_CODES = new Set(["over_sms_send_rate_limit", "over_request_rate_limit"]);
 
 export default function SignInScreen() {
   const { session, profile } = useAuth();
   const { t } = useTranslation();
   const [phase, setPhase] = useState<"enter" | "code">("enter");
-  const [identifier, setIdentifier] = useState(""); // email (or phone in sms mode)
+  const [identifier, setIdentifier] = useState(""); // email (or phone in sms mode), as typed
+  // What the code was actually sent to (E.164 in sms mode) — verify must use
+  // exactly this, not whatever is in the input.
+  const [sentTo, setSentTo] = useState("");
   const [code, setCode] = useState("");
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -43,25 +54,36 @@ export default function SignInScreen() {
   }
 
   const isEmail = AUTH_MODE === "email";
+  const codeLength = isEmail ? 8 : 6; // this project issues 8-digit email codes, 6-digit SMS codes
 
   async function handleSendCode() {
     setError(null);
-    setBusy(true);
-    const { error } = await sendOtp(identifier.trim());
-    setBusy(false);
-    if (error) {
-      setError(error.message);
+    const target = isEmail ? identifier.trim() : toE164IL(identifier);
+    if (!target) {
+      setError(t("signIn.invalidPhone"));
       return;
     }
+    setBusy(true);
+    const { error } = await sendOtp(target);
+    setBusy(false);
+    if (error) {
+      if (__DEV__) console.warn("[sign-in] sendOtp failed:", error.code, error.message);
+      setError(RATE_LIMIT_CODES.has(error.code ?? "") ? t("signIn.tooManyAttempts") : t("signIn.sendFailed"));
+      return;
+    }
+    setSentTo(target);
     setPhase("code");
   }
 
   async function handleVerify() {
     setError(null);
     setBusy(true);
-    const { error } = await verifyOtp(identifier.trim(), code.trim());
+    const { error } = await verifyOtp(sentTo, code.trim());
     setBusy(false);
-    if (error) setError(error.message);
+    if (error) {
+      if (__DEV__) console.warn("[sign-in] verifyOtp failed:", error.code, error.message);
+      setError(RATE_LIMIT_CODES.has(error.code ?? "") ? t("signIn.tooManyAttempts") : t("signIn.invalidCode"));
+    }
     // On success, useAuth() updates and the <Redirect> above takes over.
   }
 
@@ -78,7 +100,12 @@ export default function SignInScreen() {
               ? isEmail
                 ? t("signIn.subtitleEmail")
                 : t("signIn.subtitlePhone")
-              : t("signIn.subtitleCode", { identifier })}
+              : t("signIn.subtitleCode", {
+                  // Shown in local form ("0501234567"): a leading "+" inside a
+                  // Hebrew sentence gets reordered by the bidi algorithm and
+                  // renders as "972…+"; plain digits stay one LTR run.
+                  identifier: isEmail ? sentTo : `0${sentTo.slice(4)}`,
+                })}
           </Text>
 
           {phase === "enter" ? (
@@ -90,6 +117,8 @@ export default function SignInScreen() {
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType={isEmail ? "email-address" : "phone-pad"}
+              textContentType={isEmail ? "emailAddress" : "telephoneNumber"}
+              autoComplete={isEmail ? "email" : "tel"}
               value={identifier}
               onChangeText={setIdentifier}
               editable={!busy}
@@ -98,12 +127,14 @@ export default function SignInScreen() {
             <TextInput
               className="rounded-xl border border-slate-300 px-4 py-3 text-center text-2xl tracking-[4px] text-slate-900"
               style={LTR_WRITING_DIRECTION_ONLY}
-              placeholder="00000000"
+              placeholder={"0".repeat(codeLength)}
               placeholderTextColor="#94a3b8"
               keyboardType="number-pad"
-              // Supabase email OTP can be 6–8 digits depending on project settings;
-              // this project issues 8. Allow up to 8 so the full code fits.
-              maxLength={8}
+              // Offer the code from the incoming SMS above the keyboard
+              // (iOS reads textContentType, Android the autoComplete hint).
+              textContentType="oneTimeCode"
+              autoComplete={Platform.OS === "android" ? "sms-otp" : "one-time-code"}
+              maxLength={codeLength}
               value={code}
               onChangeText={setCode}
               editable={!busy}

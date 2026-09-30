@@ -23,11 +23,15 @@
     "subtitlePhone": "Sign in with your phone number",
     "subtitleCode": "Enter the code we sent to {{identifier}}",
     "emailPlaceholder": "you@example.com",
-    "phonePlaceholder": "+972…",
+    "phonePlaceholder": "050-1234567",
     "sendCode": "Send code",
     "verifyAndContinue": "Verify & continue",
     "useDifferentEmail": "Use a different email",
-    "useDifferentNumber": "Use a different number"
+    "useDifferentNumber": "Use a different number",
+    "invalidPhone": "Enter an Israeli mobile number, e.g. 050-1234567.",
+    "invalidCode": "That code is wrong or has expired. Try again or request a new one.",
+    "sendFailed": "We couldn't send the code. Please try again in a moment.",
+    "tooManyAttempts": "Too many attempts. Wait a minute and try again."
   },
   "onboarding": {
     "welcome": "Welcome 👋",

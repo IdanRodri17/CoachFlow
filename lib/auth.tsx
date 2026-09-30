@@ -27,11 +27,24 @@ export type Profile = Database["public"]["Tables"]["profiles"]["Row"];
 // 1) OTP mode + helpers
 // ---------------------------------------------------------------------------
 //
-// HOW TO SWITCH TO REAL SMS LOGIN: set AUTH_MODE to "sms" below, then enable a
-// phone provider (e.g. Twilio) in Supabase Dashboard -> Authentication -> Providers.
-// Everything else (the sign-in screen, these helpers) already branches on this flag.
-// We stay on "email" during development so we can log in without an SMS provider.
-export const AUTH_MODE: "email" | "sms" = "email";
+// V18a: SMS login. Supabase Auth has no SMS4Free provider, so the codes go out
+// through the Send SMS auth hook (supabase/functions/send-sms-hook — its header
+// lists the dashboard setup). "email" stays available as the fallback mode; the
+// dev quick-switch (DevPanel) uses email+password and doesn't read this flag.
+export const AUTH_MODE: "email" | "sms" = "sms";
+
+/**
+ * Normalize an Israeli mobile number to E.164 (+9725XXXXXXXX) — the only phone
+ * format Supabase Auth accepts. People type "050-123-4567", "0501234567",
+ * "+972 50…" or even "+9720501234567"; all become "+972501234567". Returns
+ * null for anything that isn't an Israeli mobile (Israeli numbers only for
+ * now — SMS4Free delivers only within Israel).
+ */
+export function toE164IL(raw: string): string | null {
+  const digits = raw.replace(/\D/g, "");
+  const national = (digits.startsWith("972") ? digits.slice(3) : digits).replace(/^0/, "");
+  return /^5\d{8}$/.test(national) ? `+972${national}` : null;
+}
 
 /** Send a one-time passcode to the given email (or phone, in sms mode). */
 export async function sendOtp(identifier: string) {
@@ -42,7 +55,9 @@ export async function sendOtp(identifier: string) {
       options: { shouldCreateUser: true },
     });
   }
-  return supabase.auth.signInWithOtp({ phone: identifier });
+  // Normalized here as well as on the screen so send and verify can never
+  // disagree on the format — Auth matches the code to the exact string.
+  return supabase.auth.signInWithOtp({ phone: toE164IL(identifier) ?? identifier });
 }
 
 /** Verify the passcode the user typed in. On success, a session is created. */
@@ -50,7 +65,7 @@ export async function verifyOtp(identifier: string, token: string) {
   if (AUTH_MODE === "email") {
     return supabase.auth.verifyOtp({ email: identifier, token, type: "email" });
   }
-  return supabase.auth.verifyOtp({ phone: identifier, token, type: "sms" });
+  return supabase.auth.verifyOtp({ phone: toE164IL(identifier) ?? identifier, token, type: "sms" });
 }
 
 /** True once the user has finished onboarding: role set + both consents stamped. */
