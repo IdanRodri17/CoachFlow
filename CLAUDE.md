@@ -85,6 +85,10 @@ Versions V1→V12 (plus V5b/V8b/V12a/V12b) are specified in `docs/SRS.md §5` an
 built per `docs/CLAUDE_CODE_PLAYBOOK.md`. Deferred/out-of-scope items live in
 `docs/SRS.md §8`.
 
+Post-1.0 work (V17+) is specified in `docs/COACHFLOW_ROADMAP.md` and built per
+`docs/PLAYBOOK_V17plus.md`. Read both at session start, starting with the
+roadmap's "Status" box.
+
 ---
 
 @AGENTS.md
