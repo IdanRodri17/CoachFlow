@@ -2,27 +2,33 @@
 //
 // Moved off the Schedule tab (which is now a calendar, not a client-management
 // hub) so scheduling stays the trainer's main focus. Reached from a button on
-// the trainer Home, beside the roster. Logic here (add app client by email,
-// add offline client, per-client contact phone for WhatsApp reminders) is
-// unchanged from the old schedule/index.tsx — just relocated.
+// the trainer Home, beside the roster. Logic here (add offline client,
+// per-client contact phone for WhatsApp reminders) is unchanged from the old
+// schedule/index.tsx — just relocated.
+//
+// V18b: app clients join by INVITE, not by email. The trainer creates a
+// single-use code (create_invite, 0020) and sends it on WhatsApp; the client
+// types it into their own app (accept_invite) — that is the consent. The old
+// add-by-email RPC let any trainer link any client without asking and is now
+// revoked in the DB.
 
 import { useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients, type RosterClient } from "@/lib/useRoster";
+import { formatDisplayDate, toDateString } from "@/lib/dates";
 import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
 
 export default function ClientsScreen() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { session, profile } = useAuth();
   const queryClient = useQueryClient();
-  const [email, setEmail] = useState("");
   const [offlineName, setOfflineName] = useState("");
 
   if (profile && profile.role !== "trainer") return <Redirect href="/" />;
@@ -30,15 +36,51 @@ export default function ClientsScreen() {
 
   const roster = useRosterClients(trainerId);
 
-  const addAppClient = useMutation({
-    mutationFn: async (rawEmail: string) => {
-      const { error } = await supabase.rpc("add_client_by_email", { p_email: rawEmail });
+  // Pending invites only: used ones have become roster rows, expired ones are
+  // dead. expires_at is an instant, so comparing it to "now" in UTC is right
+  // (no calendar-date logic here).
+  const invites = useQuery({
+    queryKey: ["client-invites", trainerId],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from("client_invites")
+        .select("id, code, expires_at")
+        .is("used_at", null)
+        .gt("expires_at", new Date().toISOString())
+        .order("created_at", { ascending: false });
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  function sendInviteOnWhatsApp(code: string) {
+    const message = t("clients.inviteMessage", {
+      code,
+      trainerName: profile?.display_name ?? "",
+    });
+    // No phone number: WhatsApp opens its chat picker so the trainer chooses
+    // the client (who may not even be in the roster's contact list yet).
+    Linking.openURL(`https://wa.me/?text=${encodeURIComponent(message)}`);
+  }
+
+  const createInvite = useMutation({
+    mutationFn: async () => {
+      const { data, error } = await supabase.rpc("create_invite");
+      if (error) throw error;
+      return data;
+    },
+    onSuccess: (invite) => {
+      queryClient.invalidateQueries({ queryKey: ["client-invites"] });
+      sendInviteOnWhatsApp(invite.code);
+    },
+  });
+
+  const cancelInvite = useMutation({
+    mutationFn: async (id: string) => {
+      const { error } = await supabase.from("client_invites").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["roster-clients"] });
-      setEmail("");
-    },
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["client-invites"] }),
   });
 
   const addOfflineClient = useMutation({
@@ -83,18 +125,57 @@ export default function ClientsScreen() {
         <Text className="mb-2 mt-6 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
           {t("clients.addAppClientTitle")}
         </Text>
-        <AddRow
-          value={email}
-          onChangeText={setEmail}
-          placeholder={t("clients.emailPlaceholder")}
-          keyboardType="email-address"
-          busy={addAppClient.isPending}
-          onAdd={() => addAppClient.mutate(email.trim())}
-        />
-        {addAppClient.error ? (
-          <Text className="mt-2 w-full text-left text-sm text-red-600">{(addAppClient.error as Error).message}</Text>
+        <Pressable
+          className="items-center rounded-xl bg-emerald-600 px-4 py-3 active:opacity-80"
+          disabled={createInvite.isPending}
+          onPress={() => createInvite.mutate()}
+        >
+          {createInvite.isPending ? (
+            <ActivityIndicator color="#ffffff" />
+          ) : (
+            <Text className="text-base font-semibold text-white">{t("clients.inviteButton")}</Text>
+          )}
+        </Pressable>
+        {createInvite.error ? (
+          <Text className="mt-2 w-full text-left text-sm text-red-600">{(createInvite.error as Error).message}</Text>
         ) : null}
-        <Text className="mt-2 w-full text-left text-xs text-slate-400">{t("clients.addAppClientHint")}</Text>
+        <Text className="mt-2 w-full text-left text-xs text-slate-400">{t("clients.inviteHint")}</Text>
+
+        {invites.data && invites.data.length > 0 ? (
+          <View className="mt-4 gap-2">
+            <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
+              {t("clients.pendingInvites")}
+            </Text>
+            {invites.data.map((inv) => (
+              <View key={inv.id} className="rounded-xl border border-dashed border-slate-300 px-4 py-3">
+                <Text className="w-full text-left text-sm text-slate-700">
+                  {t("clients.inviteExpires", {
+                    code: inv.code,
+                    date: formatDisplayDate(
+                      toDateString(new Date(inv.expires_at)),
+                      i18n.language === "he" ? "he" : "en",
+                    ),
+                  })}
+                </Text>
+                <View className="mt-2 flex-row gap-2">
+                  <Pressable
+                    className="rounded-lg border border-emerald-300 px-3 py-1.5 active:bg-emerald-50"
+                    onPress={() => sendInviteOnWhatsApp(inv.code)}
+                  >
+                    <Text className="text-xs font-semibold text-emerald-700">{t("clients.resendInvite")}</Text>
+                  </Pressable>
+                  <Pressable
+                    className="rounded-lg border border-slate-300 px-3 py-1.5 active:bg-slate-100"
+                    disabled={cancelInvite.isPending}
+                    onPress={() => cancelInvite.mutate(inv.id)}
+                  >
+                    <Text className="text-xs font-semibold text-slate-600">{t("common.cancel")}</Text>
+                  </Pressable>
+                </View>
+              </View>
+            ))}
+          </View>
+        ) : null}
 
         {/* Add an offline client */}
         <Text className="mb-2 mt-6 w-full text-left text-sm font-semibold uppercase tracking-wide text-slate-500">
@@ -137,36 +218,30 @@ export default function ClientsScreen() {
   );
 }
 
-// An input + Add button row.
+// An input + Add button row (offline client name; the email variant went
+// away with add-by-email in V18b).
 function AddRow({
   value,
   onChangeText,
   placeholder,
-  keyboardType,
   busy,
   onAdd,
 }: {
   value: string;
   onChangeText: (v: string) => void;
   placeholder: string;
-  keyboardType?: "email-address" | "default";
   busy: boolean;
   onAdd: () => void;
 }) {
   const { t } = useTranslation();
-  const isEmail = keyboardType === "email-address";
   return (
     <View className="flex-row gap-2">
       <TextInput
-        className={`flex-1 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${
-          isEmail ? "" : directionalTextClassName()
-        }`}
-        style={isEmail ? LTR_INPUT_STYLE : undefined}
+        className={`flex-1 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
         placeholder={placeholder}
         placeholderTextColor="#94a3b8"
-        autoCapitalize={isEmail ? "none" : "words"}
+        autoCapitalize="words"
         autoCorrect={false}
-        keyboardType={keyboardType ?? "default"}
         value={value}
         onChangeText={onChangeText}
         editable={!busy}

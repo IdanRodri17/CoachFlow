@@ -188,6 +188,39 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- V18b: 0020_client_invites.sql ---
+      // Rows are created by create_invite() and stamped by accept_invite();
+      // the app only reads its own and deletes pending ones.
+      client_invites: {
+        Row: {
+          id: string;
+          trainer_id: string;
+          code: string;
+          created_at: string;
+          expires_at: string;
+          used_at: string | null;
+          used_by: string | null;
+        };
+        Insert: {
+          id?: string;
+          trainer_id: string;
+          code: string;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          used_by?: string | null;
+        };
+        Update: {
+          id?: string;
+          trainer_id?: string;
+          code?: string;
+          created_at?: string;
+          expires_at?: string;
+          used_at?: string | null;
+          used_by?: string | null;
+        };
+        Relationships: [];
+      };
       scheduled_workouts: {
         Row: {
           id: string;
@@ -630,9 +663,20 @@ export type Database = {
     };
     Functions: {
       // V4: add a client to the caller-trainer's roster by email.
+      // V18b (0020): revoked from every app role — kept only for history.
       add_client_by_email: {
         Args: { p_email: string };
         Returns: undefined;
+      };
+      // V18b: the calling trainer gets a fresh single-use invite code.
+      create_invite: {
+        Args: Record<PropertyKey, never>;
+        Returns: Database["public"]["Tables"]["client_invites"]["Row"];
+      };
+      // V18b: links the calling client to the code's trainer; returns the trainer id.
+      accept_invite: {
+        Args: { p_code: string };
+        Returns: string;
       };
     };
     Enums: Record<string, never>;
