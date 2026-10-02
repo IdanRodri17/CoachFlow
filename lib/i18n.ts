@@ -178,4 +178,21 @@ export const LTR_INPUT_STYLE = { writingDirection: "ltr", textAlign: "left" } as
  * overridden by an explicit textAlign. */
 export const LTR_WRITING_DIRECTION_ONLY = { writingDirection: "ltr" } as const;
 
+/** Wraps a string in Unicode directional isolates (LRI … PDI) so it always
+ * reads left-to-right inside a Hebrew sentence. Without it, the bidi algorithm
+ * flips `40 × 10` into `10 × 40`, `−15` into `15−` and reorders phone numbers
+ * with dashes (D19b; docs/design/DESIGN.md §7).
+ *
+ *   - DISPLAY ONLY: for text rendered in a <Text>. Never put it in a value
+ *     written to the DB, a TextInput's value, or a WhatsApp / SMS body — the
+ *     invisible marks would be saved or sent along.
+ *   - It changes character ORDER, not alignment: <Text> keeps its literal
+ *     `text-left` (start edge) and inputs keep directionalTextClassName() /
+ *     LTR_INPUT_STYLE above.
+ *   - A number followed by a Hebrew unit (`42.5 ק״ג`) and a date range stay in
+ *     normal flow — no ltr() needed. */
+export function ltr(s: string): string {
+  return `⁦${s}⁩`;
+}
+
 export default i18next;
