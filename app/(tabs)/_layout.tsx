@@ -4,14 +4,15 @@
 // it checks auth state and redirects out if the user isn't ready. That keeps all
 // the "who's allowed in" logic in one obvious place.
 //
-// V1 keeps the tab bar label-only (no icon library) to stay minimal. Icons can
-// be added later if we want them.
+// D21a: the bar itself is components/TabBar.tsx (icons, volt pill, the
+// trainer's [+]). This file still owns which routes exist and the guards.
 
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { profileComplete, useAuth } from "@/lib/auth";
+import { TabBar } from "@/components/TabBar";
 
 export default function TabsLayout() {
   const { loading, session, profile } = useAuth();
@@ -35,8 +36,9 @@ export default function TabsLayout() {
   const isTrainer = profile?.role === "trainer";
 
   return (
-    <Tabs screenOptions={{ tabBarActiveTintColor: "#0f172a" }}>
-      <Tabs.Screen name="index" options={{ title: t("tabs.home") }} />
+    <Tabs tabBar={(props) => <TabBar {...props} isTrainer={isTrainer} />}>
+      {/* Home draws its own header (date + greeting), per the design. */}
+      <Tabs.Screen name="index" options={{ title: t("tabs.home"), headerShown: false }} />
       {/* "exercises"/"templates" are folders with their own Stack, so hide the
           tab header (the inner stack provides headers). */}
       <Tabs.Screen name="exercises" options={{ title: t("tabs.exercises"), headerShown: false }} />

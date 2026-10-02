@@ -365,9 +365,11 @@ export type ButtonVariant =
   | "ghost"
   | "danger"
   | "dark"
-  | "darkOutline";
+  | "darkOutline"
+  | "bone";
 
 const BUTTON_LOOK: Record<ButtonVariant, { bg: string; fg: string; border?: string }> = {
+  bone: { bg: colors.bone, fg: colors.ink }, // the light button on an ink card
   primary: { bg: colors.ink, fg: colors.white },
   accent: { bg: colors.volt, fg: colors.ink },
   secondary: { bg: colors.paper, fg: colors.ink, border: colors.lineStrong },
@@ -381,6 +383,7 @@ const BUTTON_LOOK: Record<ButtonVariant, { bg: string; fg: string; border?: stri
 // height → [radius, horizontal padding, font size, icon size]
 const BUTTON_SIZE = {
   44: [12, 12, 14, 18],
+  48: [14, 20, 15, 20], // the buttons on the trainer's next-up card
   52: [14, 20, 16, 20],
   56: [16, 20, 17, 20],
   60: [18, 20, 17, 20], // workout "skip rest"
@@ -405,7 +408,7 @@ export function Button({
   label: string;
   onPress?: () => void;
   variant?: ButtonVariant;
-  size?: 44 | 52 | 56 | 60 | 64 | 72;
+  size?: 44 | 48 | 52 | 56 | 60 | 64 | 72;
   icon?: IconComponent;
   iconMirror?: boolean;
   /** Full width. */
