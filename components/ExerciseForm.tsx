@@ -1,23 +1,36 @@
 // components/ExerciseForm.tsx — the trainer's add/edit form for an exercise.
 //
 // Shared by the "new exercise" and "edit exercise" screens so the fields and
-// validation live in one place. It keeps its own local text state, validates on
+// validation live in one place. It keeps its own local state, validates on
 // submit, and calls onSubmit with a clean, DB-ready payload (numbers parsed,
 // blanks turned into null).
+//
+// D29b: rebuilt to docs/design/screens/trainer-exercise-edit.html — name,
+// muscle group as chips (+ "אחר" → free text), the video link with a preview
+// block, default sets / reps as mini steppers, cues (the description) and
+// one save button. The props and the payload are unchanged; thumbnail_url has
+// no field in the design, so an existing value is passed through untouched.
 
-import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
+import { useState, type ReactNode } from "react";
+import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import type { LucideProps } from "lucide-react-native";
+import Play from "lucide-react-native/icons/play";
+import Plus from "lucide-react-native/icons/plus";
 
-import { isValidVideoUrl } from "@/lib/video";
-import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
+import i18next from "@/lib/i18n";
+import { isValidVideoUrl, parseVideoUrl } from "@/lib/video";
+import {
+  AppText,
+  Button,
+  colors,
+  FieldLabel,
+  fonts,
+  Icon,
+  Input,
+  SelectChip,
+  Stepper,
+} from "@/components/ui";
 
 // The cleaned shape we hand back to the screen (ready for supabase insert/update).
 export type ExerciseInput = {
@@ -30,7 +43,7 @@ export type ExerciseInput = {
   default_reps: number | null;
 };
 
-// Pre-fill values when editing (all optional / strings for the text inputs).
+// Pre-fill values when editing.
 export type ExerciseFormInitial = {
   name?: string;
   description?: string | null;
@@ -41,22 +54,28 @@ export type ExerciseFormInitial = {
   default_reps?: number | null;
 };
 
-function toText(value: string | number | null | undefined): string {
-  return value === null || value === undefined ? "" : String(value);
+/** The design's muscle-group chips. The DB keeps free text (the label in the
+ * trainer's language, as before); these keys only drive the chips and the
+ * list's filter. */
+export const MUSCLE_KEYS = ["legs", "glutes", "back", "chest", "shoulders", "arms", "core", "other"] as const;
+export type MuscleKey = (typeof MUSCLE_KEYS)[number];
+
+/** Which chip a stored muscle_group belongs to, in either language. */
+export function muscleKeyOf(value: string | null | undefined): MuscleKey | null {
+  const v = value?.trim().toLowerCase();
+  if (!v) return null;
+  for (const k of MUSCLE_KEYS) {
+    if (k === "other") continue;
+    for (const lng of ["he", "en"]) {
+      if (i18next.t(`exercises.muscles.${k}`, { lng }).toLowerCase() === v) return k;
+    }
+  }
+  return "other";
 }
 
-// Empty string -> null; otherwise the trimmed string.
 function nullable(value: string): string | null {
   const v = value.trim();
   return v.length === 0 ? null : v;
-}
-
-// Empty -> null; otherwise a parsed non-negative integer (or null if not a number).
-function toIntOrNull(value: string): number | null {
-  const v = value.trim();
-  if (v.length === 0) return null;
-  const n = Number.parseInt(v, 10);
-  return Number.isFinite(n) ? n : null;
 }
 
 export function ExerciseForm({
@@ -74,19 +93,22 @@ export function ExerciseForm({
   onSubmit: (input: ExerciseInput) => void;
   errorMessage?: string | null;
   // Optional content rendered inside the scroll view, above the fields / below
-  // the submit button (e.g. a video preview header, a delete button footer).
-  header?: React.ReactNode;
-  footer?: React.ReactNode;
+  // the submit button (e.g. a video player header, a delete button footer).
+  header?: ReactNode;
+  footer?: ReactNode;
 }) {
-  const [name, setName] = useState(toText(initial?.name));
-  const [description, setDescription] = useState(toText(initial?.description));
-  const [muscleGroup, setMuscleGroup] = useState(toText(initial?.muscle_group));
-  const [videoUrl, setVideoUrl] = useState(toText(initial?.video_url));
-  const [thumbnailUrl, setThumbnailUrl] = useState(toText(initial?.thumbnail_url));
-  const [defaultSets, setDefaultSets] = useState(toText(initial?.default_sets));
-  const [defaultReps, setDefaultReps] = useState(toText(initial?.default_reps));
-  const [validationError, setValidationError] = useState<string | null>(null);
   const { t } = useTranslation();
+  const initialKey = muscleKeyOf(initial?.muscle_group);
+  const [name, setName] = useState(initial?.name ?? "");
+  const [description, setDescription] = useState(initial?.description ?? "");
+  const [muscle, setMuscle] = useState<MuscleKey | null>(initialKey);
+  const [otherMuscle, setOtherMuscle] = useState(initialKey === "other" ? (initial?.muscle_group ?? "") : "");
+  const [videoUrl, setVideoUrl] = useState(initial?.video_url ?? "");
+  const [sets, setSets] = useState<number | null>(initial?.default_sets ?? null);
+  const [reps, setReps] = useState<number | null>(initial?.default_reps ?? null);
+  const [validationError, setValidationError] = useState<string | null>(null);
+
+  const video = parseVideoUrl(videoUrl);
 
   function handleSubmit() {
     if (name.trim().length === 0) {
@@ -99,146 +121,183 @@ export function ExerciseForm({
       return;
     }
     setValidationError(null);
+    const muscleGroup =
+      muscle === null ? null : muscle === "other" ? nullable(otherMuscle) : t(`exercises.muscles.${muscle}`);
     onSubmit({
       name: name.trim(),
       description: nullable(description),
-      muscle_group: nullable(muscleGroup),
+      muscle_group: muscleGroup,
       video_url: nullable(videoUrl),
-      thumbnail_url: nullable(thumbnailUrl),
-      default_sets: toIntOrNull(defaultSets),
-      default_reps: toIntOrNull(defaultReps),
+      thumbnail_url: initial?.thumbnail_url ?? null,
+      default_sets: sets,
+      default_reps: reps,
     });
   }
 
+  // − below 1 clears the default; + from empty starts at 1.
+  const step = (v: number | null, d: number) => {
+    const next = (v ?? 0) + d;
+    return next < 1 ? null : next;
+  };
+
   return (
-    <ScrollView
-      className="flex-1 bg-white"
-      contentContainerClassName="px-6 py-6"
-      keyboardShouldPersistTaps="handled"
-    >
-      {header ? <View className="mb-5">{header}</View> : null}
-
-      <Labeled label={t("exercises.form.nameLabel")}>
-        <Input
-          value={name}
-          onChangeText={setName}
-          placeholder={t("exercises.form.namePlaceholder")}
-          editable={!submitting}
-          className={directionalTextClassName()}
-        />
-      </Labeled>
-
-      <Labeled label={t("exercises.form.muscleGroupLabel")}>
-        <Input
-          value={muscleGroup}
-          onChangeText={setMuscleGroup}
-          placeholder={t("exercises.form.muscleGroupPlaceholder")}
-          editable={!submitting}
-          className={directionalTextClassName()}
-        />
-      </Labeled>
-
-      <Labeled label={t("exercises.form.descriptionLabel")}>
-        <Input
-          value={description}
-          onChangeText={setDescription}
-          placeholder={t("exercises.form.descriptionPlaceholder")}
-          editable={!submitting}
-          multiline
-          className={directionalTextClassName()}
-        />
-      </Labeled>
-
-      <Labeled label={t("exercises.form.videoUrlLabel")}>
-        <Input
-          value={videoUrl}
-          onChangeText={setVideoUrl}
-          placeholder="https://youtube.com/watch?v=…"
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          editable={!submitting}
-          style={LTR_INPUT_STYLE}
-        />
-      </Labeled>
-
-      <Labeled label={t("exercises.form.thumbnailUrlLabel")}>
-        <Input
-          value={thumbnailUrl}
-          onChangeText={setThumbnailUrl}
-          placeholder="https://…"
-          autoCapitalize="none"
-          autoCorrect={false}
-          keyboardType="url"
-          editable={!submitting}
-          style={LTR_INPUT_STYLE}
-        />
-      </Labeled>
-
-      <View className="flex-row gap-3">
-        <View className="flex-1">
-          <Labeled label={t("exercises.form.defaultSetsLabel")}>
-            <Input
-              value={defaultSets}
-              onChangeText={setDefaultSets}
-              placeholder="4"
-              keyboardType="number-pad"
-              editable={!submitting}
-              style={LTR_INPUT_STYLE}
-            />
-          </Labeled>
-        </View>
-        <View className="flex-1">
-          <Labeled label={t("exercises.form.defaultRepsLabel")}>
-            <Input
-              value={defaultReps}
-              onChangeText={setDefaultReps}
-              placeholder="8"
-              keyboardType="number-pad"
-              editable={!submitting}
-              style={LTR_INPUT_STYLE}
-            />
-          </Labeled>
-        </View>
-      </View>
-
-      {validationError || errorMessage ? (
-        <Text className="mb-3 w-full text-left text-sm text-red-600">{validationError ?? errorMessage}</Text>
-      ) : null}
-
-      <Pressable
-        className="mt-2 items-center rounded-xl bg-slate-900 px-4 py-3 active:opacity-80"
-        disabled={submitting}
-        onPress={handleSubmit}
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.chalk }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 30, gap: 20 }}
+        keyboardShouldPersistTaps="handled"
       >
-        {submitting ? (
-          <ActivityIndicator color="#ffffff" />
-        ) : (
-          <Text className="text-base font-semibold text-white">{submitLabel}</Text>
-        )}
-      </Pressable>
+        {header ? <View>{header}</View> : null}
 
-      {footer ? <View className="mt-4">{footer}</View> : null}
-    </ScrollView>
+        <View style={{ gap: 8 }}>
+          <FieldLabel>{t("exercises.edit.name")}</FieldLabel>
+          <Input
+            size="md"
+            value={name}
+            onChangeText={setName}
+            placeholder={t("exercises.form.namePlaceholder")}
+            editable={!submitting}
+            accessibilityLabel={t("exercises.edit.name")}
+          />
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <FieldLabel>{t("exercises.edit.muscleGroup")}</FieldLabel>
+          <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+            {MUSCLE_KEYS.map((k) => (
+              <SelectChip
+                key={k}
+                label={t(`exercises.muscles.${k}`)}
+                icon={k === "other" ? Plus : undefined}
+                selected={muscle === k}
+                disabled={submitting}
+                onPress={() => setMuscle(muscle === k ? null : k)}
+              />
+            ))}
+          </View>
+          {muscle === "other" ? (
+            <Input
+              size="md"
+              value={otherMuscle}
+              onChangeText={setOtherMuscle}
+              placeholder={t("exercises.edit.otherPlaceholder")}
+              editable={!submitting}
+              accessibilityLabel={t("exercises.edit.otherPlaceholder")}
+            />
+          ) : null}
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <View style={{ gap: 8 }}>
+            <FieldLabel>{t("exercises.edit.video")}</FieldLabel>
+            <Input
+              size="md"
+              ltr
+              value={videoUrl}
+              onChangeText={setVideoUrl}
+              placeholder="youtube.com/watch?v=…"
+              autoCapitalize="none"
+              autoCorrect={false}
+              keyboardType="url"
+              editable={!submitting}
+              accessibilityLabel={t("exercises.edit.video")}
+            />
+          </View>
+          {video ? (
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => Linking.openURL(videoUrl.trim())}
+              style={({ pressed }) => ({
+                height: 170,
+                borderRadius: 18,
+                backgroundColor: colors.ink,
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 10,
+                opacity: pressed ? 0.85 : 1,
+              })}
+            >
+              <View
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 28,
+                  backgroundColor: colors.volt,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  paddingStart: 4,
+                }}
+              >
+                <Icon icon={FilledPlay} size={26} color={colors.ink} />
+              </View>
+              <AppText size={13} tone="ash" center>
+                {t("exercises.edit.preview", { source: video.provider === "youtube" ? "YouTube" : "Vimeo" })}
+              </AppText>
+            </Pressable>
+          ) : null}
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <FieldLabel>{t("exercises.edit.defaults")}</FieldLabel>
+          <View style={{ flexDirection: "row", gap: 10 }}>
+            <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+              <AppText size={13} weight="semibold" tone="graphite">
+                {t("exercises.edit.sets")}
+              </AppText>
+              <Stepper
+                value={sets ?? "—"}
+                onDecrement={() => setSets((v) => step(v, -1))}
+                onIncrement={() => setSets((v) => step(v, 1))}
+                decrementLabel={t("exercises.edit.decrease")}
+                incrementLabel={t("exercises.edit.increase")}
+                background={colors.mist}
+              />
+            </View>
+            <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+              <AppText size={13} weight="semibold" tone="graphite">
+                {t("exercises.edit.reps")}
+              </AppText>
+              <Stepper
+                value={reps ?? "—"}
+                onDecrement={() => setReps((v) => step(v, -1))}
+                onIncrement={() => setReps((v) => step(v, 1))}
+                decrementLabel={t("exercises.edit.decrease")}
+                incrementLabel={t("exercises.edit.increase")}
+                background={colors.mist}
+              />
+            </View>
+          </View>
+        </View>
+
+        <View style={{ gap: 8 }}>
+          <FieldLabel>{t("exercises.edit.cues")}</FieldLabel>
+          <Input
+            size="md"
+            multiline
+            value={description}
+            onChangeText={setDescription}
+            placeholder={t("exercises.form.descriptionPlaceholder")}
+            editable={!submitting}
+            accessibilityLabel={t("exercises.edit.cues")}
+            style={{ minHeight: 72, fontSize: 16, lineHeight: 24, fontFamily: fonts.regular }}
+          />
+        </View>
+
+        {validationError || errorMessage ? (
+          <AppText size={14} tone="ember">
+            {validationError ?? errorMessage}
+          </AppText>
+        ) : null}
+
+        <Button label={submitLabel} size={56} block loading={submitting} onPress={handleSubmit} />
+
+        {footer ? <View>{footer}</View> : null}
+      </ScrollView>
+    </KeyboardAvoidingView>
   );
 }
 
-// --- small presentational helpers ---
-function Labeled({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <View className="mb-4">
-      <Text className="mb-2 w-full text-left text-sm font-medium text-slate-700">{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function Input({ className, ...props }: React.ComponentProps<typeof TextInput>) {
-  return (
-    <TextInput
-      placeholderTextColor="#94a3b8"
-      className={`rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${className ?? ""}`}
-      {...props}
-    />
-  );
+/** The play mark is a filled triangle in the reference. */
+function FilledPlay(props: LucideProps) {
+  return <Play {...props} fill={props.color} />;
 }

@@ -2,8 +2,7 @@
 // (docs/design/screens/trainer-quick-add.html): four create tiles.
 //
 // Still to come with D21b proper: "קביעה מהירה ל…" (frequent clients) and
-// "מחכה לך" (today's unmarked offline workouts). Until the Library tab exists
-// (D21d), the exercise list is reachable from here too.
+// "מחכה לך" (today's unmarked offline workouts).
 
 import { Pressable, View } from "react-native";
 import { useRouter, type Href } from "expo-router";
@@ -13,7 +12,7 @@ import Dumbbell from "lucide-react-native/icons/dumbbell";
 import Layers from "lucide-react-native/icons/layers";
 import UserPlus from "lucide-react-native/icons/user-plus";
 
-import { AppText, colors, Icon, ListCard, ListRow, Sheet, type IconComponent } from "@/components/ui";
+import { AppText, colors, Icon, Sheet, type IconComponent } from "@/components/ui";
 
 export function QuickAddSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { t } = useTranslation();
@@ -70,16 +69,6 @@ export function QuickAddSheet({ visible, onClose }: { visible: boolean; onClose:
           </Pressable>
         ))}
       </View>
-
-      <ListCard>
-        <ListRow
-          density="setting"
-          leading={<Icon icon={Dumbbell} size={22} />}
-          title={t("quickAdd.exerciseLibrary")}
-          chevron
-          onPress={() => go("/exercises")}
-        />
-      </ListCard>
     </Sheet>
   );
 }

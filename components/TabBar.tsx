@@ -7,8 +7,10 @@
 // The items are declared here rather than derived from the routes, because
 // two of the trainer's design tabs don't exist as tab routes yet:
 //   - מתאמנים opens /clients (a stack screen) until D21c moves it into the tabs.
-//   - ספרייה opens the templates tab until D21d adds the segmented control
-//     with exercises. Exercises are reachable from the [+] sheet meanwhile.
+//   - ספרייה is the exercises tab, whose screen carries the תבניות | תרגילים
+//     switch (D29b); it stays highlighted on templates too. Templates gets the
+//     switch back to exercises with its own restyle (D29a).
+// Clients reach the exercise library from Profile (D28b), as designed.
 
 import { useState } from "react";
 import { Pressable, View } from "react-native";
@@ -18,7 +20,6 @@ import { useTranslation } from "react-i18next";
 import Apple from "lucide-react-native/icons/apple";
 import Calendar from "lucide-react-native/icons/calendar";
 import ChartLine from "lucide-react-native/icons/chart-line";
-import Dumbbell from "lucide-react-native/icons/dumbbell";
 import House from "lucide-react-native/icons/house";
 import Layers from "lucide-react-native/icons/layers";
 import Plus from "lucide-react-native/icons/plus";
@@ -29,7 +30,7 @@ import { AppText, colors, Icon, type IconComponent } from "@/components/ui";
 import { QuickAddSheet } from "@/components/QuickAddSheet";
 
 type Item =
-  | { kind: "tab"; route: string; label: string; icon: IconComponent }
+  | { kind: "tab"; route: string; label: string; icon: IconComponent; alsoActiveOn?: string[] }
   | { kind: "link"; href: Href; label: string; icon: IconComponent }
   | { kind: "add" };
 
@@ -45,14 +46,12 @@ export function TabBar({ state, navigation, insets, isTrainer }: BottomTabBarPro
         { kind: "tab", route: "schedule", label: t("tabBar.calendar"), icon: Calendar },
         { kind: "add" },
         { kind: "link", href: "/clients", label: t("tabBar.clients"), icon: Users },
-        { kind: "tab", route: "templates", label: t("tabBar.library"), icon: Layers },
+        { kind: "tab", route: "exercises", label: t("tabBar.library"), icon: Layers, alsoActiveOn: ["templates"] },
       ]
     : [
         { kind: "tab", route: "index", label: t("tabBar.today"), icon: House },
         { kind: "tab", route: "progress", label: t("tabs.progress"), icon: ChartLine },
         { kind: "tab", route: "nutrition", label: t("tabs.nutrition"), icon: Apple },
-        // Until D28b puts "ספריית התרגילים" in Profile, clients keep this tab.
-        { kind: "tab", route: "exercises", label: t("tabs.exercises"), icon: Dumbbell },
         { kind: "tab", route: "profile", label: t("tabs.profile"), icon: User },
       ];
 
@@ -109,7 +108,9 @@ export function TabBar({ state, navigation, insets, isTrainer }: BottomTabBarPro
               </View>
             );
           }
-          const active = item.kind === "tab" && item.route === activeRoute;
+          const active =
+            item.kind === "tab" &&
+            (item.route === activeRoute || (!!activeRoute && !!item.alsoActiveOn?.includes(activeRoute)));
           return (
             <Pressable
               key={i}

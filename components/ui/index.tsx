@@ -1090,6 +1090,8 @@ type InputProps = TextInputProps & {
   ltr?: boolean | "start";
   /** Text at the end of the field (₪, אימונים). */
   suffix?: string;
+  /** An icon at the start of the field (the search magnifier). */
+  leadingIcon?: IconComponent;
   invalid?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 };
@@ -1097,7 +1099,7 @@ type InputProps = TextInputProps & {
 /** Text field: paper, 1px line.strong, radius 14, 17/500. Free text follows the
  * language (directionalTextClassName); `ltr` for phones and numbers. */
 export const Input = forwardRef<TextInput, InputProps>(function Input(
-  { size = "lg", ltr: ltrMode, suffix, invalid, containerStyle, multiline, style, ...rest },
+  { size = "lg", ltr: ltrMode, suffix, leadingIcon, invalid, containerStyle, multiline, style, ...rest },
   ref,
 ) {
   useTranslation(); // re-align when the language changes
@@ -1123,6 +1125,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         containerStyle,
       ]}
     >
+      {leadingIcon ? <Icon icon={leadingIcon} size={20} color={colors.smoke} /> : null}
       <TextInput
         ref={ref}
         placeholderTextColor={colors.smoke}
