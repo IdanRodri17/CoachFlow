@@ -5,29 +5,40 @@
 // consents (terms of use + health disclaimer). On save it writes the profile row
 // — stamping accepted_terms_at / accepted_health_disclaimer_at (SRS V1) — then the
 // guards route the user into the app.
+//
+// D30a: rebuilt to docs/design/screens/auth-onboarding.html — two role cards
+// and the two consent checkboxes. The role is still locked once saved (0013).
 
 import { useState } from "react";
-import {
-  ActivityIndicator,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
 import { useTranslation } from "react-i18next";
+import Check from "lucide-react-native/icons/check";
+import ClipboardList from "lucide-react-native/icons/clipboard-list";
+import Dumbbell from "lucide-react-native/icons/dumbbell";
 
 import { supabase } from "@/lib/supabase";
 import { profileComplete, useAuth } from "@/lib/auth";
-import { directionalTextClassName } from "@/lib/i18n";
+import {
+  AppText,
+  Button,
+  Checkbox,
+  colors,
+  Display,
+  FieldLabel,
+  fonts,
+  Icon,
+  Input,
+  type IconComponent,
+} from "@/components/ui";
 
 type Role = "trainer" | "client";
 
 export default function OnboardingScreen() {
   const { session, profile, refreshProfile } = useAuth();
   const { t } = useTranslation();
+  const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState("");
   const [role, setRole] = useState<Role | null>(null);
   const [acceptedTerms, setAcceptedTerms] = useState(false);
@@ -35,12 +46,11 @@ export default function OnboardingScreen() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
-  // No session? Back to sign-in. Already onboarded? Into the app.
+  // No session? Back to sign-in. Already onboarded? Into the app. (After all hooks.)
   if (!session) return <Redirect href="/(auth)/sign-in" />;
   if (profileComplete(profile)) return <Redirect href="/" />;
 
-  const canSubmit =
-    displayName.trim().length > 0 && role !== null && acceptedTerms && acceptedHealth;
+  const canSubmit = displayName.trim().length > 0 && role !== null && acceptedTerms && acceptedHealth;
 
   async function handleSave() {
     if (!session || !role) return;
@@ -67,108 +77,167 @@ export default function OnboardingScreen() {
   }
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <ScrollView contentContainerClassName="px-6 py-8">
-        <Text className="w-full text-left text-2xl font-bold text-slate-900">{t("onboarding.welcome")}</Text>
-        <Text className="mt-1 mb-6 w-full text-left text-base text-slate-500">{t("onboarding.subtitle")}</Text>
-
-        {/* Display name */}
-        <Text className="mb-2 w-full text-left text-sm font-medium text-slate-700">{t("onboarding.nameLabel")}</Text>
-        <TextInput
-          className={`mb-6 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
-          placeholder={t("onboarding.namePlaceholder")}
-          placeholderTextColor="#94a3b8"
-          value={displayName}
-          onChangeText={setDisplayName}
-          editable={!busy}
-        />
-
-        {/* Role */}
-        <Text className="mb-2 w-full text-left text-sm font-medium text-slate-700">{t("onboarding.roleLabel")}</Text>
-        <View className="mb-6 flex-row gap-3">
-          {(["trainer", "client"] as Role[]).map((r) => {
-            const selected = role === r;
-            return (
-              <Pressable
-                key={r}
-                className={`flex-1 items-center rounded-xl border px-4 py-3 ${
-                  selected ? "border-slate-900 bg-slate-900" : "border-slate-300 bg-white"
-                }`}
-                disabled={busy}
-                onPress={() => setRole(r)}
-              >
-                <Text
-                  className={`text-base font-semibold ${
-                    selected ? "text-white" : "text-slate-700"
-                  }`}
-                >
-                  {r === "trainer" ? t("common.trainer") : t("common.client")}
-                </Text>
-              </Pressable>
-            );
-          })}
-        </View>
-
-        {/* Consents */}
-        <Consent
-          checked={acceptedTerms}
-          disabled={busy}
-          onToggle={() => setAcceptedTerms((v) => !v)}
-          label={t("onboarding.termsLabel")}
-        />
-        <Consent
-          checked={acceptedHealth}
-          disabled={busy}
-          onToggle={() => setAcceptedHealth((v) => !v)}
-          label={t("onboarding.healthLabel")}
-        />
-
-        {error ? <Text className="mt-4 w-full text-left text-sm text-red-600">{error}</Text> : null}
-
-        <Pressable
-          className={`mt-8 items-center rounded-xl px-4 py-3 ${
-            canSubmit ? "bg-slate-900 active:opacity-80" : "bg-slate-300"
-          }`}
-          disabled={!canSubmit || busy}
-          onPress={handleSave}
+    <View style={{ flex: 1, backgroundColor: colors.chalk }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingTop: insets.top + 16,
+            paddingBottom: Math.max(insets.bottom, 20),
+            paddingHorizontal: 24,
+            gap: 22,
+          }}
         >
-          {busy ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text className="text-base font-semibold text-white">{t("common.continue")}</Text>
-          )}
-        </Pressable>
-      </ScrollView>
-    </SafeAreaView>
+          <View style={{ gap: 8 }}>
+            <Display size={52}>{t("onboarding.title")}</Display>
+            <AppText size={16} tone="graphite">
+              {t("onboarding.lead")}
+            </AppText>
+          </View>
+
+          <View style={{ gap: 8 }}>
+            <FieldLabel>{t("onboarding.nameQuestion")}</FieldLabel>
+            <Input
+              value={displayName}
+              onChangeText={setDisplayName}
+              placeholder={t("onboarding.namePlaceholder")}
+              autoCapitalize="words"
+              autoComplete="name"
+              textContentType="name"
+              editable={!busy}
+              accessibilityLabel={t("onboarding.nameQuestion")}
+            />
+          </View>
+
+          <View style={{ gap: 10 }}>
+            <FieldLabel>{t("onboarding.iAm")}</FieldLabel>
+            <View accessibilityRole="radiogroup" style={{ flexDirection: "row", gap: 10 }}>
+              <RoleCard
+                icon={ClipboardList}
+                title={t("onboarding.trainerTitle")}
+                description={t("onboarding.trainerDesc")}
+                selected={role === "trainer"}
+                disabled={busy}
+                onPress={() => setRole("trainer")}
+              />
+              <RoleCard
+                icon={Dumbbell}
+                title={t("onboarding.clientTitle")}
+                description={t("onboarding.clientDesc")}
+                selected={role === "client"}
+                disabled={busy}
+                onPress={() => setRole("client")}
+              />
+            </View>
+          </View>
+
+          <View style={{ gap: 6 }}>
+            <Checkbox checked={acceptedTerms} disabled={busy} onToggle={() => setAcceptedTerms((v) => !v)}>
+              {t("onboarding.termsPrefix")}
+              <Text style={{ fontFamily: fonts.semibold, textDecorationLine: "underline" }}>
+                {t("onboarding.termsLink")}
+              </Text>
+            </Checkbox>
+            <Checkbox checked={acceptedHealth} disabled={busy} onToggle={() => setAcceptedHealth((v) => !v)}>
+              {t("onboarding.health")}
+            </Checkbox>
+          </View>
+
+          {error ? (
+            <AppText size={14} tone="ember">
+              {error}
+            </AppText>
+          ) : null}
+
+          <View style={{ flex: 1 }} />
+
+          <Button
+            label={t("common.continue")}
+            size={56}
+            block
+            loading={busy}
+            disabled={!canSubmit}
+            onPress={handleSave}
+          />
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
 
-// A simple tappable checkbox row.
-function Consent({
-  checked,
+// A role card: 168 tall, 1px line.strong, or 2px ink with a volt check badge
+// in the end corner when selected.
+function RoleCard({
+  icon,
+  title,
+  description,
+  selected,
   disabled,
-  onToggle,
-  label,
+  onPress,
 }: {
-  checked: boolean;
+  icon: IconComponent;
+  title: string;
+  description: string;
+  selected: boolean;
   disabled: boolean;
-  onToggle: () => void;
-  label: string;
+  onPress: () => void;
 }) {
   return (
     <Pressable
-      className="mb-4 flex-row items-start gap-3"
+      onPress={onPress}
       disabled={disabled}
-      onPress={onToggle}
+      accessibilityRole="radio"
+      accessibilityState={{ checked: selected, disabled }}
+      style={({ pressed }) => ({
+        flex: 1,
+        minHeight: 168,
+        borderRadius: 20,
+        borderWidth: selected ? 2 : 1,
+        borderColor: selected ? colors.ink : colors.lineStrong,
+        backgroundColor: colors.paper,
+        // 1 dp less padding when the border is 1 dp thicker, so nothing jumps.
+        padding: selected ? 15 : 16,
+        gap: 10,
+        alignItems: "flex-start",
+        transform: [{ scale: pressed ? 0.97 : 1 }],
+      })}
     >
+      {selected ? (
+        <View
+          style={{
+            position: "absolute",
+            top: 12,
+            end: 12,
+            width: 26,
+            height: 26,
+            borderRadius: 13,
+            backgroundColor: colors.volt,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon icon={Check} size={15} color={colors.ink} strokeWidth={3} />
+        </View>
+      ) : null}
       <View
-        className={`mt-0.5 h-6 w-6 items-center justify-center rounded-md border ${
-          checked ? "border-slate-900 bg-slate-900" : "border-slate-400 bg-white"
-        }`}
+        style={{
+          width: 48,
+          height: 48,
+          borderRadius: 14,
+          backgroundColor: selected ? colors.ink : colors.mist,
+          alignItems: "center",
+          justifyContent: "center",
+        }}
       >
-        {checked ? <Text className="text-sm font-bold text-white">✓</Text> : null}
+        <Icon icon={icon} size={24} color={selected ? colors.volt : colors.ink} />
       </View>
-      <Text className="flex-1 text-sm leading-5 text-slate-700">{label}</Text>
+      <AppText size={18} weight="bold" lineHeight={24}>
+        {title}
+      </AppText>
+      <AppText size={13} lineHeight={19} tone="graphite">
+        {description}
+      </AppText>
     </Pressable>
   );
 }

@@ -6,7 +6,8 @@
     "signOut": "Sign out",
     "trainer": "Trainer",
     "client": "Client",
-    "add": "Add"
+    "add": "Add",
+    "back": "Back"
   },
   "tabs": {
     "home": "Home",
@@ -31,7 +32,21 @@
     "invalidPhone": "Enter an Israeli mobile number, e.g. 050-1234567.",
     "invalidCode": "That code is wrong or has expired. Try again or request a new one.",
     "sendFailed": "We couldn't send the code. Please try again in a moment.",
-    "tooManyAttempts": "Too many attempts. Wait a minute and try again."
+    "tooManyAttempts": "Too many attempts. Wait a minute and try again.",
+    "taglineLine1": "Less phone.",
+    "taglineLine2": "More training.",
+    "pitch": "One app for a trainer and their clients — workouts, schedule and payments.",
+    "phoneLabel": "Phone number",
+    "sendCodeSms": "Send code by SMS",
+    "firstTimeHint": "The first time, we'll only ask for your name and role.",
+    "codeTitle": "Your code is on its way",
+    "codeSentTo": "We sent a 6-digit code to {{phone}}",
+    "codeLabel": "Verification code",
+    "autoContinue": "We continue on our own once every digit is in",
+    "resendIn": "Resend in {{time}}",
+    "resend": "Resend code",
+    "otherNumber": "Different number",
+    "verifyAndSignIn": "Verify and sign in"
   },
   "onboarding": {
     "welcome": "Welcome 👋",
@@ -40,7 +55,18 @@
     "namePlaceholder": "e.g. Idan",
     "roleLabel": "I am a…",
     "termsLabel": "I accept the Terms of Use.",
-    "healthLabel": "I understand I should consult a physician before starting any exercise program."
+    "healthLabel": "I understand I should consult a physician before starting any exercise program.",
+    "title": "Nice to meet you",
+    "lead": "Two quick questions and you're in.",
+    "nameQuestion": "What's your name?",
+    "iAm": "I'm…",
+    "trainerTitle": "Trainer",
+    "trainerDesc": "Manages clients, schedule and payments",
+    "clientTitle": "Client",
+    "clientDesc": "Gets workouts from their trainer",
+    "termsPrefix": "I've read and agree to the ",
+    "termsLink": "Terms of Use",
+    "health": "I know I should consult a doctor before starting a training program"
   },
   "home": {
     "greeting": "Hi {{name}} 👋",
@@ -258,7 +284,8 @@
     "joinButton": "Join",
     "notNow": "Not now",
     "invalidCode": "This code is wrong, already used, or expired. Ask your trainer to send a new one.",
-    "failed": "Couldn’t connect. Check your connection and try again."
+    "failed": "Couldn’t connect. Check your connection and try again.",
+    "codeLabel": "Invite code"
   },
   "progress": {
     "photoPermission": "Photo library permission is needed to attach a photo.",
@@ -341,6 +368,52 @@
       "pause": "Pause",
       "resume": "Resume",
       "skip": "Skip"
+    },
+    "mode": {
+      "minimize": "Minimize — the workout keeps running",
+      "allExercises": "All exercises in this workout",
+      "progress": "Workout progress",
+      "exerciseOf": "Exercise {{n}} of {{total}}",
+      "targetRaised": "Target raised to {{weight}} kg",
+      "demo": "Demo",
+      "swap": "Swap",
+      "skip": "Skip",
+      "setOf": "Set {{n}} of {{total}}",
+      "lastTime": "Last time {{nums}}",
+      "swappedNoHistory": "Substitute — no history yet",
+      "kg": "kg",
+      "reps": "reps",
+      "bodyweight": "Bodyweight",
+      "weightGroup": "Weight",
+      "repsGroup": "Reps",
+      "weightDown": "Weight down by 2.5 kg",
+      "weightUp": "Weight up by 2.5 kg",
+      "repsDown": "One rep less",
+      "repsUp": "One rep more",
+      "setShort": "Set {{n}}",
+      "now": "Now",
+      "editSet": "Edit set {{n}}",
+      "setDone": "Set done",
+      "restHint": "The rest timer ({{time}}) starts by itself",
+      "lastSetHint": "This is the last set of the workout",
+      "startRest": "Rest",
+      "restOver": "Rest's over — set {{n}}, go",
+      "logged": "Set {{n}} logged · {{weight}} kg · {{reps}} reps",
+      "loggedBodyweight": "Set {{n}} logged · {{reps}} reps",
+      "edit": "Edit",
+      "rest": "Rest",
+      "paused": "Paused",
+      "ofTotal": "of {{time}}",
+      "restTimer": "Rest, {{seconds}} seconds left",
+      "minus15": "15 seconds less",
+      "plus15": "15 seconds more",
+      "pause": "Pause",
+      "resume": "Resume",
+      "upNext": "Up next",
+      "nextSet": "Set {{n}} of {{total}} · {{name}}",
+      "nextExercise": "Next exercise · {{name}}",
+      "putDown": "You can put the phone down — it buzzes when the rest is over",
+      "skipRest": "Skip rest"
     }
   },
   "dashboard": {
@@ -430,7 +503,32 @@
     "beginner": "Beginner",
     "intermediate": "Intermediate",
     "advanced": "Advanced",
-    "save": "Save"
+    "save": "Save",
+    "lead": "This helps your trainer build your plan. Every question is optional.",
+    "skip": "Skip",
+    "goalQuestion": "What's the goal?",
+    "goalOptions": {
+      "weightLoss": "Weight loss",
+      "toning": "Toning",
+      "strength": "Strength",
+      "muscle": "Muscle mass",
+      "fitness": "General fitness",
+      "rehab": "Back after an injury"
+    },
+    "injuryOptions": {
+      "none": "None",
+      "lowerBack": "Lower back",
+      "knees": "Knees",
+      "shoulders": "Shoulders",
+      "other": "Other"
+    },
+    "injuryDetails": "Details (optional)",
+    "whereQuestion": "Where do you train?",
+    "whereOptions": {
+      "gym": "Full gym",
+      "home": "Weights at home",
+      "none": "No equipment"
+    }
   },
   "money": {
     "title": "Monthly summary",
