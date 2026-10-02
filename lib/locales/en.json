@@ -158,6 +158,39 @@
       "saveChanges": "Save changes",
       "deleteExercise": "Delete exercise",
       "target": "Target: {{sets}} sets × {{reps}} reps"
+    },
+    "library": {
+      "title": "Library",
+      "clientTitle": "Exercise library",
+      "templatesTab": "Templates",
+      "exercisesTab": "Exercises",
+      "search": "Search exercises",
+      "all": "All",
+      "newExercise": "New exercise",
+      "noMatches": "No exercises match"
+    },
+    "muscles": {
+      "legs": "Legs",
+      "glutes": "Glutes",
+      "back": "Back",
+      "chest": "Chest",
+      "shoulders": "Shoulders",
+      "arms": "Arms",
+      "core": "Core",
+      "other": "Other"
+    },
+    "edit": {
+      "name": "Exercise name",
+      "muscleGroup": "Muscle group",
+      "otherPlaceholder": "Which group?",
+      "video": "Demo video link (YouTube or Vimeo)",
+      "preview": "Preview · {{source}}",
+      "defaults": "Defaults",
+      "sets": "Sets",
+      "reps": "Reps",
+      "decrease": "Decrease",
+      "increase": "Increase",
+      "cues": "Cues for the client"
     }
   },
   "templates": {
@@ -640,5 +673,30 @@
     "noClients": "No clients yet",
     "noClientsHint": "Invite your first client from the Clients screen.",
     "addClient": "Add a client"
+  },
+  "settings": {
+    "title": "Settings",
+    "packageTitle": "Session package",
+    "left": "left",
+    "usedOf": "{{used}} of {{total}} used · renew through your trainer",
+    "shareTitle": "Share your progress",
+    "shareHint": "A card for your story or WhatsApp",
+    "duringWorkout": "During a workout",
+    "restAlerts": "Vibrate and sound when rest ends",
+    "keepAwake": "Keep the screen on",
+    "keepAwakeHint": "Only during a workout",
+    "autoRest": "Automatic rest timer",
+    "autoRestHint": "Starts when you log a set",
+    "language": "Language",
+    "more": "More",
+    "exerciseLibrary": "Exercise library",
+    "badges": "My badges",
+    "signOut": "Sign out",
+    "deleteAccount": "Delete account",
+    "deleteHint": "Permanently deletes all your data",
+    "edit": "Edit",
+    "editName": "Your name",
+    "save": "Save",
+    "version": "CoachFlow · version {{version}}"
   }
 }

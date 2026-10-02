@@ -1,78 +1,138 @@
-// app/(tabs)/profile.tsx — the Profile tab (route: /profile).
+// app/(tabs)/profile.tsx — Profile (client) and Settings (trainer)
+// (route: /profile). Trainers reach it from the avatar on Home.
 //
-// V1: shows who you are (name, role, account email) and lets you sign out.
-// Signing out clears the Supabase session; the (tabs) guard then bounces you
-// back to the sign-in screen automatically.
-// V9 (client only): earned badges + a "Share progress" card (app/share-card).
-// V10 (client only): sessions remaining, if the trainer has set up a package.
-// V12a: language toggle (i18next + RTL — see lib/i18n.ts).
-// Deployment prep: delete-account — required by Apple/Google for any app with
-// login (docs/DEPLOYMENT.md §7). Calls the delete-account edge function
-// (service-role only, never in the app) which deletes the auth user; every
-// owned row cascades away via the schema's on-delete-cascade FKs.
+// D28b / D20h / D29c: rebuilt to docs/design/screens/client-profile.html and
+// trainer-settings.html.
+//   Client: avatar + name, the package as a segment meter, the share-card
+//   entry with the current streak, "בזמן אימון" (lib/workoutPrefs.ts — on the
+//   phone only), language, the exercise library, badges (until Progress gets
+//   them, D28a), sign out, delete account.
+//   Trainer: back to Home, profile card with "עריכה" for the name, language,
+//   sign out, delete account, version.
+// Not yet, because their data doesn't exist yet (main session):
+//   "תזכורות" (profiles.sms_reminders_enabled, B4) and "העסק" (business name +
+//   default price, B3). The email digest switch is gone for good: login is
+//   SMS-only and the digest isn't scheduled (0022).
+//
+// Delete account calls the delete-account edge function (service-role only,
+// never in the app); every owned row cascades away. Required by Apple/Google.
 
-import { Link } from "expo-router";
-import { ActivityIndicator, Alert, Pressable, ScrollView, Switch, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useState } from "react";
+import { Alert, Pressable, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import Constants from "expo-constants";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
+import Dumbbell from "lucide-react-native/icons/dumbbell";
+import LogOut from "lucide-react-native/icons/log-out";
+import Pencil from "lucide-react-native/icons/pencil";
+import Sun from "lucide-react-native/icons/sun";
+import Timer from "lucide-react-native/icons/timer";
+import Trash from "lucide-react-native/icons/trash";
+import Trophy from "lucide-react-native/icons/trophy";
+import Vibrate from "lucide-react-native/icons/vibrate";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { BADGE_INFO, type BadgeType } from "@/lib/badges";
-import { SUPPORTED_LOCALES, setLocale, type SupportedLocale } from "@/lib/i18n";
+import { ltr, setLocale, type SupportedLocale } from "@/lib/i18n";
+import { setWorkoutPref, useWorkoutPrefs } from "@/lib/workoutPrefs";
+import {
+  AppText,
+  Avatar,
+  Button,
+  Card,
+  Chip,
+  colors,
+  Display,
+  GroupLabel,
+  Icon,
+  IconButton,
+  Input,
+  ListCard,
+  ListRow,
+  Num,
+  Segmented,
+  SegmentMeter,
+  Sheet,
+  Toggle,
+} from "@/components/ui";
 
-const LOCALE_LABELS: Record<SupportedLocale, string> = { en: "English", he: "עברית" };
+const LOCALE_LABELS: Record<SupportedLocale, string> = { he: "עברית", en: "English" };
+
+/** "972525885818" → "052-588-5818". */
+function localPhone(raw: string | undefined): string | null {
+  if (!raw) return null;
+  const digits = raw.replace(/\D/g, "");
+  const local = digits.startsWith("972") ? `0${digits.slice(3)}` : digits;
+  return local.length === 10 ? `${local.slice(0, 3)}-${local.slice(3, 6)}-${local.slice(6)}` : local;
+}
 
 export default function ProfileScreen() {
   const { profile, session, signOut, patchProfile } = useAuth();
   const { t, i18n } = useTranslation();
+  const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const prefs = useWorkoutPrefs();
   const isClient = profile?.role === "client";
-  const isTrainer = profile?.role === "trainer";
+  const userId = session?.user.id ?? "";
+  const [editing, setEditing] = useState(false);
+  const [nameDraft, setNameDraft] = useState("");
 
   const badges = useQuery({
-    queryKey: ["badges", session?.user.id],
+    queryKey: ["badges", userId],
     enabled: isClient && !!session,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("badges")
         .select("type")
-        .eq("client_id", session!.user.id)
+        .eq("client_id", userId)
         .order("earned_at", { ascending: true });
       if (error) throw error;
       return data.map((b) => b.type as BadgeType);
     },
   });
 
-  const packageQuery = useQuery({
-    queryKey: ["package", session?.user.id],
+  // Same key and shape as the client Home's package query.
+  const pkg = useQuery({
+    queryKey: ["package", userId],
     enabled: isClient && !!session,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("packages")
         .select("total_sessions, used_sessions")
-        .eq("client_id", session!.user.id)
+        .eq("client_id", userId)
         .maybeSingle();
       if (error) throw error;
       return data;
     },
   });
 
-  // V17: trainer-only opt-out for the morning digest email. Writes straight
-  // through profiles_update_own — 0013's guard trigger only protects role and
-  // the consent stamps, so no new policy is needed.
-  const setDigest = useMutation({
-    mutationFn: async (enabled: boolean) => {
-      const { error } = await supabase
-        .from("profiles")
-        .update({ daily_digest_enabled: enabled })
-        .eq("id", session!.user.id);
+  // Same key as the client Home's streak.
+  const streak = useQuery({
+    queryKey: ["client-streak", userId],
+    enabled: isClient && !!session,
+    queryFn: async () => {
+      const { data, error } = await supabase.from("client_streaks").select("current_streak").eq("client_id", userId);
       if (error) throw error;
-      return enabled;
+      return Math.max(0, ...data.map((r) => r.current_streak));
     },
-    // patchProfile, NOT refreshProfile — the latter re-enters the global
-    // loading state and remounts the entire tab navigator (see lib/auth.tsx).
-    onSuccess: (enabled) => patchProfile({ daily_digest_enabled: enabled }),
+  });
+
+  const saveName = useMutation({
+    mutationFn: async (name: string) => {
+      const { error } = await supabase.from("profiles").update({ display_name: name }).eq("id", userId);
+      if (error) throw error;
+      return name;
+    },
+    // patchProfile, not refreshProfile: no global loading state, no remount.
+    onSuccess: (name) => {
+      patchProfile({ display_name: name });
+      setEditing(false);
+    },
   });
 
   const deleteAccount = useMutation({
@@ -86,158 +146,248 @@ export default function ProfileScreen() {
   function confirmDeleteAccount() {
     Alert.alert(t("profile.deleteAccountTitle"), t("profile.deleteAccountMessage"), [
       { text: t("common.cancel"), style: "cancel" },
-      { text: t("profile.deleteAccount"), style: "destructive", onPress: () => deleteAccount.mutate() },
+      { text: t("settings.deleteAccount"), style: "destructive", onPress: () => deleteAccount.mutate() },
     ]);
   }
 
+  const name = profile?.display_name ?? "";
+  const language = (
+    <View style={{ gap: 8 }}>
+      <GroupLabel>{t("settings.language")}</GroupLabel>
+      <Segmented
+        value={i18n.language === "he" ? "he" : "en"}
+        onChange={(l) => setLocale(l)}
+        options={(["he", "en"] as SupportedLocale[]).map((l) => ({ value: l, label: LOCALE_LABELS[l] }))}
+      />
+    </View>
+  );
+  const account = (
+    <ListCard inset={16} padded>
+      <ListRow density="setting" leading={<Icon icon={LogOut} size={22} />} title={t("settings.signOut")} onPress={signOut} />
+      <ListRow
+        density="setting"
+        leading={<Icon icon={Trash} size={22} color={colors.ember} />}
+        title={t("settings.deleteAccount")}
+        subtitle={isClient ? undefined : t("settings.deleteHint")}
+        onPress={deleteAccount.isPending ? undefined : confirmDeleteAccount}
+      />
+    </ListCard>
+  );
+
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
-      <ScrollView contentContainerClassName="px-6 pt-6 pb-10">
-        <Text className="w-full text-left text-2xl font-bold text-slate-900">{t("profile.title")}</Text>
-
-        <View className="mt-6 gap-4">
-          <Field label={t("profile.name")} value={profile?.display_name ?? "—"} freeText />
-          <Field
-            label={t("profile.role")}
-            value={profile?.role === "trainer" ? t("common.trainer") : t("common.client")}
-          />
-          <Field label={t("profile.account")} value={session?.user.email ?? session?.user.phone ?? "—"} />
-        </View>
-
-        {isClient && packageQuery.data ? (
-          <View className="mt-6">
-            <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
-              {t("profile.sessionsRemaining")}
-            </Text>
-            <Text className="mt-1 text-base text-slate-900">
-              {packageQuery.data.total_sessions - packageQuery.data.used_sessions} of{" "}
-              {packageQuery.data.total_sessions}
-            </Text>
-          </View>
-        ) : null}
-
+    <View style={{ flex: 1, backgroundColor: colors.chalk }}>
+      <ScrollView
+        contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 30, gap: 22 }}
+      >
         {isClient ? (
-          <View className="mt-6">
-            <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
-              {t("profile.badges")}
-            </Text>
-            {badges.isLoading ? (
-              <ActivityIndicator className="mt-2" />
-            ) : badges.data && badges.data.length > 0 ? (
-              <View className="mt-2 flex-row flex-wrap gap-2">
-                {badges.data.map((type) => (
-                  <View key={type} className="flex-row items-center gap-1 rounded-full bg-amber-100 px-3 py-1.5">
-                    <Text className="text-base">{BADGE_INFO[type].emoji}</Text>
-                    <Text className="text-xs font-semibold text-amber-800">{BADGE_INFO[type].label}</Text>
-                  </View>
-                ))}
+          <>
+            <View style={{ flexDirection: "row", alignItems: "center", gap: 16 }}>
+              <Avatar id={userId} name={name || "?"} size={72} />
+              <View style={{ flex: 1, gap: 4 }}>
+                <Display size={38}>{name}</Display>
               </View>
-            ) : (
-              <Text className="mt-1 w-full text-left text-sm text-slate-400">
-                {t("profile.noBadgesYet")}
-              </Text>
-            )}
-
-            {session ? (
-              <Link href={`/share-card/${session.user.id}`} asChild>
-                <Pressable className="mt-4 items-center rounded-xl bg-slate-900 px-4 py-3 active:opacity-80">
-                  <Text className="text-base font-semibold text-white">{t("profile.shareProgress")}</Text>
-                </Pressable>
-              </Link>
-            ) : null}
-          </View>
-        ) : null}
-
-        {isTrainer ? (
-          <View className="mt-6">
-            <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
-              {t("profile.notifications")}
-            </Text>
-            <View className="mt-2 flex-row items-center justify-between gap-3 rounded-xl border border-slate-200 px-4 py-3">
-              <View className="flex-1">
-                <Text className="text-left text-sm font-medium text-slate-700">
-                  {t("profile.dailyDigest")}
-                </Text>
-                <Text className="mt-0.5 text-left text-xs text-slate-400">
-                  {t("profile.dailyDigestHint")}
-                </Text>
-              </View>
-              <Switch
-                value={profile?.daily_digest_enabled ?? true}
-                disabled={setDigest.isPending}
-                onValueChange={(v) => setDigest.mutate(v)}
-              />
             </View>
-            {setDigest.error ? (
-              <Text className="mt-2 w-full text-left text-sm text-red-600">
-                {(setDigest.error as Error).message}
-              </Text>
+
+            {pkg.data && pkg.data.total_sessions > 0 ? (
+              <Card style={{ padding: 12, gap: 16 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+                  <AppText size={18} weight="semibold" lineHeight={23}>
+                    {t("settings.packageTitle")}
+                  </AppText>
+                  <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+                    <Num size={30}>{Math.max(0, pkg.data.total_sessions - pkg.data.used_sessions)}</Num>
+                    <AppText size={14} tone="graphite">
+                      {t("settings.left")}
+                    </AppText>
+                  </View>
+                </View>
+                <SegmentMeter total={pkg.data.total_sessions} filled={pkg.data.used_sessions} />
+                <AppText size={13} tone="graphite">
+                  {t("settings.usedOf", { used: pkg.data.used_sessions, total: pkg.data.total_sessions })}
+                </AppText>
+              </Card>
             ) : null}
-          </View>
-        ) : null}
 
-        <View className="mt-6">
-          <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
-            {t("profile.language")}
-          </Text>
-          <View className="mt-2 flex-row gap-2">
-            {SUPPORTED_LOCALES.map((locale) => {
-              const active = i18n.language === locale;
-              return (
-                <Pressable
-                  key={locale}
-                  className={`flex-1 items-center rounded-xl border px-4 py-2.5 ${
-                    active ? "border-slate-900 bg-slate-900" : "border-slate-300 active:bg-slate-100"
-                  }`}
-                  disabled={active}
-                  onPress={() => setLocale(locale)}
-                >
-                  <Text className={`text-sm font-semibold ${active ? "text-white" : "text-slate-700"}`}>
-                    {LOCALE_LABELS[locale]}
-                  </Text>
-                </Pressable>
-              );
-            })}
-          </View>
-        </View>
+            <Pressable
+              accessibilityRole="button"
+              onPress={() => router.push(`/share-card/${userId}`)}
+              style={({ pressed }) => ({
+                flexDirection: "row",
+                alignItems: "center",
+                gap: 16,
+                paddingVertical: 16,
+                paddingHorizontal: 18,
+                backgroundColor: colors.ink,
+                borderRadius: 22,
+                transform: [{ scale: pressed ? 0.98 : 1 }],
+              })}
+            >
+              <Num size={56} tone="volt">
+                {streak.data ?? 0}
+              </Num>
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText size={17} weight="semibold" tone="bone">
+                  {t("settings.shareTitle")}
+                </AppText>
+                <AppText size={14} tone="ash">
+                  {t("settings.shareHint")}
+                </AppText>
+              </View>
+              <Icon icon={ChevronRight} size={22} color={colors.bone} mirror />
+            </Pressable>
 
-        <Pressable
-          className="mt-10 items-center rounded-xl border border-red-300 px-4 py-3 active:opacity-70"
-          onPress={signOut}
-        >
-          <Text className="text-base font-semibold text-red-600">{t("common.signOut")}</Text>
-        </Pressable>
+            <View style={{ gap: 8 }}>
+              <GroupLabel>{t("settings.duringWorkout")}</GroupLabel>
+              <ListCard inset={16} padded>
+                <ListRow
+                  density="setting"
+                  leading={<Icon icon={Vibrate} size={22} />}
+                  title={t("settings.restAlerts")}
+                  trailing={
+                    <Toggle
+                      value={prefs.restAlerts}
+                      onValueChange={(v) => setWorkoutPref("restAlerts", v)}
+                      accessibilityLabel={t("settings.restAlerts")}
+                    />
+                  }
+                />
+                <ListRow
+                  density="setting"
+                  leading={<Icon icon={Sun} size={22} />}
+                  title={t("settings.keepAwake")}
+                  subtitle={t("settings.keepAwakeHint")}
+                  trailing={
+                    <Toggle
+                      value={prefs.keepAwake}
+                      onValueChange={(v) => setWorkoutPref("keepAwake", v)}
+                      accessibilityLabel={t("settings.keepAwake")}
+                    />
+                  }
+                />
+                <ListRow
+                  density="setting"
+                  leading={<Icon icon={Timer} size={22} />}
+                  title={t("settings.autoRest")}
+                  subtitle={t("settings.autoRestHint")}
+                  trailing={
+                    <Toggle
+                      value={prefs.autoRest}
+                      onValueChange={(v) => setWorkoutPref("autoRest", v)}
+                      accessibilityLabel={t("settings.autoRest")}
+                    />
+                  }
+                />
+              </ListCard>
+            </View>
 
-        <Pressable
-          className="mt-3 items-center rounded-xl px-4 py-3 active:opacity-70"
-          disabled={deleteAccount.isPending}
-          onPress={confirmDeleteAccount}
-        >
-          {deleteAccount.isPending ? (
-            <ActivityIndicator color="#f87171" />
-          ) : (
-            <Text className="text-sm font-medium text-red-400">{t("profile.deleteAccount")}</Text>
-          )}
-        </Pressable>
+            {language}
+
+            <View style={{ gap: 8 }}>
+              <GroupLabel>{t("settings.more")}</GroupLabel>
+              <ListCard inset={16} padded>
+                <ListRow
+                  density="setting"
+                  leading={<Icon icon={Dumbbell} size={22} />}
+                  title={t("settings.exerciseLibrary")}
+                  chevron
+                  onPress={() => router.push("/exercises")}
+                />
+              </ListCard>
+            </View>
+
+            {badges.data && badges.data.length > 0 ? (
+              <View style={{ gap: 8 }}>
+                <GroupLabel>{t("settings.badges")}</GroupLabel>
+                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
+                  {badges.data.map((type) => (
+                    <Chip key={type} kind="pr" icon={Trophy} label={BADGE_INFO[type].label} />
+                  ))}
+                </View>
+              </View>
+            ) : null}
+
+            {account}
+          </>
+        ) : (
+          <>
+            <View style={{ height: 52, flexDirection: "row", alignItems: "center", gap: 8 }}>
+              <IconButton
+                icon={ChevronLeft}
+                mirror
+                iconSize={22}
+                accessibilityLabel={t("common.back")}
+                onPress={() => router.navigate("/")}
+              />
+              <AppText size={17} weight="semibold" center style={{ flex: 1 }}>
+                {t("settings.title")}
+              </AppText>
+              <View style={{ width: 44 }} />
+            </View>
+
+            <Card style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+              <Avatar id={userId} name={name || "?"} size={56} />
+              <View style={{ flex: 1, gap: 2 }}>
+                <AppText size={18} weight="semibold">
+                  {name}
+                </AppText>
+                {localPhone(session?.user.phone) ? (
+                  <AppText size={14} tone="graphite">
+                    {ltr(localPhone(session?.user.phone)!)}
+                  </AppText>
+                ) : null}
+              </View>
+              <Button
+                label={t("settings.edit")}
+                icon={Pencil}
+                variant="secondary"
+                size={44}
+                onPress={() => {
+                  setNameDraft(name);
+                  setEditing(true);
+                }}
+              />
+            </Card>
+
+            {language}
+            {account}
+
+            <AppText size={13} tone="smoke" center>
+              {t("settings.version", { version: Constants.expoConfig?.version ?? "1.0" })}
+            </AppText>
+          </>
+        )}
+
         {deleteAccount.error ? (
-          <Text className="mt-2 w-full text-left text-sm text-red-600">
+          <AppText size={14} tone="ember">
             {(deleteAccount.error as Error).message}
-          </Text>
+          </AppText>
         ) : null}
       </ScrollView>
-    </SafeAreaView>
-  );
-}
 
-function Field({ label, value, freeText }: { label: string; value: string; freeText?: boolean }) {
-  return (
-    <View>
-      <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
-        {label}
-      </Text>
-      <Text className="mt-1 w-full text-left text-base text-slate-900">
-        {value}
-      </Text>
+      <Sheet visible={editing} onClose={() => setEditing(false)} closeLabel={t("common.cancel")} title={t("settings.editName")}>
+        <Input
+          size="md"
+          value={nameDraft}
+          onChangeText={setNameDraft}
+          autoFocus
+          autoCapitalize="words"
+          maxLength={60}
+          accessibilityLabel={t("settings.editName")}
+        />
+        {saveName.error ? (
+          <AppText size={14} tone="ember">
+            {(saveName.error as Error).message}
+          </AppText>
+        ) : null}
+        <Button
+          label={t("settings.save")}
+          size={56}
+          block
+          loading={saveName.isPending}
+          disabled={nameDraft.trim().length === 0}
+          onPress={() => saveName.mutate(nameDraft.trim())}
+        />
+      </Sheet>
     </View>
   );
 }

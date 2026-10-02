@@ -158,6 +158,39 @@
       "saveChanges": "שמירת שינויים",
       "deleteExercise": "מחיקת תרגיל",
       "target": "יעד: {{sets}} סטים × {{reps}} חזרות"
+    },
+    "library": {
+      "title": "ספרייה",
+      "clientTitle": "ספריית התרגילים",
+      "templatesTab": "תבניות",
+      "exercisesTab": "תרגילים",
+      "search": "חיפוש תרגיל",
+      "all": "הכול",
+      "newExercise": "תרגיל חדש",
+      "noMatches": "אין תרגילים שמתאימים"
+    },
+    "muscles": {
+      "legs": "רגליים",
+      "glutes": "ישבן",
+      "back": "גב",
+      "chest": "חזה",
+      "shoulders": "כתפיים",
+      "arms": "ידיים",
+      "core": "ליבה",
+      "other": "אחר"
+    },
+    "edit": {
+      "name": "שם התרגיל",
+      "muscleGroup": "קבוצת שרירים",
+      "otherPlaceholder": "איזו קבוצה?",
+      "video": "קישור לסרטון הדגמה (YouTube או Vimeo)",
+      "preview": "תצוגה מקדימה · {{source}}",
+      "defaults": "ברירת מחדל",
+      "sets": "סטים",
+      "reps": "חזרות",
+      "decrease": "הורדה",
+      "increase": "הוספה",
+      "cues": "דגשים למתאמן"
     }
   },
   "templates": {
@@ -640,5 +673,30 @@
     "noClients": "עוד אין מתאמנים",
     "noClientsHint": "אפשר להזמין את המתאמן הראשון ממסך המתאמנים.",
     "addClient": "הוספת מתאמן"
+  },
+  "settings": {
+    "title": "הגדרות",
+    "packageTitle": "חבילת אימונים",
+    "left": "נותרו",
+    "usedOf": "{{used}} מתוך {{total}} נוצלו · חידוש החבילה דרך המאמן",
+    "shareTitle": "שיתוף ההתקדמות",
+    "shareHint": "כרטיס לסטורי או לוואטסאפ",
+    "duringWorkout": "בזמן אימון",
+    "restAlerts": "רטט וצליל בסוף מנוחה",
+    "keepAwake": "המסך נשאר דלוק",
+    "keepAwakeHint": "רק בזמן אימון",
+    "autoRest": "טיימר מנוחה אוטומטי",
+    "autoRestHint": "מתחיל כשמסמנים סט",
+    "language": "שפה",
+    "more": "עוד",
+    "exerciseLibrary": "ספריית התרגילים",
+    "badges": "התגים שלי",
+    "signOut": "התנתקות",
+    "deleteAccount": "מחיקת החשבון",
+    "deleteHint": "מוחק לצמיתות את כל הנתונים",
+    "edit": "עריכה",
+    "editName": "השם שלך",
+    "save": "שמירה",
+    "version": "CoachFlow · גרסה {{version}}"
   }
 }

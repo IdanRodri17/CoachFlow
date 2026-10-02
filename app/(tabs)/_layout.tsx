@@ -60,7 +60,8 @@ export default function TabsLayout() {
         name="nutrition"
         options={{ title: t("tabs.nutrition"), href: isTrainer ? null : undefined }}
       />
-      <Tabs.Screen name="profile" options={{ title: t("tabs.profile") }} />
+      {/* Profile / Settings draws its own header too. */}
+      <Tabs.Screen name="profile" options={{ title: t("tabs.profile"), headerShown: false }} />
     </Tabs>
   );
 }
