@@ -5,17 +5,22 @@
 // the signed-in caller, and a trainer can no longer add anyone on their own.
 // Wrong, used and expired codes all come back as one generic error on
 // purpose (so codes can't be probed) — the screen says the same.
+//
+// D30b: restyled with the kit. There's no reference screen for it, so it
+// borrows the SMS-code step's layout (auth-code.html): back button, headline,
+// six boxes. The boxes are one hidden input, like the SMS code.
 
 import { useState } from "react";
-import { ActivityIndicator, Pressable, Text, TextInput, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Redirect, useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
 
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { LTR_WRITING_DIRECTION_ONLY } from "@/lib/i18n";
+import { AppText, Button, CodeInput, colors, Display, IconButton, TextButton } from "@/components/ui";
 
 const CODE_LENGTH = 6;
 
@@ -24,6 +29,7 @@ export default function JoinScreen() {
   const { profile } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
+  const insets = useSafeAreaInsets();
   const [code, setCode] = useState("");
 
   const join = useMutation({
@@ -51,48 +57,85 @@ export default function JoinScreen() {
       : t("join.failed")
     : null;
 
+  function onCodeChange(v: string) {
+    // Codes are A–Z / 2–9 only; uppercasing here means a lowercase or spaced
+    // paste still works (the server trims and uppercases too).
+    const next = v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, CODE_LENGTH);
+    setCode(next);
+    if (join.error) join.reset();
+  }
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <View className="flex-1 justify-center px-6">
-        <Text className="w-full text-left text-2xl font-bold text-slate-900">{t("join.title")}</Text>
-        <Text className="mb-8 mt-1 w-full text-left text-base text-slate-500">{t("join.subtitle")}</Text>
-
-        <TextInput
-          className="rounded-xl border border-slate-300 px-4 py-3 text-center text-2xl tracking-[6px] text-slate-900"
-          style={LTR_WRITING_DIRECTION_ONLY}
-          placeholder="K7M2QX"
-          placeholderTextColor="#cbd5e1"
-          autoCapitalize="characters"
-          autoCorrect={false}
-          autoComplete="off"
-          maxLength={CODE_LENGTH}
-          value={code}
-          // Codes are A–Z / 2–9 only; uppercasing here means a lowercase or
-          // spaced paste still works (the server trims and uppercases too).
-          onChangeText={(v) => setCode(v.toUpperCase().replace(/[^A-Z0-9]/g, "").slice(0, CODE_LENGTH))}
-          editable={!join.isPending}
-        />
-
-        {errorText ? <Text className="mt-3 w-full text-left text-sm text-red-600">{errorText}</Text> : null}
-
-        <Pressable
-          className={`mt-6 items-center rounded-xl px-4 py-3 ${
-            code.length === CODE_LENGTH ? "bg-slate-900 active:opacity-80" : "bg-slate-300"
-          }`}
-          disabled={code.length !== CODE_LENGTH || join.isPending}
-          onPress={() => join.mutate(code)}
+    <View style={{ flex: 1, backgroundColor: colors.chalk }}>
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+        <ScrollView
+          keyboardShouldPersistTaps="handled"
+          contentContainerStyle={{
+            flexGrow: 1,
+            paddingTop: insets.top,
+            paddingBottom: Math.max(insets.bottom, 20),
+            paddingHorizontal: 24,
+            gap: 20,
+          }}
         >
-          {join.isPending ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text className="text-base font-semibold text-white">{t("join.joinButton")}</Text>
-          )}
-        </Pressable>
+          <View style={{ height: 52, flexDirection: "row", alignItems: "center" }}>
+            <IconButton
+              icon={ChevronLeft}
+              mirror
+              iconSize={22}
+              accessibilityLabel={t("common.back")}
+              onPress={() => router.back()}
+            />
+          </View>
 
-        <Pressable className="mt-4 items-center" disabled={join.isPending} onPress={() => router.back()}>
-          <Text className="text-sm text-slate-500">{t("join.notNow")}</Text>
-        </Pressable>
-      </View>
-    </SafeAreaView>
+          <View style={{ gap: 10 }}>
+            <Display size={52}>{t("join.title")}</Display>
+            <AppText size={16} lineHeight={24} tone="graphite">
+              {t("join.subtitle")}
+            </AppText>
+          </View>
+
+          <CodeInput
+            value={code}
+            onChangeText={onCodeChange}
+            accessibilityLabel={t("join.codeLabel")}
+            editable={!join.isPending}
+            invalid={!!errorText}
+            inputProps={{
+              autoFocus: true,
+              autoCapitalize: "characters",
+              autoCorrect: false,
+              autoComplete: "off",
+            }}
+          />
+
+          {errorText ? (
+            <AppText size={14} tone="ember">
+              {errorText}
+            </AppText>
+          ) : null}
+
+          <View style={{ flex: 1 }} />
+
+          <View style={{ gap: 4 }}>
+            <Button
+              label={t("join.joinButton")}
+              size={56}
+              block
+              loading={join.isPending}
+              disabled={code.length !== CODE_LENGTH}
+              onPress={() => join.mutate(code)}
+            />
+            <TextButton
+              label={t("join.notNow")}
+              underline
+              disabled={join.isPending}
+              onPress={() => router.back()}
+              style={{ alignSelf: "center" }}
+            />
+          </View>
+        </ScrollView>
+      </KeyboardAvoidingView>
+    </View>
   );
 }
