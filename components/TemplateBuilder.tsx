@@ -23,6 +23,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { directionalTextClassName, LTR_WRITING_DIRECTION_ONLY } from "@/lib/i18n";
 
@@ -262,7 +263,7 @@ function ExercisePickerModal({
 }) {
   const { t } = useTranslation();
   const { data, isLoading } = useQuery({
-    queryKey: ["exercises"],
+    queryKey: qk.exercises.list,
     queryFn: async () => {
       const { data, error } = await supabase.from("exercises").select("*").order("name");
       if (error) throw error;

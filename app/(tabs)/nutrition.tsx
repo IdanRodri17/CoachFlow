@@ -10,6 +10,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -28,7 +29,7 @@ function NutritionScreenBody() {
 
 
   const nutritionPlan = useQuery({
-    queryKey: ["nutrition-plan-latest", session?.user.id],
+    queryKey: qk.nutritionPlan.latest(session?.user.id),
     enabled: !!session,
     queryFn: async () => {
       const { data, error } = await supabase

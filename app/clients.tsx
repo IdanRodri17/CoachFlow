@@ -18,6 +18,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { toE164IL, useAuth } from "@/lib/auth";
@@ -48,7 +49,7 @@ function ClientsScreenBody() {
   // dead. expires_at is an instant, so comparing it to "now" in UTC is right
   // (no calendar-date logic here).
   const invites = useQuery({
-    queryKey: ["client-invites", trainerId],
+    queryKey: qk.invites.byTrainer(trainerId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("client_invites")
@@ -81,7 +82,7 @@ function ClientsScreenBody() {
       return data;
     },
     onSuccess: (invite) => {
-      queryClient.invalidateQueries({ queryKey: ["client-invites"] });
+      queryClient.invalidateQueries({ queryKey: qk.invites.all });
       setInviteName("");
       sendInviteOnWhatsApp(invite.code, invite.label);
     },
@@ -92,7 +93,7 @@ function ClientsScreenBody() {
       const { error } = await supabase.from("client_invites").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["client-invites"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.invites.all }),
   });
 
   const addOfflineClient = useMutation({
@@ -101,7 +102,7 @@ function ClientsScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["roster-clients"] });
+      queryClient.invalidateQueries({ queryKey: qk.roster.all });
       setOfflineName("");
     },
   });
@@ -126,7 +127,7 @@ function ClientsScreenBody() {
         if (error) throw error;
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["roster-clients"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.roster.all }),
   });
 
   return (

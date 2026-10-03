@@ -27,6 +27,7 @@ import Ticket from "lucide-react-native/icons/ticket";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import User from "lucide-react-native/icons/user";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
@@ -85,7 +86,7 @@ export function TrainerHome() {
 
   // Under "scheduled-trainer", so every existing schedule mutation refreshes it.
   const todays = useQuery({
-    queryKey: ["scheduled-trainer", "today", today],
+    queryKey: qk.scheduledTrainer.today(today),
     queryFn: async (): Promise<Session[]> => {
       const { data, error } = await supabase
         .from("scheduled_workouts")
@@ -109,7 +110,7 @@ export function TrainerHome() {
 
   const monthKey = `${today.slice(0, 7)}-01`;
   const money = useQuery({
-    queryKey: ["trainer-monthly-money", monthKey],
+    queryKey: qk.money.month(monthKey),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("trainer_monthly_money")
@@ -123,7 +124,7 @@ export function TrainerHome() {
   });
 
   const atRisk = useQuery({
-    queryKey: ["client-risk"],
+    queryKey: qk.clientRisk.all,
     queryFn: async () => {
       const { data, error } = await supabase.from("client_risk").select("*").eq("trainer_id", trainerId);
       if (error) throw error;
@@ -137,10 +138,9 @@ export function TrainerHome() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
-      queryClient.invalidateQueries({ queryKey: ["client-risk"] });
-      queryClient.invalidateQueries({ queryKey: ["trainer-monthly-money"] });
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.all });
+      queryClient.invalidateQueries({ queryKey: qk.clientRisk.all });
+      queryClient.invalidateQueries({ queryKey: qk.money.all });
     },
   });
 
@@ -448,7 +448,7 @@ function NextUpCard({
 
   // Last effort / note (app clients log their own) + the package balance.
   const context = useQuery({
-    queryKey: ["client-context", kind, refId],
+    queryKey: qk.clientContext.subject(kind, refId),
     queryFn: async () => {
       const [logRes, pkgRes] = await Promise.all([
         kind === "app"

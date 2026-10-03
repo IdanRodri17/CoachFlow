@@ -8,6 +8,7 @@
 
 import { useQuery } from "@tanstack/react-query";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 
 export type RosterClient = {
@@ -20,7 +21,7 @@ export type RosterClient = {
 
 export function useRosterClients(trainerId: string, options?: { enabled?: boolean }) {
   return useQuery({
-    queryKey: ["roster-clients"],
+    queryKey: qk.roster.all,
     enabled: options?.enabled ?? true,
     queryFn: async (): Promise<RosterClient[]> => {
       const [appRes, managedRes] = await Promise.all([

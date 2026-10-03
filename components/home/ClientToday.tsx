@@ -33,6 +33,7 @@ import User from "lucide-react-native/icons/user";
 import Users from "lucide-react-native/icons/users";
 import UserPlus from "lucide-react-native/icons/user-plus";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { addDays, todayISO, weekStartOf } from "@/lib/dates";
@@ -78,7 +79,7 @@ export function ClientToday() {
   // Today onward, with template names (same key and shape as before, so the
   // workout screen's invalidation still refreshes it).
   const upcoming = useQuery({
-    queryKey: ["scheduled-client"],
+    queryKey: qk.scheduledClient.upcoming,
     queryFn: async (): Promise<Upcoming[]> => {
       const { data: sws, error } = await supabase
         .from("scheduled_workouts")
@@ -103,7 +104,7 @@ export function ClientToday() {
 
   // This week (Sun–Sat), for the strip.
   const week = useQuery({
-    queryKey: ["scheduled-client", "week", weekStart],
+    queryKey: qk.scheduledClient.week(weekStart),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("scheduled_workouts")
@@ -117,7 +118,7 @@ export function ClientToday() {
   });
 
   const trainerLinks = useQuery({
-    queryKey: ["my-trainer-links", clientId],
+    queryKey: qk.myTrainerLinks.byClient(clientId),
     queryFn: async () => {
       const { count, error } = await supabase
         .from("trainer_clients")
@@ -130,7 +131,7 @@ export function ClientToday() {
 
   // Same key and shape as the Profile tab's package query.
   const pkg = useQuery({
-    queryKey: ["package", clientId],
+    queryKey: qk.package.own(clientId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("packages")
@@ -143,7 +144,7 @@ export function ClientToday() {
   });
 
   const streak = useQuery({
-    queryKey: ["client-streak", clientId],
+    queryKey: qk.clientStreak.own(clientId),
     queryFn: async () => {
       const { data, error } = await supabase.from("client_streaks").select("current_streak").eq("client_id", clientId);
       if (error) throw error;
@@ -153,7 +154,7 @@ export function ClientToday() {
 
   // "Under check-ins", so submitting one on Progress refreshes this too.
   const checkedIn = useQuery({
-    queryKey: ["check-ins", clientId, "week", weekStart],
+    queryKey: qk.checkIns.week(clientId, weekStart),
     queryFn: async () => {
       const { count, error } = await supabase
         .from("check_ins")
@@ -170,7 +171,7 @@ export function ClientToday() {
       const { error } = await supabase.from("scheduled_workouts").update({ scheduled_date: date }).eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["scheduled-client"] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.scheduledClient.all }),
   });
   function shiftDay(s: Upcoming, delta: number) {
     const next = addDays(s.scheduled_date, delta);
@@ -432,7 +433,7 @@ function HeroCard({
   const done = item.status === "completed";
 
   const preview = useQuery({
-    queryKey: ["template-preview", item.template_id],
+    queryKey: qk.templates.preview(item.template_id),
     enabled: !!item.template_id,
     queryFn: async () => {
       const { data: tes, error } = await supabase

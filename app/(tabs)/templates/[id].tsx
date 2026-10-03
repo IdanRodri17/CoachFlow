@@ -10,6 +10,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import {
@@ -37,7 +38,7 @@ function EditTemplateScreenBody() {
 
   // Load the template, its exercises (ordered), and the exercise names.
   const { data, isLoading, error } = useQuery({
-    queryKey: ["template", id],
+    queryKey: qk.templates.one(id),
     queryFn: async (): Promise<TemplateBuilderInitial> => {
       const { data: tpl, error: tErr } = await supabase
         .from("workout_templates")
@@ -109,8 +110,7 @@ function EditTemplateScreenBody() {
       if (insErr) throw insErr;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
-      queryClient.invalidateQueries({ queryKey: ["template", id] });
+      queryClient.invalidateQueries({ queryKey: qk.templates.all });
       router.back();
     },
   });
@@ -122,7 +122,7 @@ function EditTemplateScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["templates"] });
+      queryClient.invalidateQueries({ queryKey: qk.templates.all });
       router.back();
     },
   });

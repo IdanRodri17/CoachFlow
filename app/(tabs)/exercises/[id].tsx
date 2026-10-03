@@ -20,6 +20,7 @@ import Play from "lucide-react-native/icons/play";
 import Repeat from "lucide-react-native/icons/repeat";
 import Trophy from "lucide-react-native/icons/trophy";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toDateString } from "@/lib/dates";
@@ -40,7 +41,7 @@ export default function ExerciseDetailScreen() {
   const queryClient = useQueryClient();
 
   const { data: exercise, isLoading, error } = useQuery({
-    queryKey: ["exercise", id],
+    queryKey: qk.exercises.one(id),
     queryFn: async () => {
       const { data, error } = await supabase.from("exercises").select("*").eq("id", id).single();
       if (error) throw error;
@@ -54,8 +55,7 @@ export default function ExerciseDetailScreen() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exercises"] });
-      queryClient.invalidateQueries({ queryKey: ["exercise", id] });
+      queryClient.invalidateQueries({ queryKey: qk.exercises.all });
       router.back();
     },
   });
@@ -66,7 +66,7 @@ export default function ExerciseDetailScreen() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["exercises"] });
+      queryClient.invalidateQueries({ queryKey: qk.exercises.all });
       router.back();
     },
   });
@@ -134,7 +134,7 @@ function ClientExercise({ exercise }: { exercise: Exercise }) {
 
   // The client's own past sets of this exercise, newest session first.
   const history = useQuery({
-    queryKey: ["exercise-history", exercise.id, clientId],
+    queryKey: qk.exercises.history(exercise.id, clientId),
     enabled: !!clientId,
     queryFn: async () => {
       const { data, error } = await supabase

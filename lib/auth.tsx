@@ -13,10 +13,12 @@ import {
   useCallback,
   useContext,
   useEffect,
+  useRef,
   useState,
   type ReactNode,
 } from "react";
 import type { Session } from "@supabase/supabase-js";
+import { useQueryClient } from "@tanstack/react-query";
 
 import { supabase } from "@/lib/supabase";
 import type { Database } from "@/lib/database.types";
@@ -161,6 +163,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setProfileResolved(true);
     }
   }, [session, loadProfile]);
+
+  // V19 (2d): the query cache belongs to ONE user. Several keys don't carry a
+  // user id (qk.scheduledClient.upcoming, qk.templates.list, qk.roster.all…),
+  // so without this, a second account signing in on the same phone within
+  // the 30 s staleTime would be shown the previous account's cached data.
+  // Clear it whenever the signed-in user changes or signs out (not on the
+  // first sign-in of an app run — there's nothing to clear yet).
+  const queryClient = useQueryClient();
+  const lastUserId = useRef<string | null>(null);
+  useEffect(() => {
+    const userId = session?.user.id ?? null;
+    if (lastUserId.current !== null && lastUserId.current !== userId) queryClient.clear();
+    lastUserId.current = userId;
+  }, [session, queryClient]);
 
   const value: AuthContextValue = {
     // Still loading if the session isn't resolved yet, or we have a session but

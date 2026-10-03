@@ -7,11 +7,12 @@ import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
-import { addDays, addMonths, weekdayOf } from "@/lib/dates";
+import { expandScheduleDates } from "@/lib/schedule";
 import { ScheduleForm, type SchedulePayload } from "@/components/ScheduleForm";
 
 export default function NewScheduleScreen() {
@@ -32,7 +33,7 @@ function NewScheduleScreenBody() {
 
   const roster = useRosterClients(trainerId);
   const templates = useQuery({
-    queryKey: ["templates"],
+    queryKey: qk.templates.list,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("workout_templates")
@@ -62,20 +63,10 @@ function NewScheduleScreenBody() {
         managed_client_id = payload.client.refId;
       }
 
-      // Build the date list: a single date, or every chosen weekday from the
-      // start date until N weeks / N months later.
-      let dates: string[];
-      if (payload.repeat && payload.repeat.days.length > 0) {
-        const { days, count, unit } = payload.repeat;
-        const end = unit === "months" ? addMonths(payload.date, count) : addDays(payload.date, count * 7);
-        dates = [];
-        for (let d = payload.date; d < end; d = addDays(d, 1)) {
-          if (days.includes(weekdayOf(d))) dates.push(d);
-        }
-        if (dates.length === 0) dates = [payload.date];
-      } else {
-        dates = [payload.date];
-      }
+      // The same rule the form uses to show "קביעת N אימונים" — so the count
+      // on the button and the rows inserted can't disagree (lib/schedule.ts,
+      // unit-tested).
+      const dates = expandScheduleDates(payload.date, payload.repeat);
 
       const rows = dates.map((d) => ({
         trainer_id: trainerId,
@@ -92,8 +83,8 @@ function NewScheduleScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
-      queryClient.invalidateQueries({ queryKey: ["roster-clients"] });
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.all });
+      queryClient.invalidateQueries({ queryKey: qk.roster.all });
       router.back();
     },
   });

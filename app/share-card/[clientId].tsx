@@ -15,6 +15,7 @@ import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { BADGE_INFO, type BadgeType } from "@/lib/badges";
@@ -39,7 +40,7 @@ function ShareCardBody() {
   const [error, setError] = useState<string | null>(null);
 
   const card = useQuery({
-    queryKey: ["share-card", clientId],
+    queryKey: qk.shareCard.own(clientId),
     queryFn: async () => {
       const [profileRes, streakRes, badgesRes, workoutCountRes, rosterRes] = await Promise.all([
         supabase.from("profiles").select("display_name").eq("id", clientId).single(),

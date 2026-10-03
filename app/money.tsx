@@ -13,6 +13,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -43,7 +44,7 @@ function MoneyScreenBody() {
   const currentMonthKey = `${todayISO().slice(0, 7)}-01`;
 
   const history = useQuery({
-    queryKey: ["trainer-monthly-money-history"],
+    queryKey: qk.money.history,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("trainer_monthly_money")

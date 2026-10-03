@@ -7,6 +7,7 @@ import { Link, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 
@@ -25,7 +26,7 @@ function TemplatesListScreenBody() {
   // Templates are trainer-only.
 
   const { data, isLoading, error } = useQuery({
-    queryKey: ["templates"],
+    queryKey: qk.templates.list,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("workout_templates")

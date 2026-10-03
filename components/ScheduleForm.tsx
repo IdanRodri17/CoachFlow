@@ -29,6 +29,7 @@ import Plus from "lucide-react-native/icons/plus";
 import User from "lucide-react-native/icons/user";
 import Users from "lucide-react-native/icons/users";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { addDays, todayISO } from "@/lib/dates";
@@ -148,7 +149,7 @@ export function ScheduleForm({
   // The trainer's sessions on the chosen day, for "תפוס" (under
   // "scheduled-trainer", so every schedule change refreshes it).
   const busy = useQuery({
-    queryKey: ["scheduled-trainer", "day", date],
+    queryKey: qk.scheduledTrainer.day(date),
     enabled: !!session,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -166,7 +167,7 @@ export function ScheduleForm({
   const busyTimes = (busy.data ?? []).filter((x) => x !== ownTime);
 
   const counts = useQuery({
-    queryKey: ["templates", "exercise-counts"],
+    queryKey: qk.templates.exerciseCounts,
     queryFn: async () => {
       const { data, error } = await supabase.from("template_exercises").select("template_id");
       if (error) throw error;

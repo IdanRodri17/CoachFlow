@@ -20,6 +20,7 @@ import Play from "lucide-react-native/icons/play";
 import Plus from "lucide-react-native/icons/plus";
 import Search from "lucide-react-native/icons/search";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { ltr } from "@/lib/i18n";
@@ -47,7 +48,7 @@ export default function ExercisesListScreen() {
   const [muscle, setMuscle] = useState<string | null>(null);
 
   const { data, error, isSuccess } = useQuery({
-    queryKey: ["exercises"],
+    queryKey: qk.exercises.list,
     queryFn: async () => {
       const { data, error } = await supabase.from("exercises").select("*").order("name");
       if (error) throw error;

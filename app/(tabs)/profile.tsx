@@ -35,6 +35,7 @@ import Trash from "lucide-react-native/icons/trash";
 import Trophy from "lucide-react-native/icons/trophy";
 import Vibrate from "lucide-react-native/icons/vibrate";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { BADGE_INFO, type BadgeType } from "@/lib/badges";
@@ -83,7 +84,7 @@ export default function ProfileScreen() {
   const [nameDraft, setNameDraft] = useState("");
 
   const badges = useQuery({
-    queryKey: ["badges", userId],
+    queryKey: qk.badges.own(userId),
     enabled: isClient && !!session,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -98,7 +99,7 @@ export default function ProfileScreen() {
 
   // Same key and shape as the client Home's package query.
   const pkg = useQuery({
-    queryKey: ["package", userId],
+    queryKey: qk.package.own(userId),
     enabled: isClient && !!session,
     queryFn: async () => {
       const { data, error } = await supabase
@@ -113,7 +114,7 @@ export default function ProfileScreen() {
 
   // Same key as the client Home's streak.
   const streak = useQuery({
-    queryKey: ["client-streak", userId],
+    queryKey: qk.clientStreak.own(userId),
     enabled: isClient && !!session,
     queryFn: async () => {
       const { data, error } = await supabase.from("client_streaks").select("current_streak").eq("client_id", userId);

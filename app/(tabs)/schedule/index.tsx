@@ -17,6 +17,7 @@ import { Link, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -101,7 +102,7 @@ function ScheduleHomeScreenBody() {
     // different first element — so none of those six matched and the calendar
     // never refreshed after scheduling/editing/deleting. Keep the range in
     // later elements, never fused into the first one.
-    queryKey: ["scheduled-trainer", "range", rangeStart, rangeEnd],
+    queryKey: qk.scheduledTrainer.range(rangeStart, rangeEnd),
     queryFn: async (): Promise<Workout[]> => {
       const { data, error } = await supabase
         .from("scheduled_workouts")
@@ -123,7 +124,7 @@ function ScheduleHomeScreenBody() {
     // Same prefix rule as the workouts key above: template mutations invalidate
     // ["templates"], and a first element of "templates-by-ids" never matches
     // it — so a renamed template kept showing its old name here.
-    queryKey: ["templates", "by-ids", templateIds.join(",")],
+    queryKey: qk.templates.byIds(templateIds),
     enabled: templateIds.length > 0,
     queryFn: async () => {
       const { data, error } = await supabase.from("workout_templates").select("id, name").in("id", templateIds);

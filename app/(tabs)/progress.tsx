@@ -26,6 +26,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -88,7 +89,7 @@ function ProgressScreenBody() {
   const thisWeek = weekStartOf(todayISO());
 
   const checkinHistory = useQuery({
-    queryKey: ["check-ins", clientId],
+    queryKey: qk.checkIns.own(clientId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("check_ins")
@@ -114,11 +115,11 @@ function ProgressScreenBody() {
       });
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["check-ins", clientId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.checkIns.own(clientId) }),
   });
 
   const progress = useQuery({
-    queryKey: ["progress"],
+    queryKey: qk.progress.own(clientId),
     queryFn: async () => {
       const { data: entries, error } = await supabase
         .from("progress_entries")
@@ -189,7 +190,7 @@ function ProgressScreenBody() {
       if (insErr) throw insErr;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["progress"] });
+      queryClient.invalidateQueries({ queryKey: qk.progress.all });
       setWeight("");
       setWaist("");
       setChest("");

@@ -15,6 +15,7 @@ import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -92,7 +93,7 @@ function ClientDetailScreenBody() {
   const trainerId = session!.user.id;
 
   const detail = useQuery({
-    queryKey: ["client-detail", kind, refId],
+    queryKey: qk.clientDetail.subject(kind, refId),
     queryFn: async (): Promise<Detail> => {
       const streakCol = kind === "app" ? "client_id" : "managed_client_id";
 
@@ -254,10 +255,13 @@ function ClientDetailScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["client-detail", kind, refId] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
-      queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
-      queryClient.invalidateQueries({ queryKey: ["package", kind, refId] });
+      queryClient.invalidateQueries({ queryKey: qk.clientDetail.subject(kind, refId) });
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.all });
+      queryClient.invalidateQueries({ queryKey: qk.package.subject(kind, refId) });
+      // A completed session changes "earned this month" and can clear an
+      // at-risk flag — neither was refreshed before 2d.
+      queryClient.invalidateQueries({ queryKey: qk.money.all });
+      queryClient.invalidateQueries({ queryKey: qk.clientRisk.all });
     },
   });
 
@@ -270,8 +274,10 @@ function ClientDetailScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["client-detail", kind, refId] });
-      queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
+      queryClient.invalidateQueries({ queryKey: qk.clientDetail.subject(kind, refId) });
+      // Paid/unpaid moves money between "collected" and "outstanding" on the
+      // Home card and the Money screen — not refreshed before 2d.
+      queryClient.invalidateQueries({ queryKey: qk.money.all });
     },
   });
 
@@ -285,7 +291,7 @@ function ClientDetailScreenBody() {
   const [priceInput, setPriceInput] = useState("");
 
   const packageQuery = useQuery({
-    queryKey: ["package", kind, refId],
+    queryKey: qk.package.subject(kind, refId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("packages")
@@ -318,7 +324,7 @@ function ClientDetailScreenBody() {
         if (error) throw error;
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["package", kind, refId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.package.subject(kind, refId) }),
   });
 
   const savePrice = useMutation({
@@ -342,15 +348,15 @@ function ClientDetailScreenBody() {
       }
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["package", kind, refId] });
-      queryClient.invalidateQueries({ queryKey: ["trainer-monthly-money"] });
+      queryClient.invalidateQueries({ queryKey: qk.package.subject(kind, refId) });
+      queryClient.invalidateQueries({ queryKey: qk.money.all });
       setPriceInput("");
     },
   });
 
   // Latest weekly check-in (V10) — app clients only (self-reported).
   const latestCheckin = useQuery({
-    queryKey: ["latest-checkin", refId],
+    queryKey: qk.checkIns.latest(refId),
     enabled: kind === "app",
     queryFn: async () => {
       const { data, error } = await supabase
@@ -373,7 +379,7 @@ function ClientDetailScreenBody() {
   const [editingBody, setEditingBody] = useState("");
 
   const notes = useQuery({
-    queryKey: ["client-notes", refId],
+    queryKey: qk.clientNotes.subject(refId),
     enabled: kind === "app",
     queryFn: async (): Promise<ClientNote[]> => {
       const { data, error } = await supabase
@@ -393,7 +399,7 @@ function ClientDetailScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["client-notes", refId] });
+      queryClient.invalidateQueries({ queryKey: qk.clientNotes.subject(refId) });
       setNewNote("");
     },
   });
@@ -404,7 +410,7 @@ function ClientDetailScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["client-notes", refId] });
+      queryClient.invalidateQueries({ queryKey: qk.clientNotes.subject(refId) });
       setEditingNoteId(null);
     },
   });
@@ -414,7 +420,7 @@ function ClientDetailScreenBody() {
       const { error } = await supabase.from("client_notes").delete().eq("id", id);
       if (error) throw error;
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["client-notes", refId] }),
+    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.clientNotes.subject(refId) }),
   });
 
   function confirmDeleteNote(id: string) {
@@ -435,7 +441,7 @@ function ClientDetailScreenBody() {
   const [suggestedPlan, setSuggestedPlan] = useState<string | null>(null);
 
   const latestNutritionPlan = useQuery({
-    queryKey: ["nutrition-plan", kind, refId],
+    queryKey: qk.nutritionPlan.subject(kind, refId),
     queryFn: async () => {
       const { data, error } = await supabase
         .from("nutrition_plans")
@@ -491,7 +497,7 @@ function ClientDetailScreenBody() {
     },
     onSuccess: () => {
       setSuggestedPlan(null);
-      queryClient.invalidateQueries({ queryKey: ["nutrition-plan", kind, refId] });
+      queryClient.invalidateQueries({ queryKey: qk.nutritionPlan.subject(kind, refId) });
     },
   });
 

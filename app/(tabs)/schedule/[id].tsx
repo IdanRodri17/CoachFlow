@@ -8,6 +8,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -37,7 +38,7 @@ function EditScheduleScreenBody() {
 
   const roster = useRosterClients(trainerId);
   const templates = useQuery({
-    queryKey: ["templates"],
+    queryKey: qk.templates.list,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("workout_templates")
@@ -49,7 +50,7 @@ function EditScheduleScreenBody() {
   });
 
   const workout = useQuery({
-    queryKey: ["scheduled", id],
+    queryKey: qk.scheduledTrainer.one(id),
     queryFn: async (): Promise<ScheduleFormInitial> => {
       const { data, error } = await supabase
         .from("scheduled_workouts")
@@ -103,9 +104,8 @@ function EditScheduleScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
-      queryClient.invalidateQueries({ queryKey: ["scheduled", id] });
-      queryClient.invalidateQueries({ queryKey: ["roster-clients"] });
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.all });
+      queryClient.invalidateQueries({ queryKey: qk.roster.all });
       router.back();
     },
   });
@@ -116,7 +116,7 @@ function EditScheduleScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.all });
       router.back();
     },
   });

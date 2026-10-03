@@ -18,6 +18,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { AppText, Button, CodeInput, colors, Display, IconButton, TextButton } from "@/components/ui";
@@ -40,8 +41,8 @@ export default function JoinScreen() {
     onSuccess: () => {
       // The client's Home reads both: the join card disappears and the
       // trainer's scheduled workouts show up.
-      queryClient.invalidateQueries({ queryKey: ["my-trainer-links"] });
-      queryClient.invalidateQueries({ queryKey: ["scheduled-client"] });
+      queryClient.invalidateQueries({ queryKey: qk.myTrainerLinks.all });
+      queryClient.invalidateQueries({ queryKey: qk.scheduledClient.all });
       router.replace("/");
     },
   });
