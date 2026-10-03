@@ -22,11 +22,11 @@ import {
   View,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Redirect } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { DEFAULT_TIME_ZONE, formatDisplayDate, todayISO, weekStartOf } from "@/lib/dates";
@@ -52,8 +52,16 @@ const CHECKIN_FIELDS = [
 type CheckinFieldKey = (typeof CHECKIN_FIELDS)[number]["key"];
 
 export default function ProgressScreen() {
+  return (
+    <RoleGate role="client">
+      <ProgressScreenBody />
+    </RoleGate>
+  );
+}
+
+function ProgressScreenBody() {
   const { t } = useTranslation();
-  const { session, profile } = useAuth();
+  const { session } = useAuth();
   const queryClient = useQueryClient();
 
   const [checkinValues, setCheckinValues] = useState<Record<CheckinFieldKey, number>>({
@@ -76,7 +84,6 @@ export default function ProgressScreen() {
     measurements: Record<string, unknown> | null;
   } | null>(null);
 
-  if (profile && profile.role !== "client") return <Redirect href="/" />;
   const clientId = session!.user.id;
   const thisWeek = weekStartOf(todayISO());
 

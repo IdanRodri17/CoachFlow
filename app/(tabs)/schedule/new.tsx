@@ -3,10 +3,11 @@
 // first; then we insert one scheduled workout per date (a single date, or every
 // chosen weekday for N weeks).
 
-import { Redirect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
@@ -14,12 +15,19 @@ import { addDays, addMonths, weekdayOf } from "@/lib/dates";
 import { ScheduleForm, type SchedulePayload } from "@/components/ScheduleForm";
 
 export default function NewScheduleScreen() {
-  const { session, profile } = useAuth();
+  return (
+    <RoleGate role="trainer">
+      <NewScheduleScreenBody />
+    </RoleGate>
+  );
+}
+
+function NewScheduleScreenBody() {
+  const { session } = useAuth();
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
   const trainerId = session!.user.id;
 
   const roster = useRosterClients(trainerId);

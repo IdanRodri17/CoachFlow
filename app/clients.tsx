@@ -15,10 +15,10 @@
 import { useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Redirect } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { toE164IL, useAuth } from "@/lib/auth";
 import { useRosterClients, type RosterClient } from "@/lib/useRoster";
@@ -26,13 +26,20 @@ import { formatDisplayDate, toDateString } from "@/lib/dates";
 import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
 
 export default function ClientsScreen() {
+  return (
+    <RoleGate role="trainer">
+      <ClientsScreenBody />
+    </RoleGate>
+  );
+}
+
+function ClientsScreenBody() {
   const { t, i18n } = useTranslation();
   const { session, profile } = useAuth();
   const queryClient = useQueryClient();
   const [inviteName, setInviteName] = useState("");
   const [offlineName, setOfflineName] = useState("");
 
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
   const trainerId = session!.user.id;
 
   const roster = useRosterClients(trainerId);

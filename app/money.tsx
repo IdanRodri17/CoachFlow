@@ -8,12 +8,12 @@
 // in app code either. Per-client breakdown/export is deliberately out of
 // scope for now.
 
-import { Redirect } from "expo-router";
 import { ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { DEFAULT_TIME_ZONE, todayISO } from "@/lib/dates";
@@ -28,10 +28,17 @@ function monthLabel(monthISO: string, locale: string) {
 }
 
 export default function MoneyScreen() {
-  const { t, i18n } = useTranslation();
-  const { session, profile } = useAuth();
+  return (
+    <RoleGate role="trainer">
+      <MoneyScreenBody />
+    </RoleGate>
+  );
+}
 
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
+function MoneyScreenBody() {
+  const { t, i18n } = useTranslation();
+  const { session } = useAuth();
+
   const trainerId = session!.user.id;
   const currentMonthKey = `${todayISO().slice(0, 7)}-01`;
 

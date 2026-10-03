@@ -4,10 +4,11 @@
 // template, set a time, edit the note — or delete it. Reuses ScheduleForm.
 
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
@@ -18,13 +19,20 @@ import {
 } from "@/components/ScheduleForm";
 
 export default function EditScheduleScreen() {
+  return (
+    <RoleGate role="trainer">
+      <EditScheduleScreenBody />
+    </RoleGate>
+  );
+}
+
+function EditScheduleScreenBody() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session, profile } = useAuth();
+  const { session } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
   const trainerId = session!.user.id;
 
   const roster = useRosterClients(trainerId);

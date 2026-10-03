@@ -20,16 +20,23 @@ import { useAuth } from "@/lib/auth";
 import { BADGE_INFO, type BadgeType } from "@/lib/badges";
 import { directionalTextClassName } from "@/lib/i18n";
 
+// The two guards run BEFORE the card's hooks mount (Rules of Hooks — see
+// components/RoleGate.tsx); this screen has a second rule RoleGate doesn't
+// cover: a client may only open their OWN card.
 export default function ShareCardScreen() {
-  const { t } = useTranslation();
   const { clientId } = useLocalSearchParams<{ clientId: string }>();
   const { session, profile } = useAuth();
+  if (profile && profile.role !== "client") return <Redirect href="/" />;
+  if (session && session.user.id !== clientId) return <Redirect href="/profile" />;
+  return <ShareCardBody />;
+}
+
+function ShareCardBody() {
+  const { t } = useTranslation();
+  const { clientId } = useLocalSearchParams<{ clientId: string }>();
   const cardRef = useRef<View>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
-
-  if (profile && profile.role !== "client") return <Redirect href="/" />;
-  if (session && session.user.id !== clientId) return <Redirect href="/profile" />;
 
   const card = useQuery({
     queryKey: ["share-card", clientId],

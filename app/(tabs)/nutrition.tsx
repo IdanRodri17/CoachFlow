@@ -5,20 +5,27 @@
 // see app/(tabs)/progress.tsx). AI-generated plan text is unbounded in length, so
 // this screen is just a ScrollView showing the client's latest plan.
 
-import { Redirect } from "expo-router";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 
 export default function NutritionScreen() {
-  const { t } = useTranslation();
-  const { session, profile } = useAuth();
+  return (
+    <RoleGate role="client">
+      <NutritionScreenBody />
+    </RoleGate>
+  );
+}
 
-  if (profile && profile.role !== "client") return <Redirect href="/" />;
+function NutritionScreenBody() {
+  const { t } = useTranslation();
+  const { session } = useAuth();
+
 
   const nutritionPlan = useQuery({
     queryKey: ["nutrition-plan-latest", session?.user.id],

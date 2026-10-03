@@ -1,5 +1,6 @@
-# .github/workflows/ci.yml — V19 (Step 2): every push and pull request must
-# type-check and pass the unit tests before it reaches the phone.
+# .github/workflows/ci.yml — V19 (Steps 2 + 2b): every push and pull request
+# must type-check, lint clean and pass the unit tests before it reaches the
+# phone.
 #
 # `npm ci` honours the committed .npmrc (legacy-peer-deps=true), so installs
 # resolve exactly as they do locally. The date tests pin their own clock and
@@ -31,6 +32,11 @@ jobs:
 
       - name: Type-check
         run: npm run typecheck
+
+      # Errors fail the build (rules-of-hooks among them); warnings don't —
+      # see eslint.config.js for the ones deliberately parked as warnings.
+      - name: Lint
+        run: npm run lint
 
       - name: Unit tests
         run: npm test

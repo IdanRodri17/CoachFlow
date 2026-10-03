@@ -13,10 +13,11 @@
 import { useState } from "react";
 import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Link, Redirect, useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
@@ -65,11 +66,18 @@ function localeName(locale: string) {
 }
 
 export default function ScheduleHomeScreen() {
+  return (
+    <RoleGate role="trainer">
+      <ScheduleHomeScreenBody />
+    </RoleGate>
+  );
+}
+
+function ScheduleHomeScreenBody() {
   const { t, i18n } = useTranslation();
   const { session, profile } = useAuth();
   const router = useRouter();
 
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
   const trainerId = session!.user.id;
 
   const [mode, setMode] = useState<ViewMode>("week");

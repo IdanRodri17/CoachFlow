@@ -3,21 +3,29 @@
 // On save: insert the workout_templates row (owned by this trainer), then insert
 // its template_exercises with position = array order.
 
-import { Redirect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { TemplateBuilder, type TemplateInput } from "@/components/TemplateBuilder";
 
 export default function NewTemplateScreen() {
-  const { session, profile } = useAuth();
+  return (
+    <RoleGate role="trainer">
+      <NewTemplateScreenBody />
+    </RoleGate>
+  );
+}
+
+function NewTemplateScreenBody() {
+  const { session } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
 
   const mutation = useMutation({
     mutationFn: async (input: TemplateInput) => {

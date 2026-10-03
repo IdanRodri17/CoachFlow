@@ -3,20 +3,26 @@
 
 import { ActivityIndicator, FlatList, Pressable, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Link, Redirect, useRouter } from "expo-router";
+import { Link, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth";
 
 export default function TemplatesListScreen() {
-  const { profile } = useAuth();
+  return (
+    <RoleGate role="trainer">
+      <TemplatesListScreenBody />
+    </RoleGate>
+  );
+}
+
+function TemplatesListScreenBody() {
   const router = useRouter();
   const { t } = useTranslation();
 
   // Templates are trainer-only.
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
 
   const { data, isLoading, error } = useQuery({
     queryKey: ["templates"],

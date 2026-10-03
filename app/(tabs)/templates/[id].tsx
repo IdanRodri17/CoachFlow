@@ -6,12 +6,12 @@
 // added/removed rows. Also supports deleting the whole template.
 
 import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
-import { useAuth } from "@/lib/auth";
 import {
   TemplateBuilder,
   type TemplateBuilderInitial,
@@ -19,13 +19,19 @@ import {
 } from "@/components/TemplateBuilder";
 
 export default function EditTemplateScreen() {
+  return (
+    <RoleGate role="trainer">
+      <EditTemplateScreenBody />
+    </RoleGate>
+  );
+}
+
+function EditTemplateScreenBody() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { profile } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
 
   const exerciseFallback = t("templates.detail.exerciseFallback");
 

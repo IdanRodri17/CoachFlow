@@ -10,10 +10,11 @@
 import { useRef, useState } from "react";
 import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { formatDisplayDate, toDateString } from "@/lib/dates";
@@ -49,12 +50,19 @@ const toNum = (v: string) => {
 };
 
 export default function WorkoutScreen() {
+  return (
+    <RoleGate role="client">
+      <WorkoutScreenBody />
+    </RoleGate>
+  );
+}
+
+function WorkoutScreenBody() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { profile, session } = useAuth();
+  const { session } = useAuth();
   const { t } = useTranslation();
 
   // Only clients log workouts.
-  if (profile && profile.role !== "client") return <Redirect href="/" />;
 
   const query = useQuery({
     queryKey: ["workout-session", id],

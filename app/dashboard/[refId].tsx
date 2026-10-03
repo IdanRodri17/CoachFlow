@@ -9,12 +9,13 @@
 // get their completed-workout history and the "mark complete" action.
 
 import { useState } from "react";
-import { Redirect, useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams } from "expo-router";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
@@ -74,13 +75,20 @@ type Detail =
     };
 
 export default function ClientDetailScreen() {
+  return (
+    <RoleGate role="trainer">
+      <ClientDetailScreenBody />
+    </RoleGate>
+  );
+}
+
+function ClientDetailScreenBody() {
   const { t, i18n } = useTranslation();
   const { refId, kind: kindParam } = useLocalSearchParams<{ refId: string; kind?: string }>();
   const kind: "app" | "managed" = kindParam === "managed" ? "managed" : "app";
-  const { session, profile } = useAuth();
+  const { session } = useAuth();
   const queryClient = useQueryClient();
 
-  if (profile && profile.role !== "trainer") return <Redirect href="/" />;
   const trainerId = session!.user.id;
 
   const detail = useQuery({

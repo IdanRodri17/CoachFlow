@@ -3,22 +3,30 @@
 // Renders the shared ExerciseForm and, on submit, inserts a row owned by the
 // current trainer. The exercises list cache is invalidated so it refreshes.
 
-import { Redirect, useRouter } from "expo-router";
+import { useRouter } from "expo-router";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
+import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { ExerciseForm, type ExerciseInput } from "@/components/ExerciseForm";
 
 export default function NewExerciseScreen() {
-  const { session, profile } = useAuth();
+  return (
+    <RoleGate role="trainer" redirectTo="/exercises">
+      <NewExerciseScreenBody />
+    </RoleGate>
+  );
+}
+
+function NewExerciseScreenBody() {
+  const { session } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t } = useTranslation();
 
   // Only trainers create exercises; clients shouldn't reach here.
-  if (profile && profile.role !== "trainer") return <Redirect href="/exercises" />;
 
   const mutation = useMutation({
     mutationFn: async (input: ExerciseInput) => {
