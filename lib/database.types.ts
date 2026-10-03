@@ -689,6 +689,18 @@ export type Database = {
         Args: { p_code: string };
         Returns: string;
       };
+      // B1 (0026): the calling client's active trainer — zero rows for a
+      // trainer or an unlinked client. phone is local 05X… (or null).
+      my_trainer: {
+        Args: Record<PropertyKey, never>;
+        Returns: {
+          id: string;
+          display_name: string;
+          business_name: string | null;
+          phone: string | null;
+          linked_since: string;
+        }[];
+      };
     };
     Enums: Record<string, never>;
     CompositeTypes: Record<string, never>;
