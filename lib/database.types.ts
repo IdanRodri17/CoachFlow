@@ -28,6 +28,9 @@ export type Database = {
           // V17 (0019): trainer opt-out for the morning daily digest.
           daily_digest_enabled: boolean;
           created_at: string;
+          // B3 (0025): trainer's business defaults; null = not set.
+          default_price_per_session: number | null;
+          business_name: string | null;
         };
         Insert: {
           id: string;
@@ -40,6 +43,8 @@ export type Database = {
           intake?: Json | null;
           daily_digest_enabled?: boolean;
           created_at?: string;
+          default_price_per_session?: number | null;
+          business_name?: string | null;
         };
         Update: {
           id?: string;
@@ -52,6 +57,8 @@ export type Database = {
           intake?: Json | null;
           daily_digest_enabled?: boolean;
           created_at?: string;
+          default_price_per_session?: number | null;
+          business_name?: string | null;
         };
         Relationships: [];
       };
