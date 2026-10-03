@@ -366,6 +366,7 @@ export type ButtonVariant =
   | "danger"
   | "dark"
   | "darkOutline"
+  | "darkGhost"
   | "bone";
 
 const BUTTON_LOOK: Record<ButtonVariant, { bg: string; fg: string; border?: string }> = {
@@ -378,6 +379,7 @@ const BUTTON_LOOK: Record<ButtonVariant, { bg: string; fg: string; border?: stri
   danger: { bg: "transparent", fg: colors.ember },
   dark: { bg: colors.iron3, fg: colors.bone },
   darkOutline: { bg: "transparent", fg: colors.bone, border: colors.ironLine },
+  darkGhost: { bg: "transparent", fg: colors.bone },
 };
 
 // height → [radius, horizontal padding, font size, icon size]
@@ -1098,13 +1100,15 @@ type InputProps = TextInputProps & {
   /** An icon at the start of the field (the search magnifier). */
   leadingIcon?: IconComponent;
   invalid?: boolean;
+  /** The workout mode's sheets: iron-3 field, bone text. */
+  dark?: boolean;
   containerStyle?: StyleProp<ViewStyle>;
 };
 
 /** Text field: paper, 1px line.strong, radius 14, 17/500. Free text follows the
  * language (directionalTextClassName); `ltr` for phones and numbers. */
 export const Input = forwardRef<TextInput, InputProps>(function Input(
-  { size = "lg", ltr: ltrMode, suffix, leadingIcon, invalid, containerStyle, multiline, style, ...rest },
+  { size = "lg", ltr: ltrMode, suffix, leadingIcon, invalid, dark, containerStyle, multiline, style, ...rest },
   ref,
 ) {
   useTranslation(); // re-align when the language changes
@@ -1122,18 +1126,18 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
           paddingHorizontal: 16,
           paddingVertical: multiline ? 14 : 0,
           borderWidth: 1,
-          borderColor: invalid ? colors.ember : colors.lineStrong,
+          borderColor: invalid ? colors.ember : dark ? colors.ironLine : colors.lineStrong,
           borderRadius: 14,
-          backgroundColor: colors.paper,
+          backgroundColor: dark ? colors.iron3 : colors.paper,
         },
         ltrMode === true && { direction: "ltr" },
         containerStyle,
       ]}
     >
-      {leadingIcon ? <Icon icon={leadingIcon} size={20} color={colors.smoke} /> : null}
+      {leadingIcon ? <Icon icon={leadingIcon} size={20} color={dark ? colors.ash : colors.smoke} /> : null}
       <TextInput
         ref={ref}
-        placeholderTextColor={colors.smoke}
+        placeholderTextColor={dark ? colors.ash2 : colors.smoke}
         multiline={multiline}
         textAlignVertical={multiline ? "top" : "center"}
         {...rest}
@@ -1145,7 +1149,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
             alignSelf: "stretch",
             fontFamily: fonts.medium,
             fontSize: 17,
-            color: colors.ink,
+            color: dark ? colors.bone : colors.ink,
             paddingVertical: 0,
           },
           inputAlign,
@@ -1153,7 +1157,7 @@ export const Input = forwardRef<TextInput, InputProps>(function Input(
         ]}
       />
       {suffix ? (
-        <AppText size={15} weight="medium" tone="smoke">
+        <AppText size={15} weight="medium" tone={dark ? "ash" : "smoke"}>
           {suffix}
         </AppText>
       ) : null}
