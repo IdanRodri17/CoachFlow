@@ -1,53 +1,49 @@
-// app/workout/[id].tsx — the active-workout / logging screen (route /workout/:id,
-// where :id is a scheduled_workout id). Client-only.
+// app/workout/[id].tsx — the workout screen (route /workout/:id, where :id is
+// a scheduled_workout id). Client-only.
 //
-// Shows the trainer's note, then each exercise with its "last time" numbers and
-// targets, editable set rows (reps × weight, pre-filled with last time), a rest
-// button, and a per-exercise Skip / Swap menu (V5b). "Complete workout" writes
-// the workout_log + set_logs (+ exercise_adjustments) and flips the scheduled
-// workout to 'completed'. A completed workout opens a read-only summary.
+// D20a–e: an open workout runs in the dark workout mode (DESIGN.md §6): one
+// exercise at a time with two big steppers and one tap per set
+// (components/workout/SetView), a rest screen that starts by itself (RestView),
+// the swap / skip sheet (components/AdjustmentModal), the all-exercises sheet
+// (OverviewSheet) and the finish step with effort + note (FinishView). Logging
+// a set only changes local state (lib/useWorkoutSession.ts); the one save at
+// the end writes the workout_log, set_logs (with PR flags) and adjustments and
+// marks the scheduled workout completed — saveWorkout(), unchanged rules.
+// A completed workout opens the read-only summary.
+//
+// Until D20g persists an open session, leaving mid-workout asks first: the
+// logged sets live only on this screen.
 
-import { useRef, useState } from "react";
-import { ActivityIndicator, Pressable, ScrollView, Text, TextInput, View } from "react-native";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { ActivityIndicator, Alert, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { useLocalSearchParams, useRouter } from "expo-router";
+import { Stack, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { StatusBar } from "expo-status-bar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { formatDisplayDate, toDateString } from "@/lib/dates";
-import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
-import { RestTimer } from "@/components/RestTimer";
+import { formatDisplayDate, toDateString, todayISO } from "@/lib/dates";
+import { useWorkoutPrefs } from "@/lib/workoutPrefs";
+import {
+  loadWorkout,
+  saveWorkout,
+  subjectHistory,
+  useWorkoutSession,
+  type WorkoutData,
+  type WorkoutSubject,
+} from "@/lib/useWorkoutSession";
+import { exerciseName, isSwapped, sessionPrs, setsLogged, streakAfterCompleting } from "@/lib/workoutSession";
 import { AdjustmentModal, type AdjustmentResult } from "@/components/AdjustmentModal";
-import { detectPRs } from "@/lib/pr";
-import { checkAndAwardBadges } from "@/lib/badges";
-
-type SessionExercise = {
-  exerciseId: string;
-  name: string;
-  targetSets: number | null;
-  targetReps: number | null;
-  targetWeight: number | null;
-  restSeconds: number | null;
-  lastTime: { weight: number | null; reps: number | null } | null;
-};
-type SessionData = {
-  note: string | null;
-  status: "scheduled" | "completed";
-  hasTemplate: boolean;
-  exercises: SessionExercise[];
-};
-
-const toInt = (v: string) => {
-  const n = Number.parseInt(v.trim(), 10);
-  return v.trim() === "" || !Number.isFinite(n) ? null : n;
-};
-const toNum = (v: string) => {
-  const n = Number.parseFloat(v.trim());
-  return v.trim() === "" || !Number.isFinite(n) ? null : n;
-};
+import { ExerciseVideo } from "@/components/ExerciseVideo";
+import { longDate } from "@/components/home/format";
+import { FinishView, type FinishInput } from "@/components/workout/FinishView";
+import { OverviewSheet } from "@/components/workout/OverviewSheet";
+import { RestView } from "@/components/workout/RestView";
+import { SetView } from "@/components/workout/SetView";
+import { AppText, colors, Sheet } from "@/components/ui";
 
 export default function WorkoutScreen() {
   return (
@@ -61,72 +57,31 @@ function WorkoutScreenBody() {
   const { id } = useLocalSearchParams<{ id: string }>();
   const { session } = useAuth();
   const { t } = useTranslation();
-
-  // Only clients log workouts.
+  const clientId = session!.user.id;
+  // The workout's subject: here always the signed-in client (V17 adds a
+  // trainer logging an offline client — DESIGN.md §6.3).
+  const subject = useMemo<WorkoutSubject>(() => ({ kind: "app", id: clientId }), [clientId]);
 
   const query = useQuery({
     queryKey: ["workout-session", id],
-    queryFn: async (): Promise<SessionData> => {
-      const { data: sw, error } = await supabase
-        .from("scheduled_workouts")
-        .select("*")
-        .eq("id", id)
-        .single();
-      if (error) throw error;
-
-      let exercises: SessionExercise[] = [];
-      if (sw.template_id) {
-        const { data: tes, error: teErr } = await supabase
-          .from("template_exercises")
-          .select("*")
-          .eq("template_id", sw.template_id)
-          .order("position");
-        if (teErr) throw teErr;
-
-        const exIds = tes.map((te) => te.exercise_id);
-        const nameMap = new Map<string, string>();
-        const lastMap = new Map<string, { weight: number | null; reps: number | null }>();
-        if (exIds.length > 0) {
-          const { data: exs } = await supabase.from("exercises").select("id, name").in("id", exIds);
-          exs?.forEach((e) => nameMap.set(e.id, e.name));
-          const { data: sls } = await supabase
-            .from("set_logs")
-            .select("exercise_id, reps, weight, created_at")
-            .in("exercise_id", exIds)
-            .order("created_at", { ascending: false });
-          sls?.forEach((s) => {
-            if (!lastMap.has(s.exercise_id)) lastMap.set(s.exercise_id, { weight: s.weight, reps: s.reps });
-          });
-        }
-
-        exercises = tes.map((te) => ({
-          exerciseId: te.exercise_id,
-          name: nameMap.get(te.exercise_id) ?? t("workout.exerciseFallback"),
-          targetSets: te.target_sets,
-          targetReps: te.target_reps,
-          targetWeight: te.target_weight,
-          restSeconds: te.rest_seconds,
-          lastTime: lastMap.get(te.exercise_id) ?? null,
-        }));
-      }
-
-      return { note: sw.notes, status: sw.status, hasTemplate: !!sw.template_id, exercises };
-    },
+    queryFn: () => loadWorkout(id, subject, t("workout.exerciseFallback")),
   });
 
   if (query.isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.iron }}>
+        <StatusBar style="light" />
+        <ActivityIndicator color={colors.bone} />
       </View>
     );
   }
   if (query.error || !query.data) {
     return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-sm text-red-600">
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.iron }}>
+        <StatusBar style="light" />
+        <AppText size={14} tone="ash" center>
           {query.error ? (query.error as Error).message : t("workout.notFound")}
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -135,7 +90,7 @@ function WorkoutScreenBody() {
     return <CompletedSummary scheduledId={id} note={query.data.note} />;
   }
 
-  return <LoggingSession scheduledId={id} clientId={session!.user.id} data={query.data} />;
+  return <WorkoutMode data={query.data} subject={subject} loggedBy={clientId} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -306,432 +261,218 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
 }
 
 // ---------------------------------------------------------------------------
-// Active logging session
+// Workout mode (an open workout)
 // ---------------------------------------------------------------------------
-type Row = { reps: string; weight: string };
-type Adjustment =
-  | { action: "skipped"; reason: string }
-  | { action: "swapped"; reason: string; swapId: string; swapName: string };
-
-function LoggingSession({
-  scheduledId,
-  clientId,
-  data,
-}: {
-  scheduledId: string;
-  clientId: string;
-  data: SessionData;
-}) {
+function WorkoutMode({ data, subject, loggedBy }: { data: WorkoutData; subject: WorkoutSubject; loggedBy: string }) {
   const router = useRouter();
+  const navigation = useNavigation();
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
-  const startedAt = useRef(Date.now());
-
-  const [rows, setRows] = useState<Record<string, Row[]>>(() => {
-    const initial: Record<string, Row[]> = {};
-    data.exercises.forEach((ex) => {
-      const count = ex.targetSets && ex.targetSets > 0 ? ex.targetSets : 1;
-      const defaultReps = ex.lastTime?.reps ?? ex.targetReps;
-      const defaultWeight = ex.lastTime?.weight ?? ex.targetWeight;
-      initial[ex.exerciseId] = Array.from({ length: count }, () => ({
-        reps: defaultReps != null ? String(defaultReps) : "",
-        weight: defaultWeight != null ? String(defaultWeight) : "",
-      }));
-    });
-    return initial;
+  const { t, i18n } = useTranslation();
+  const prefs = useWorkoutPrefs();
+  const session = useWorkoutSession({
+    exercises: data.exercises,
+    subject,
+    loggedBy,
+    mode: "client",
+    autoRest: prefs.autoRest,
   });
-  const [activeRest, setActiveRest] = useState<number | null>(null);
-  const [adjustments, setAdjustments] = useState<Record<string, Adjustment>>({});
-  const [modal, setModal] = useState<{ exerciseId: string; exerciseName: string; mode: "skip" | "swap" } | null>(
-    null,
-  );
-  const [effort, setEffort] = useState<number | null>(null);
-  const [effortNote, setEffortNote] = useState("");
+  const { state: s } = session;
+  const [sheet, setSheet] = useState<"adjust" | "overview" | "demo" | null>(null);
+  const [adjustMode, setAdjustMode] = useState<"swap" | "skip">("swap");
 
-  // The exercise library (for the swap picker) — client reads roster-scoped.
+  const title = data.title ?? t("workout.freeWorkout");
+  const current = data.exercises[s.ex];
+  const adj = s.adjustments[s.ex];
+
+  // The swap list shares the exercise library's cache entry (same shape).
   const library = useQuery({
-    queryKey: ["exercises"],
+    queryKey: ["exercises", "list"],
     queryFn: async () => {
-      const { data, error } = await supabase.from("exercises").select("id, name").order("name");
+      const { data: rows, error } = await supabase.from("exercises").select("*").order("name");
       if (error) throw error;
-      return data;
+      return rows;
     },
   });
 
-  function updateRow(exId: string, idx: number, field: keyof Row, value: string) {
-    setRows((prev) => {
-      const next = { ...prev };
-      const arr = [...next[exId]];
-      arr[idx] = { ...arr[idx], [field]: value };
-      next[exId] = arr;
-      return next;
+  // The finish tile: this trainer's streak for the client, once this workout counts.
+  const streak = useQuery({
+    queryKey: ["client-streak", subject.id, data.trainerId],
+    queryFn: async () => {
+      const { data: row, error } = await supabase
+        .from("client_streaks")
+        .select("current_streak")
+        .eq("client_id", subject.id)
+        .eq("trainer_id", data.trainerId)
+        .maybeSingle();
+      if (error) throw error;
+      return row?.current_streak ?? 0;
+    },
+  });
+  const finishStreak =
+    streak.data != null ? streakAfterCompleting(streak.data, data.scheduledDate, todayISO()) : null;
+
+  // Leaving mid-workout (minimize, Android back) asks first — until D20g
+  // persists the session, logged sets live only here.
+  const dirty = setsLogged(s) > 0 || s.adjustments.some((a) => a != null);
+  const guard = useRef({ dirty, saved: false });
+  useEffect(() => {
+    guard.current.dirty = dirty;
+  }, [dirty]);
+  useEffect(
+    () =>
+      navigation.addListener("beforeRemove", (e) => {
+        if (!guard.current.dirty || guard.current.saved) return;
+        e.preventDefault();
+        Alert.alert(t("workout.mode.leaveTitle"), t("workout.mode.leaveMessage"), [
+          { text: t("workout.mode.keepGoing"), style: "cancel" },
+          { text: t("workout.mode.leave"), style: "destructive", onPress: () => navigation.dispatch(e.data.action) },
+        ]);
+      }),
+    [navigation, t],
+  );
+
+  function minimize() {
+    if (router.canGoBack()) router.back();
+    else router.replace("/");
+  }
+
+  const save = useMutation({
+    mutationFn: (input: FinishInput) =>
+      saveWorkout(session, {
+        scheduledId: data.scheduledId,
+        // A free workout (no exercises) had no timed session.
+        durationSeconds: data.exercises.length > 0 ? input.durationSeconds : null,
+        effort: input.effort,
+        note: input.note,
+      }),
+  });
+
+  function finish(input: FinishInput, then: "home" | "share") {
+    save.mutate(input, {
+      onSuccess: () => {
+        guard.current.saved = true;
+        const id = subject.id;
+        // Stale but not refetched here: this screen is leaving, and a refetch
+        // would flash the completed summary on the way out.
+        queryClient.invalidateQueries({ queryKey: ["workout-session", data.scheduledId], refetchType: "none" });
+        queryClient.invalidateQueries({ queryKey: ["workout-summary", data.scheduledId] });
+        queryClient.invalidateQueries({ queryKey: ["scheduled-client"] });
+        queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
+        queryClient.invalidateQueries({ queryKey: ["client-streak"] });
+        queryClient.invalidateQueries({ queryKey: ["badges", id] });
+        queryClient.invalidateQueries({ queryKey: ["package", id] });
+        queryClient.invalidateQueries({ queryKey: ["package", "app", id] });
+        queryClient.invalidateQueries({ queryKey: ["exercises"] });
+        queryClient.invalidateQueries({ queryKey: ["progress"] });
+        queryClient.invalidateQueries({ queryKey: ["share-card"] });
+        // Trainer-side views (same device, one shared cache in dev).
+        queryClient.invalidateQueries({ queryKey: ["client-detail", "app", id] });
+        queryClient.invalidateQueries({ queryKey: ["trainer-monthly-money"] });
+        if (then === "share") router.replace(`/share-card/${id}`);
+        else minimize();
+      },
     });
   }
-  function addRow(exId: string) {
-    setRows((prev) => ({ ...prev, [exId]: [...prev[exId], { reps: "", weight: "" }] }));
+
+  function openAdjust(mode: "swap" | "skip") {
+    setAdjustMode(mode);
+    setSheet("adjust");
   }
-  function undoAdjust(exId: string) {
-    setAdjustments((prev) => {
-      const next = { ...prev };
-      delete next[exId];
-      return next;
-    });
-  }
-  function confirmAdjust(result: AdjustmentResult) {
-    if (!modal) return;
-    if (modal.mode === "skip") {
-      setAdjustments((prev) => ({ ...prev, [modal.exerciseId]: { action: "skipped", reason: result.reason } }));
-    } else if (result.swapId && result.swapName) {
-      setAdjustments((prev) => ({
-        ...prev,
-        [modal.exerciseId]: { action: "swapped", reason: result.reason, swapId: result.swapId!, swapName: result.swapName! },
-      }));
+
+  async function confirmAdjust(r: AdjustmentResult) {
+    setSheet(null);
+    if (r.action === "skip") {
+      session.skip(r.reason);
+      return;
     }
-    setModal(null);
+    if (!r.swapId || !r.swapName) return;
+    // The substitute starts from the client's last set of it, else its
+    // library default reps and the weight on screen.
+    const sub = library.data?.find((e) => e.id === r.swapId);
+    let weight = s.weight;
+    let reps = sub?.default_reps ?? s.reps;
+    try {
+      const [last] = await subjectHistory([r.swapId], subject);
+      if (last) {
+        weight = last.weight;
+        reps = last.reps ?? reps;
+      }
+    } catch {
+      // No history: keep the numbers above.
+    }
+    session.swap({ reason: r.reason, exerciseId: r.swapId, name: r.swapName, weight, reps });
   }
 
-  const complete = useMutation({
-    mutationFn: async () => {
-      const duration = Math.round((Date.now() - startedAt.current) / 1000);
-
-      // 1) Collect the filled set rows (swaps log against the substitute).
-      const newRows = data.exercises.flatMap((ex) => {
-        const adj = adjustments[ex.exerciseId];
-        if (adj?.action === "skipped") return [];
-        const targetExerciseId = adj?.action === "swapped" ? adj.swapId : ex.exerciseId;
-        return rows[ex.exerciseId]
-          .map((r, idx) => ({ r, idx }))
-          .filter(({ r }) => r.reps.trim() !== "" || r.weight.trim() !== "")
-          .map(({ r, idx }) => ({
-            exercise_id: targetExerciseId,
-            set_index: idx,
-            reps: toInt(r.reps),
-            weight: toNum(r.weight),
-          }));
-      });
-
-      // 2) PR detection vs the client's past sets for those exercises (lib/pr.ts).
-      const exIds = [...new Set(newRows.map((r) => r.exercise_id))];
-      const historyByEx = new Map<string, { weight: number | null; reps: number | null }[]>();
-      exIds.forEach((id) => historyByEx.set(id, []));
-      if (exIds.length > 0) {
-        const { data: hist } = await supabase
-          .from("set_logs")
-          .select("exercise_id, weight, reps")
-          .in("exercise_id", exIds);
-        hist?.forEach((h) => historyByEx.get(h.exercise_id)?.push({ weight: h.weight, reps: h.reps }));
-      }
-      const isPrByRow = new Array<boolean>(newRows.length).fill(false);
-      const idxByEx = new Map<string, number[]>();
-      newRows.forEach((r, i) => {
-        if (!idxByEx.has(r.exercise_id)) idxByEx.set(r.exercise_id, []);
-        idxByEx.get(r.exercise_id)!.push(i);
-      });
-      idxByEx.forEach((idxs, exId) => {
-        const flags = detectPRs(
-          historyByEx.get(exId) ?? [],
-          idxs.map((i) => ({ weight: newRows[i].weight, reps: newRows[i].reps })),
-        );
-        idxs.forEach((i, k) => (isPrByRow[i] = flags[k]));
-      });
-
-      // 3) Create the log (with effort + note).
-      const { data: log, error: logErr } = await supabase
-        .from("workout_logs")
-        .insert({
-          scheduled_workout_id: scheduledId,
-          client_id: clientId,
-          duration_seconds: duration,
-          effort_rating: effort,
-          client_note: effortNote.trim() === "" ? null : effortNote.trim(),
-        })
-        .select("id")
-        .single();
-      if (logErr) throw logErr;
-
-      // 4) Set logs (with PR flags).
-      if (newRows.length > 0) {
-        const { error: setErr } = await supabase.from("set_logs").insert(
-          newRows.map((r, i) => ({
-            workout_log_id: log.id,
-            exercise_id: r.exercise_id,
-            set_index: r.set_index,
-            reps: r.reps,
-            weight: r.weight,
-            is_pr: isPrByRow[i],
-          })),
-        );
-        if (setErr) throw setErr;
-      }
-
-      // 5) Adjustment rows (skips + swaps).
-      const adjRows = Object.entries(adjustments).map(([exerciseId, adj]) => ({
-        workout_log_id: log.id,
-        exercise_id: exerciseId,
-        action: adj.action,
-        swapped_for_exercise_id: adj.action === "swapped" ? adj.swapId : null,
-        reason: adj.reason.trim() === "" ? null : adj.reason.trim(),
-      }));
-      if (adjRows.length > 0) {
-        const { error: adjErr } = await supabase.from("exercise_adjustments").insert(adjRows);
-        if (adjErr) throw adjErr;
-      }
-
-      // 6) Mark the scheduled workout completed.
-      const { error: swErr } = await supabase
-        .from("scheduled_workouts")
-        .update({ status: "completed" })
-        .eq("id", scheduledId);
-      if (swErr) throw swErr;
-
-      // 7) Badges (V9) — deterministic, reuses the V8 streak view (lib/badges.ts).
-      await checkAndAwardBadges(clientId);
-    },
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ["scheduled-client"] });
-      queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
-      queryClient.invalidateQueries({ queryKey: ["workout-session", scheduledId] });
-      queryClient.invalidateQueries({ queryKey: ["badges", clientId] });
-      queryClient.invalidateQueries({ queryKey: ["package", clientId] });
-      queryClient.invalidateQueries({ queryKey: ["package", "app", clientId] });
-      // Trainer-side views (stale otherwise if using the same device's dev
-      // quick-switch, which shares one query cache across both roles).
-      queryClient.invalidateQueries({ queryKey: ["dashboard-status"] });
-      queryClient.invalidateQueries({ queryKey: ["client-detail", "app", clientId] });
-      router.back();
-    },
-  });
+  const swapLibrary = (library.data ?? []).filter(
+    (e) => e.id !== current?.exerciseId && !(adj?.type === "swap" && adj.exerciseId === e.id),
+  );
+  const demoUrl =
+    adj?.type === "swap"
+      ? (library.data?.find((e) => e.id === adj.exerciseId)?.video_url ?? null)
+      : (current?.videoUrl ?? null);
+  const name = current ? exerciseName(s, s.ex) : "";
 
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
-      <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
-        {data.note ? (
-          <View className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <Text className="text-xs font-bold uppercase tracking-wide text-amber-700 w-full text-left">
-              {t("workout.noteFromTrainer")}
-            </Text>
-            <Text className="mt-1 text-base text-amber-900 w-full text-left">{data.note}</Text>
-          </View>
-        ) : null}
+    <View style={{ flex: 1, backgroundColor: colors.iron }}>
+      <Stack.Screen options={{ gestureEnabled: false }} />
+      <StatusBar style="light" />
 
-        {!data.hasTemplate ? (
-          <View className="items-center rounded-2xl border border-dashed border-slate-300 px-6 py-12">
-            <Text className="text-center text-base font-medium text-slate-700">{t("workout.freeWorkout")}</Text>
-            <Text className="mt-2 text-center text-sm text-slate-400">
-              {t("workout.freeWorkoutHint")}
-            </Text>
-          </View>
-        ) : (
-          data.exercises.map((ex) => {
-            const adj = adjustments[ex.exerciseId];
-
-            // Skipped → collapsed card.
-            if (adj?.action === "skipped") {
-              return (
-                <View key={ex.exerciseId} className="mb-4 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-                  <View className="flex-row items-center justify-between">
-                    <Text className="text-base font-semibold text-slate-400 line-through">{ex.name}</Text>
-                    <Text className="rounded-full bg-slate-200 px-2 py-0.5 text-xs font-semibold text-slate-600">
-                      {t("workout.skippedBadge")}
-                    </Text>
-                  </View>
-                  {adj.reason ? <Text className="mt-1 text-sm text-slate-500 w-full text-left">“{adj.reason}”</Text> : null}
-                  <Pressable className="mt-2 self-start" onPress={() => undoAdjust(ex.exerciseId)}>
-                    <Text className="text-sm font-semibold text-slate-600">{t("workout.undo")}</Text>
-                  </Pressable>
-                </View>
-              );
-            }
-
-            const swapped = adj?.action === "swapped" ? adj : null;
-            return (
-              <View key={ex.exerciseId} className="mb-4 rounded-2xl border border-slate-200 p-4">
-                <Text className="text-lg font-bold text-slate-900 w-full text-left">{ex.name}</Text>
-
-                {swapped ? (
-                  <View className="mt-1 rounded-lg bg-slate-100 px-3 py-2">
-                    <Text className="text-sm font-medium text-slate-700 w-full text-left">
-                      {t("workout.swappedTo", { name: swapped.swapName })}
-                    </Text>
-                    {swapped.reason ? <Text className="text-sm text-slate-500 w-full text-left">“{swapped.reason}”</Text> : null}
-                    <Pressable className="mt-1 self-start" onPress={() => undoAdjust(ex.exerciseId)}>
-                      <Text className="text-sm font-semibold text-slate-600">{t("workout.undo")}</Text>
-                    </Pressable>
-                  </View>
-                ) : (
-                  <View className="mt-1 flex-row flex-wrap gap-x-4">
-                    <Text className="text-sm text-slate-500">
-                      {t("workout.lastTimeLabel")}{" "}
-                      {ex.lastTime && (ex.lastTime.weight != null || ex.lastTime.reps != null)
-                        ? `${ex.lastTime.weight ?? "—"}${ex.lastTime.weight != null ? "kg" : ""} × ${ex.lastTime.reps ?? "—"}`
-                        : "—"}
-                    </Text>
-                    <Text className="text-sm text-slate-400">
-                      {t("workout.targetLabel")} {ex.targetSets ?? "—"} × {ex.targetReps ?? "—"}
-                      {ex.targetWeight != null ? ` @ ${ex.targetWeight}${t("workout.kgSuffix")}` : ""}
-                    </Text>
-                  </View>
-                )}
-
-                <View className="mt-3 gap-2">
-                  {rows[ex.exerciseId].map((r, idx) => (
-                    <View key={idx} className="flex-row items-center gap-2">
-                      <Text className="w-12 text-sm font-medium text-slate-500">{t("workout.setNumber", { number: idx + 1 })}</Text>
-                      <SetInput
-                        value={r.reps}
-                        placeholder={ex.targetReps != null ? String(ex.targetReps) : t("workout.repsPlaceholder")}
-                        onChangeText={(v) => updateRow(ex.exerciseId, idx, "reps", v)}
-                        suffix={t("workout.repsSuffix")}
-                      />
-                      <SetInput
-                        value={r.weight}
-                        placeholder={ex.targetWeight != null ? String(ex.targetWeight) : t("workout.kgPlaceholder")}
-                        onChangeText={(v) => updateRow(ex.exerciseId, idx, "weight", v)}
-                        suffix={t("workout.kgSuffix")}
-                        decimal
-                      />
-                    </View>
-                  ))}
-                </View>
-
-                <View className="mt-3 flex-row flex-wrap gap-2">
-                  <SmallBtn label={t("workout.addSet")} onPress={() => addRow(ex.exerciseId)} />
-                  <SmallBtn
-                    dark
-                    label={t("workout.restSeconds", { seconds: ex.restSeconds ?? 60 })}
-                    onPress={() => setActiveRest(ex.restSeconds ?? 60)}
-                  />
-                  {!swapped ? (
-                    <>
-                      <SmallBtn
-                        label={t("workout.skip")}
-                        onPress={() => setModal({ exerciseId: ex.exerciseId, exerciseName: ex.name, mode: "skip" })}
-                      />
-                      <SmallBtn
-                        label={t("workout.swap")}
-                        onPress={() => setModal({ exerciseId: ex.exerciseId, exerciseName: ex.name, mode: "swap" })}
-                      />
-                    </>
-                  ) : null}
-                </View>
-              </View>
-            );
-          })
-        )}
-
-        {/* Effort + note (V6) */}
-        <View className="mb-4">
-          <Text className="mb-2 text-sm font-semibold uppercase tracking-wide text-slate-500 w-full text-left">
-            {t("workout.howDidItFeel")}
-          </Text>
-          <View className="flex-row flex-wrap gap-2">
-            {Array.from({ length: 10 }, (_, i) => i + 1).map((n) => {
-              const on = effort === n;
-              return (
-                <Pressable
-                  key={n}
-                  onPress={() => setEffort(on ? null : n)}
-                  className={`h-9 w-9 items-center justify-center rounded-lg border ${
-                    on ? "border-slate-900 bg-slate-900" : "border-slate-300"
-                  }`}
-                >
-                  <Text className={`text-sm font-semibold ${on ? "text-white" : "text-slate-700"}`}>{n}</Text>
-                </Pressable>
-              );
-            })}
-          </View>
-          <Text className="mt-1 text-xs text-slate-400 w-full text-left">{t("workout.effortScaleHint")}</Text>
-          <TextInput
-            className={`mt-3 rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
-            placeholder={t("workout.effortNotePlaceholder")}
-            placeholderTextColor="#94a3b8"
-            value={effortNote}
-            onChangeText={setEffortNote}
-            multiline
-          />
-        </View>
-
-        {complete.error ? (
-          <Text className="mb-3 text-sm text-red-600 w-full text-left">{(complete.error as Error).message}</Text>
-        ) : null}
-
-        <Pressable
-          className="mt-2 items-center rounded-xl bg-emerald-600 px-4 py-4 active:opacity-80"
-          disabled={complete.isPending}
-          onPress={() => complete.mutate()}
-        >
-          {complete.isPending ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text className="text-base font-bold text-white">{t("workout.completeWorkout")}</Text>
-          )}
-        </Pressable>
-      </ScrollView>
-
-      {activeRest != null ? (
-        <View className="absolute inset-x-0 bottom-0 px-4 pb-6">
-          <RestTimer seconds={activeRest} onDone={() => setActiveRest(null)} />
-        </View>
-      ) : null}
+      {s.screen === "set" ? (
+        <SetView
+          session={session}
+          title={title}
+          onMinimize={minimize}
+          onOverview={() => setSheet("overview")}
+          onDemo={demoUrl ? () => setSheet("demo") : undefined}
+          onSwap={() => openAdjust("swap")}
+          onSkip={() => openAdjust("skip")}
+        />
+      ) : s.screen === "rest" ? (
+        <RestView session={session} title={title} onMinimize={minimize} onOverview={() => setSheet("overview")} />
+      ) : (
+        <FinishView
+          subtitle={`${title} · ${longDate(todayISO(), i18n.language)}`}
+          startedAt={s.startedAt}
+          showDuration={data.exercises.length > 0}
+          sets={setsLogged(s)}
+          streak={finishStreak}
+          prs={sessionPrs(s)}
+          saving={save.isPending}
+          errorMessage={save.error ? (save.error as Error).message : null}
+          onSave={(input) => finish(input, "home")}
+          onShare={(input) => finish(input, "share")}
+        />
+      )}
 
       <AdjustmentModal
-        visible={modal != null}
-        mode={modal?.mode ?? null}
-        exerciseName={modal?.exerciseName ?? ""}
-        library={(library.data ?? []).filter((e) => e.id !== modal?.exerciseId)}
-        onClose={() => setModal(null)}
+        visible={sheet === "adjust"}
+        mode={adjustMode}
+        exerciseName={name}
+        exerciseLabel={t("workout.mode.exerciseOf", { n: s.ex + 1, total: data.exercises.length })}
+        muscleGroup={isSwapped(s, s.ex) ? null : current?.muscleGroup}
+        library={swapLibrary}
+        onClose={() => setSheet(null)}
         onConfirm={confirmAdjust}
       />
-    </SafeAreaView>
-  );
-}
 
-function SmallBtn({
-  label,
-  onPress,
-  dark,
-}: {
-  label: string;
-  onPress: () => void;
-  dark?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      className={`rounded-lg px-3 py-2 ${
-        dark ? "bg-slate-900 active:opacity-80" : "border border-slate-300 active:bg-slate-100"
-      }`}
-    >
-      <Text className={`text-sm font-semibold ${dark ? "text-white" : "text-slate-700"}`}>{label}</Text>
-    </Pressable>
-  );
-}
-
-function SetInput({
-  value,
-  placeholder,
-  onChangeText,
-  suffix,
-  decimal,
-}: {
-  value: string;
-  placeholder: string;
-  onChangeText: (v: string) => void;
-  suffix: string;
-  decimal?: boolean;
-}) {
-  return (
-    <View className="flex-1 flex-row items-center rounded-lg border border-slate-300 px-3">
-      <TextInput
-        className="flex-1 py-2 text-base text-slate-900"
-        style={LTR_INPUT_STYLE}
-        placeholder={placeholder}
-        placeholderTextColor="#cbd5e1"
-        keyboardType={decimal ? "decimal-pad" : "number-pad"}
-        value={value}
-        onChangeText={onChangeText}
+      <OverviewSheet
+        visible={sheet === "overview"}
+        session={session}
+        note={data.note}
+        onClose={() => setSheet(null)}
+        onJump={(ex) => {
+          setSheet(null);
+          session.jump(ex);
+        }}
+        onFinish={() => {
+          setSheet(null);
+          session.finishNow();
+        }}
       />
-      <Text className="text-xs text-slate-400">{suffix}</Text>
+
+      <Sheet visible={sheet === "demo"} onClose={() => setSheet(null)} closeLabel={t("workout.mode.closeDemo")} title={name} dark>
+        {sheet === "demo" ? <ExerciseVideo url={demoUrl} /> : null}
+      </Sheet>
     </View>
   );
 }
