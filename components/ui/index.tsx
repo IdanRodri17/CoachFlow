@@ -720,7 +720,7 @@ export function Segmented<T extends string>({
   dark,
   style,
 }: {
-  options: { value: T; label: string }[];
+  options: { value: T; label: string; icon?: IconComponent }[];
   value: T | null;
   onChange: (value: T) => void;
   /** md = 44 tall (screens), lg = 48 (sheets and forms). */
@@ -758,12 +758,17 @@ export function Segmented<T extends string>({
                 height: height - 8,
                 borderRadius: 10,
                 paddingHorizontal: 12,
+                flexDirection: "row",
+                gap: 6,
                 alignItems: "center",
                 justifyContent: "center",
               },
               selected && [{ backgroundColor: dark ? colors.bone : colors.paper }, styles.segmentShadow],
             ]}
           >
+            {o.icon ? (
+              <Icon icon={o.icon} size={18} color={selected ? colors.ink : dark ? colors.ash : colors.graphite} />
+            ) : null}
             <Text
               numberOfLines={1}
               style={{
