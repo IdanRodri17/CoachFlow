@@ -14,7 +14,12 @@
 
 import { detectPRs, type SetPerf } from "./pr";
 
-export const WEIGHT_STEP = 2.5;
+/** Below this the weight stepper moves 1 kg (light dumbbells: 1, 2 … 10);
+ * from it up, 2.5 kg (plates). See stepWeight(). */
+export const LIGHT_WEIGHT_LIMIT = 10;
+/** Highest weight / reps the steppers and typing accept. */
+export const MAX_WEIGHT = 999;
+export const MAX_REPS = 999;
 export const REST_STEP_SECONDS = 15;
 export const DEFAULT_REST_SECONDS = 60;
 /** Stepper start when neither the template nor history says anything. */
@@ -82,7 +87,12 @@ export type WorkoutState = {
 
 export type WorkoutAction =
   | { type: "weight"; delta: number }
+  /** The − / + buttons: 1 kg steps under 10 kg, 2.5 kg from there. */
+  | { type: "weightStep"; dir: 1 | -1 }
+  /** A typed number (tap the value to type). */
+  | { type: "setWeight"; value: number }
   | { type: "reps"; delta: number }
+  | { type: "setReps"; value: number }
   | { type: "logSet"; now: number; autoRest?: boolean }
   | { type: "undo" }
   | { type: "startRest"; now: number }
@@ -201,10 +211,19 @@ export function workoutReducer(s: WorkoutState, a: WorkoutAction): WorkoutState 
   switch (a.type) {
     case "weight": {
       if (s.weight == null) return s;
-      return { ...s, weight: Math.max(0, round1(s.weight + a.delta)) };
+      return { ...s, weight: Math.max(0, round2(s.weight + a.delta)) };
     }
+    case "weightStep":
+      if (s.weight == null) return s;
+      return { ...s, weight: stepWeight(s.weight, a.dir) };
+    case "setWeight":
+      if (s.weight == null || !Number.isFinite(a.value)) return s;
+      return { ...s, weight: Math.min(MAX_WEIGHT, Math.max(0, round2(a.value))) };
     case "reps":
-      return { ...s, reps: Math.max(1, s.reps + a.delta) };
+      return { ...s, reps: Math.min(MAX_REPS, Math.max(1, s.reps + a.delta)) };
+    case "setReps":
+      if (!Number.isFinite(a.value)) return s;
+      return { ...s, reps: Math.min(MAX_REPS, Math.max(1, Math.round(a.value))) };
 
     case "logSet": {
       if (s.screen !== "set") return s;
@@ -390,8 +409,57 @@ export function sessionPrs(s: WorkoutState): { name: string; weight: number; rep
   return out;
 }
 
+export type OverviewRow = {
+  index: number;
+  name: string;
+  /** done = every set logged; current = on screen (or next, while resting). */
+  status: "done" | "current" | "open" | "skipped";
+  logged: number;
+  sets: number;
+  pr: boolean;
+  swapped: boolean;
+  reason: string | null;
+  /** The numbers the exercise starts from (the "3 × 10 · 60 ק״ג" line). */
+  start: { weight: number | null; reps: number };
+};
+
+/** The all-exercises sheet (D20d): one row per exercise with its status. */
+export function overview(s: WorkoutState): OverviewRow[] {
+  const current = s.screen === "rest" && s.next ? s.next.ex : s.ex;
+  return s.exercises.map((e, i) => {
+    const a = s.adjustments[i];
+    const logged = s.logs[i].length;
+    const status: OverviewRow["status"] =
+      a?.type === "skip" ? "skipped" : logged >= e.sets ? "done" : i === current ? "current" : "open";
+    return {
+      index: i,
+      name: exerciseName(s, i),
+      status,
+      logged,
+      sets: e.sets,
+      pr: s.logs[i].some((l) => l.pr),
+      swapped: a?.type === "swap",
+      reason: a && a.reason.trim() !== "" ? a.reason.trim() : null,
+      start: startingNumbers(s, i),
+    };
+  });
+}
+
+/** The finish step's streak tile, BEFORE the save. client_streaks (0008)
+ * counts completed workouts dated up to today, newer than the latest missed
+ * one. Completing today's workout adds exactly one; a future-dated one isn't
+ * counted until its day comes; completing a past (missed) one removes a miss
+ * and re-joins runs only the view can recount — null, so the tile hides
+ * rather than show a guess. */
+export function streakAfterCompleting(current: number, scheduledDate: string, today: string): number | null {
+  if (scheduledDate === today) return current + 1;
+  if (scheduledDate > today) return current;
+  return null;
+}
+
 /** The rows the existing complete mutation writes. Swaps log against the
- * substitute; a skipped exercise has no sets. set_index restarts per exercise. */
+ * substitute; a skip skips the REST of an exercise, so sets logged before it
+ * are kept (they happened). set_index restarts per exercise. */
 export function saveRows(s: WorkoutState): {
   sets: { exercise_id: string; set_index: number; reps: number; weight: number | null }[];
   adjustments: {
@@ -403,7 +471,6 @@ export function saveRows(s: WorkoutState): {
 } {
   const sets = s.exercises.flatMap((e, i) => {
     const a = s.adjustments[i];
-    if (a?.type === "skip") return [];
     const exerciseId = a?.type === "swap" ? a.exerciseId : e.exerciseId;
     return s.logs[i].map((l, idx) => ({ exercise_id: exerciseId, set_index: idx, reps: l.reps, weight: l.weight }));
   });
@@ -426,13 +493,26 @@ export function saveRows(s: WorkoutState): {
 // Formatting
 // ---------------------------------------------------------------------------
 
-function round1(n: number): number {
-  return Math.round(n * 10) / 10;
+function round2(n: number): number {
+  return Math.round(n * 100) / 100;
 }
 
-/** 42.5 → "42.5", 40 → "40". */
+/** The weight stepper (Idan, 2026-10-03): 1 kg steps below 10 kg, where
+ * 2.5 kg jumps skip whole dumbbells, and 2.5 kg from 10 kg up. A typed value
+ * off that grid snaps onto it at the next tap (11 → 12.5 up, → 10 down). */
+export function stepWeight(w: number, dir: 1 | -1): number {
+  const eps = 1e-9;
+  if (dir > 0) {
+    if (w < LIGHT_WEIGHT_LIMIT) return Math.min(LIGHT_WEIGHT_LIMIT, Math.floor(w + eps) + 1);
+    return Math.min(MAX_WEIGHT, round2(Math.floor(w / 2.5 + eps) * 2.5 + 2.5));
+  }
+  if (w <= LIGHT_WEIGHT_LIMIT) return Math.max(0, Math.ceil(w - eps) - 1);
+  return Math.max(LIGHT_WEIGHT_LIMIT, round2(Math.ceil(w / 2.5 - eps) * 2.5 - 2.5));
+}
+
+/** 42.5 → "42.5", 40 → "40", 21.25 → "21.25" (typed micro plates). */
 export function formatWeight(w: number): string {
-  return Number.isInteger(round1(w)) ? String(Math.round(w)) : round1(w).toFixed(1);
+  return String(round2(w));
 }
 
 /** ms → "1:30" (rounded up, so a timer never shows 0:00 while running). */

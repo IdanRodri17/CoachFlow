@@ -6,19 +6,20 @@
 // (lib/useWorkoutSession.ts). Swap / skip / demo / overview are callbacks so
 // the screen that hosts this decides which sheet opens.
 
-import type { ComponentProps } from "react";
-import { ScrollView, View } from "react-native";
+import { useState, type ComponentProps } from "react";
+import { InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
 import Check from "lucide-react-native/icons/check";
 import ChevronsRight from "lucide-react-native/icons/chevrons-right";
 import Minus from "lucide-react-native/icons/minus";
+import Pencil from "lucide-react-native/icons/pencil";
 import Play from "lucide-react-native/icons/play";
 import Plus from "lucide-react-native/icons/plus";
 import Trophy from "lucide-react-native/icons/trophy";
 
-import { ltr } from "@/lib/i18n";
+import { layoutDirection, ltr } from "@/lib/i18n";
 import type { WorkoutSession } from "@/lib/useWorkoutSession";
 import {
   exerciseName,
@@ -31,12 +32,25 @@ import {
   restSecondsOf,
   type Pill,
 } from "@/lib/workoutSession";
-import { AppText, Button, colors, Display, Icon, IconButton, Num, type IconComponent } from "@/components/ui";
+import {
+  AppText,
+  Button,
+  colors,
+  Display,
+  fonts,
+  Icon,
+  IconButton,
+  Num,
+  TextButton,
+  type IconComponent,
+} from "@/components/ui";
 
 import { WorkoutHeader } from "./WorkoutHeader";
 
 /** How long the volt "rest is over" banner stays after a rest ends. */
 const REST_OVER_BANNER_MS = 1850;
+/** iOS number pads have no return key: a "סיום" bar above the keyboard. */
+const NUMBER_ACCESSORY_ID = "workout-number-entry";
 
 export function SetView({
   session,
@@ -78,6 +92,10 @@ export function SetView({
   return (
     <View style={{ flex: 1, backgroundColor: colors.iron }}>
       <ScrollView
+        // A tap on − / + / "סט בוצע" works while the keyboard is up; typed
+        // numbers are in the session already (every keystroke dispatches).
+        keyboardShouldPersistTaps="handled"
+        automaticallyAdjustKeyboardInsets
         contentContainerStyle={{
           flexGrow: 1,
           paddingTop: insets.top,
@@ -171,6 +189,8 @@ export function SetView({
               upLabel={t("workout.mode.weightUp")}
               onDown={session.weightDown}
               onUp={session.weightUp}
+              onSet={session.setWeight}
+              decimal
             />
           ) : (
             <View
@@ -195,6 +215,7 @@ export function SetView({
             upLabel={t("workout.mode.repsUp")}
             onDown={session.repsDown}
             onUp={session.repsUp}
+            onSet={session.setReps}
           />
         </View>
 
@@ -217,15 +238,50 @@ export function SetView({
           />
         ) : null}
 
-        <Button label={t("workout.mode.setDone")} variant="accent" size={72} icon={Check} block onPress={session.logSet} />
+        <Button
+          label={t("workout.mode.setDone")}
+          variant="accent"
+          size={72}
+          icon={Check}
+          block
+          onPress={() => {
+            Keyboard.dismiss();
+            session.logSet();
+          }}
+        />
         <AppText size={13} tone="ash" center>
           {lastSet
             ? t("workout.mode.lastSetHint")
             : t("workout.mode.restHint", { time: ltr(formatClock(restSecondsOf(e) * 1000)) })}
         </AppText>
       </ScrollView>
+
+      {Platform.OS === "ios" ? (
+        <InputAccessoryView nativeID={NUMBER_ACCESSORY_ID} backgroundColor={colors.iron3}>
+          <View
+            style={{
+              height: 48,
+              paddingHorizontal: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "flex-end",
+              direction: layoutDirection(),
+            }}
+          >
+            <TextButton label={t("workout.mode.doneTyping")} tone="volt" size={17} onPress={() => Keyboard.dismiss()} />
+          </View>
+        </InputAccessoryView>
+      ) : null}
     </View>
   );
+}
+
+/** "42.5", "42,5" (a comma keyboard) or "12." → a number; "" → null. */
+function parseTyped(v: string): number | null {
+  const clean = v.trim().replace(",", ".");
+  if (clean === "") return null;
+  const n = Number(clean);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 function SecondaryAction({
@@ -262,6 +318,8 @@ function BigStepper({
   upLabel,
   onDown,
   onUp,
+  onSet,
+  decimal,
 }: {
   label: string;
   value: string;
@@ -270,7 +328,15 @@ function BigStepper({
   upLabel: string;
   onDown: () => void;
   onUp: () => void;
+  /** A typed number: tap the value to type it (Idan, 2026-10-03). */
+  onSet: (value: number) => void;
+  decimal?: boolean;
 }) {
+  const { t } = useTranslation();
+  // null = showing the number; a string = typing (the field's text).
+  const [draft, setDraft] = useState<string | null>(null);
+  const typing = draft != null;
+
   // [−] value [+] in logical order: − lands on the right in Hebrew.
   return (
     <View
@@ -278,24 +344,97 @@ function BigStepper({
       accessibilityLabel={label}
       style={{
         height: 104,
-        paddingHorizontal: 16,
+        paddingHorizontal: 14,
         borderRadius: 24,
+        borderWidth: 2,
+        borderColor: typing ? colors.volt : colors.iron2,
         backgroundColor: colors.iron2,
         flexDirection: "row",
         alignItems: "center",
         gap: 8,
       }}
     >
-      <IconButton icon={Minus} variant="dark" size={64} shape="square" accessibilityLabel={downLabel} onPress={onDown} />
-      <View style={{ flex: 1, flexDirection: "row", alignItems: "baseline", justifyContent: "center", gap: 8 }}>
-        <Num size={76} tone="bone">
-          {value}
-        </Num>
-        <AppText size={17} weight="medium" tone="ash">
-          {unit}
-        </AppText>
-      </View>
-      <IconButton icon={Plus} variant="dark" size={64} shape="square" accessibilityLabel={upLabel} onPress={onUp} />
+      <IconButton
+        icon={Minus}
+        variant="dark"
+        size={64}
+        shape="square"
+        accessibilityLabel={downLabel}
+        onPress={() => {
+          setDraft(null);
+          onDown();
+        }}
+      />
+      {typing ? (
+        <View style={{ flex: 1, flexDirection: "row", alignItems: "center", justifyContent: "center", gap: 6 }}>
+          <TextInput
+            value={draft}
+            onChangeText={(v) => {
+              setDraft(v);
+              const n = parseTyped(v);
+              if (n != null) onSet(n);
+            }}
+            onBlur={() => setDraft(null)}
+            onSubmitEditing={() => Keyboard.dismiss()}
+            autoFocus
+            selectTextOnFocus
+            keyboardType={decimal ? "decimal-pad" : "number-pad"}
+            returnKeyType="done"
+            inputAccessoryViewID={Platform.OS === "ios" ? NUMBER_ACCESSORY_ID : undefined}
+            maxLength={6}
+            accessibilityLabel={label}
+            selectionColor={colors.volt}
+            style={{
+              flex: 1,
+              minWidth: 0,
+              height: 84,
+              paddingVertical: 0,
+              fontFamily: fonts.numBold,
+              fontSize: 76,
+              color: colors.bone,
+              textAlign: "center",
+              writingDirection: "ltr",
+            }}
+          />
+          <AppText size={17} weight="medium" tone="ash">
+            {unit}
+          </AppText>
+        </View>
+      ) : (
+        <Pressable
+          accessibilityRole="button"
+          accessibilityLabel={`${label} ${value} ${unit}`}
+          accessibilityHint={t("workout.mode.tapToType")}
+          onPress={() => setDraft(value)}
+          style={({ pressed }) => ({
+            flex: 1,
+            flexDirection: "row",
+            alignItems: "baseline",
+            justifyContent: "center",
+            gap: 8,
+            opacity: pressed ? 0.7 : 1,
+          })}
+        >
+          <Num size={76} tone="bone">
+            {value}
+          </Num>
+          <AppText size={17} weight="medium" tone="ash">
+            {unit}
+          </AppText>
+          <Icon icon={Pencil} size={14} color={colors.ash2} />
+        </Pressable>
+      )}
+      <IconButton
+        icon={Plus}
+        variant="dark"
+        size={64}
+        shape="square"
+        accessibilityLabel={upLabel}
+        onPress={() => {
+          setDraft(null);
+          onUp();
+        }}
+      />
     </View>
   );
 }

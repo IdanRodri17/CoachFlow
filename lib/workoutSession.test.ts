@@ -11,6 +11,7 @@ import {
   formatWeight,
   isLastSetOverall,
   nextOpen,
+  overview,
   pills,
   prefill,
   progress,
@@ -19,6 +20,8 @@ import {
   saveRows,
   sessionPrs,
   setsLogged,
+  stepWeight,
+  streakAfterCompleting,
   workoutReducer,
   type SessionExercise,
   type WorkoutAction,
@@ -204,6 +207,12 @@ describe("swap, skip and jump (rules 7, 8)", () => {
     expect(saveRows(s).adjustments[0]).toMatchObject({ action: "skipped", reason: "כאב או אי נוחות" });
   });
 
+  it("a skip after some sets keeps the sets that were logged", () => {
+    const s = run(createSession([squat, rdl], T0), { type: "logSet", now: T0 }, { type: "restDone", now: T0 }, { type: "skip", reason: "" });
+    expect(saveRows(s).sets).toEqual([{ exercise_id: "squat", set_index: 0, reps: 8, weight: 47.5 }]);
+    expect(saveRows(s).adjustments[0]).toMatchObject({ exercise_id: "squat", action: "skipped", reason: null });
+  });
+
   it("skipping the last open exercise finishes", () => {
     expect(run(createSession([legRaise], T0), { type: "skip", reason: "" }).screen).toBe("finish");
   });
@@ -258,5 +267,75 @@ describe("read-outs", () => {
     expect(formatClock(57_200)).toBe("0:58");
     expect(formatElapsed(18 * 60_000 + 40_000)).toBe("18:40");
     expect(formatElapsed(3_912_000)).toBe("1:05:12");
+  });
+});
+
+describe("overview and the finish streak (D20d, D20e)", () => {
+  it("lists every exercise with its status; while resting, the next one is current", () => {
+    const s = run(
+      createSession([squat, rdl, legRaise], T0),
+      { type: "logSet", now: T0 },
+      { type: "restDone", now: T0 },
+      { type: "logSet", now: T0 },
+    );
+    expect(s.screen).toBe("rest");
+    const rows = overview(s);
+    expect(rows.map((r) => r.status)).toEqual(["done", "current", "open"]);
+    expect(rows[0]).toMatchObject({ logged: 2, sets: 2, pr: false, swapped: false, reason: null });
+    expect(rows[1].start).toEqual({ weight: 42.5, reps: 10 });
+    expect(rows[2].start).toEqual({ weight: null, reps: 12 });
+  });
+
+  it("shows skipped exercises with their reason and swaps under the substitute's name", () => {
+    const s = run(
+      createSession([squat, rdl], T0),
+      { type: "swap", reason: "המכשיר תפוס", exerciseId: "legpress", name: "לחיצת רגליים", weight: 100, reps: 10 },
+      { type: "jump", ex: 1 },
+      { type: "skip", reason: " כאב " },
+    );
+    const rows = overview(s);
+    expect(rows[0]).toMatchObject({ name: "לחיצת רגליים", swapped: true, status: "current", start: { weight: 100, reps: 10 } });
+    expect(rows[1]).toMatchObject({ status: "skipped", reason: "כאב" });
+  });
+
+  it("the streak tile: today adds one, a future date adds nothing, a past one is unknown", () => {
+    expect(streakAfterCompleting(8, "2026-10-03", "2026-10-03")).toBe(9);
+    expect(streakAfterCompleting(0, "2026-10-03", "2026-10-03")).toBe(1);
+    expect(streakAfterCompleting(8, "2026-10-04", "2026-10-03")).toBe(8);
+    expect(streakAfterCompleting(8, "2026-10-01", "2026-10-03")).toBeNull();
+  });
+});
+
+describe("weight stepper and typing (Idan, 2026-10-03)", () => {
+  it("moves 1 kg below 10 kg and 2.5 kg from 10 kg up", () => {
+    expect(stepWeight(0, 1)).toBe(1);
+    expect(stepWeight(7, 1)).toBe(8);
+    expect(stepWeight(9, 1)).toBe(10);
+    expect(stepWeight(10, 1)).toBe(12.5);
+    expect(stepWeight(42.5, 1)).toBe(45);
+    expect(stepWeight(12.5, -1)).toBe(10);
+    expect(stepWeight(10, -1)).toBe(9);
+    expect(stepWeight(1, -1)).toBe(0);
+    expect(stepWeight(0, -1)).toBe(0);
+  });
+
+  it("snaps a typed value onto the grid at the next tap", () => {
+    expect(stepWeight(7.5, 1)).toBe(8);
+    expect(stepWeight(7.5, -1)).toBe(7);
+    expect(stepWeight(9.5, 1)).toBe(10);
+    expect(stepWeight(11, 1)).toBe(12.5);
+    expect(stepWeight(11, -1)).toBe(10);
+    expect(stepWeight(13, -1)).toBe(12.5);
+  });
+
+  it("typed numbers are clamped and rounded; bodyweight ignores a typed weight", () => {
+    const s = createSession([ex({ exerciseId: "x", targetWeight: 20 })], T0);
+    expect(run(s, { type: "setWeight", value: 21.25 }).weight).toBe(21.25);
+    expect(run(s, { type: "setWeight", value: -3 }).weight).toBe(0);
+    expect(run(s, { type: "setWeight", value: Number.NaN }).weight).toBe(20);
+    expect(run(s, { type: "setReps", value: 0 }).reps).toBe(1);
+    expect(run(s, { type: "setReps", value: 12.4 }).reps).toBe(12);
+    expect(run(createSession([legRaise], T0), { type: "setWeight", value: 10 }).weight).toBeNull();
+    expect(formatWeight(21.25)).toBe("21.25");
   });
 });

@@ -3,7 +3,9 @@
 // §6.2 rule 3). The countdown is read from an absolute end time
 // (lib/workoutSession.ts), so it's right after the phone was locked.
 
+import { useEffect } from "react";
 import { ScrollView, View } from "react-native";
+import Animated, { cancelAnimation, Easing, useAnimatedProps, useSharedValue, withTiming } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import Svg, { Circle } from "react-native-svg";
@@ -25,6 +27,8 @@ const STROKE = 14;
 const RADIUS = 125;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 
+const AnimatedCircle = Animated.createAnimatedComponent(Circle);
+
 export function RestView({
   session,
   title,
@@ -42,8 +46,24 @@ export function RestView({
   const left = restLeftMs(s, now);
   const total = s.rest?.totalMs ?? 1;
   const paused = s.rest?.pausedLeftMs != null;
-  const fraction = Math.max(0, Math.min(1, left / total));
   const lg = s.lastLog;
+
+  // The ring drains continuously on the UI thread (a 4×/s re-render made it
+  // step). It re-syncs from the absolute end time whenever the rest changes:
+  // start, ±15, pause, resume — and stays right after the phone was locked.
+  const rest = s.rest;
+  const progress = useSharedValue(1);
+  useEffect(() => {
+    if (!rest) return;
+    const now = Date.now();
+    const leftNow = rest.pausedLeftMs ?? Math.max(0, rest.endsAt - now);
+    cancelAnimation(progress);
+    progress.set(Math.max(0, Math.min(1, leftNow / rest.totalMs)));
+    if (rest.pausedLeftMs == null && leftNow > 0) {
+      progress.set(withTiming(0, { duration: leftNow, easing: Easing.linear }));
+    }
+  }, [rest, progress]);
+  const ringProps = useAnimatedProps(() => ({ strokeDashoffset: CIRCUMFERENCE * (1 - progress.get()) }));
 
   // "Up next": the same exercise keeps the numbers just logged; another one
   // shows its own starting numbers.
@@ -117,7 +137,7 @@ export function RestView({
           <View style={{ width: RING, height: RING }}>
             <Svg width={RING} height={RING} style={{ transform: [{ rotate: "-90deg" }] }}>
               <Circle cx={RING / 2} cy={RING / 2} r={RADIUS} fill="none" stroke={colors.iron3} strokeWidth={STROKE} />
-              <Circle
+              <AnimatedCircle
                 cx={RING / 2}
                 cy={RING / 2}
                 r={RADIUS}
@@ -126,7 +146,7 @@ export function RestView({
                 strokeWidth={STROKE}
                 strokeLinecap="round"
                 strokeDasharray={CIRCUMFERENCE}
-                strokeDashoffset={CIRCUMFERENCE * (1 - fraction)}
+                animatedProps={ringProps}
               />
             </Svg>
             <View
