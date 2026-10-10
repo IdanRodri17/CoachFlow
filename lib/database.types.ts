@@ -265,6 +265,8 @@ export type Database = {
           // V17 (0019): morning-of sends, tracked separately from the day-before ones.
           morning_reminded_at: string | null;
           morning_sms_reminded_at: string | null;
+          // V23 (0031): shared by the rows of one repeat insert; null = a one-off.
+          series_id: string | null;
         };
         Insert: {
           id?: string;
@@ -283,6 +285,7 @@ export type Database = {
           sms_reminded_at?: string | null;
           morning_reminded_at?: string | null;
           morning_sms_reminded_at?: string | null;
+          series_id?: string | null;
         };
         Update: {
           id?: string;
@@ -301,6 +304,7 @@ export type Database = {
           sms_reminded_at?: string | null;
           morning_reminded_at?: string | null;
           morning_sms_reminded_at?: string | null;
+          series_id?: string | null;
         };
         Relationships: [];
       };

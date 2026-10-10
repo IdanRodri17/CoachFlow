@@ -2,10 +2,15 @@
 // recurrence. If the trainer typed a one-off name we create an offline client
 // first; then we insert one scheduled workout per date (a single date, or every
 // chosen weekday for N weeks).
+//
+// V23 (Step 11): a repeat that creates more than one workout stamps one shared
+// series_id on every row, so the edit screen can later offer "this and all
+// future" (lib/series.ts). A single workout stays a one-off (null).
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import { randomUUID } from "expo-crypto";
 
 import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
@@ -78,6 +83,7 @@ function NewScheduleScreenBody() {
       // on the button and the rows inserted can't disagree (lib/schedule.ts,
       // unit-tested).
       const dates = expandScheduleDates(payload.date, payload.repeat);
+      const series_id = dates.length > 1 ? randomUUID() : null;
 
       const rows = dates.map((d) => ({
         trainer_id: trainerId,
@@ -89,6 +95,7 @@ function NewScheduleScreenBody() {
         notes: payload.note,
         with_trainer: payload.withTrainer,
         status: "scheduled" as const,
+        series_id,
       }));
       const { error } = await supabase.from("scheduled_workouts").insert(rows);
       if (error) throw error;
