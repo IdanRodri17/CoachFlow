@@ -31,7 +31,8 @@
       "expo-sharing",
       "expo-status-bar",
       "expo-font",
-      "expo-splash-screen"
+      "expo-splash-screen",
+      "expo-secure-store"
     ],
     "extra": {
       "supportsRTL": true
