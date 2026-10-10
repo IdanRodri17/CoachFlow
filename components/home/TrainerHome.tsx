@@ -12,7 +12,7 @@
 // number comes from the DB views; none is computed or faked here.
 
 import { useEffect, useState } from "react";
-import { Linking, Pressable, ScrollView, View } from "react-native";
+import { Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -31,6 +31,7 @@ import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
 import { useRosterClients, type RosterClient } from "@/lib/useRoster";
+import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import { buildWhatsAppReminderLink } from "@/lib/whatsapp";
 import {
   AppText,
@@ -156,10 +157,22 @@ export function TrainerHome() {
     (s) => s.status === "scheduled" && s.scheduled_time && minutesOf(s.scheduled_time) >= nowMin - NEXT_GRACE_MINUTES,
   );
 
+  // Pull down: today's sessions + the attention feed (under scheduled-trainer),
+  // the roster, money, the next-up card's client context.
+  const refresh = usePullToRefresh([
+    qk.scheduledTrainer.all,
+    qk.roster.all,
+    qk.money.all,
+    qk.clientRisk.all,
+    qk.clientContext.all,
+    qk.templates.all,
+  ]);
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.chalk }}
       contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 24, gap: 24 }}
+      refreshControl={<RefreshControl {...refresh} />}
     >
       {/* Header */}
       <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>

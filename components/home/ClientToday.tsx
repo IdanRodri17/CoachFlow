@@ -19,7 +19,7 @@
 // "חזרה לאימון" card sits at the top and reopens it where it was left.
 
 import { useCallback } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +46,7 @@ import { addDays, todayISO, weekStartOf } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
 import { listOpenWorkouts, type OpenWorkout } from "@/lib/useWorkoutSession";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
+import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import {
   AppText,
   Button,
@@ -210,10 +211,23 @@ export function ClientToday() {
   const left = pkg.data ? pkg.data.total_sessions - pkg.data.used_sessions : null;
   const hasTrainer = (trainerLinks.data ?? 0) > 0;
 
+  // Pull down: everything on this screen, including the open-workout card.
+  const refresh = usePullToRefresh([
+    qk.scheduledClient.all,
+    qk.package.all,
+    qk.clientStreak.all,
+    qk.checkIns.all,
+    qk.myTrainerLinks.all,
+    qk.myTrainer.all,
+    qk.templates.all,
+    qk.workout.open(clientId),
+  ]);
+
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.chalk }}
       contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 24, gap: 22 }}
+      refreshControl={<RefreshControl {...refresh} />}
     >
       <View style={{ gap: 6 }}>
         <AppText size={14} weight="medium" tone="smoke">
