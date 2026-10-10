@@ -1070,5 +1070,22 @@
     "submitMany_one": "Schedule 1 session",
     "submitMany_two": "Schedule {{count}} sessions",
     "submitMany_other": "Schedule {{count}} sessions"
+  },
+  "nutrition": {
+    "title": "Nutrition",
+    "fromTrainer": "The menu from {{name}} · updated {{date}}",
+    "updated": "Updated {{date}}",
+    "dailyTarget": "Daily target",
+    "kcal": "kcal",
+    "protein": "Protein",
+    "carbs": "Carbs",
+    "fat": "Fat",
+    "grams": "g",
+    "oneDay": "A sample day",
+    "noneTitle": "No menu yet",
+    "noneHintName": "The menu from {{name}} will show up here.",
+    "disclaimer": "General suggestions only — not medical or nutrition advice.",
+    "askOnWhatsApp": "Ask {{name}} on WhatsApp",
+    "waQuestion": "Hi {{name}}, a question about my menu: "
   }
 }

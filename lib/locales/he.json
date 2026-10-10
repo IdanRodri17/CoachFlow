@@ -1070,5 +1070,22 @@
     "submitMany_one": "קביעת אימון אחד",
     "submitMany_two": "קביעת {{count}} אימונים",
     "submitMany_other": "קביעת {{count}} אימונים"
+  },
+  "nutrition": {
+    "title": "תזונה",
+    "fromTrainer": "התפריט מ{{name}} · עודכן ב-{{date}}",
+    "updated": "עודכן ב-{{date}}",
+    "dailyTarget": "יעד יומי",
+    "kcal": "קק״ל",
+    "protein": "חלבון",
+    "carbs": "פחמימות",
+    "fat": "שומן",
+    "grams": "ג׳",
+    "oneDay": "תפריט ליום אחד",
+    "noneTitle": "עוד אין תפריט",
+    "noneHintName": "התפריט מ{{name}} יופיע כאן.",
+    "disclaimer": "הצעות כלליות בלבד — לא ייעוץ רפואי או תזונתי.",
+    "askOnWhatsApp": "שאלה ל{{name}} בוואטסאפ",
+    "waQuestion": "היי {{name}}, שאלה על התפריט: "
   }
 }
