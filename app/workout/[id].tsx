@@ -29,6 +29,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { formatDisplayDate, toDateString, todayISO } from "@/lib/dates";
 import { useWorkoutPrefs } from "@/lib/workoutPrefs";
+import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import {
   clearSavedWorkout,
   loadSavedWorkout,
@@ -299,6 +300,7 @@ function WorkoutMode({
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const prefs = useWorkoutPrefs();
+  const trainerName = trainerFirstName(useMyTrainer().data);
   const session = useWorkoutSession({
     scheduledId: data.scheduledId,
     title: data.title ?? t("workout.freeWorkout"),
@@ -436,6 +438,7 @@ function WorkoutMode({
         <SetView
           session={session}
           title={title}
+          trainerName={trainerName}
           onMinimize={minimize}
           onOverview={() => setSheet("overview")}
           onDemo={demoUrl ? () => setSheet("demo") : undefined}
@@ -448,6 +451,7 @@ function WorkoutMode({
         <FinishView
           subtitle={`${title} · ${longDate(todayISO(), i18n.language)}`}
           startedAt={s.startedAt}
+          trainerName={trainerName}
           showDuration={data.exercises.length > 0}
           sets={setsLogged(s)}
           streak={finishStreak}
@@ -465,6 +469,7 @@ function WorkoutMode({
         exerciseName={name}
         exerciseLabel={t("workout.mode.exerciseOf", { n: s.ex + 1, total: data.exercises.length })}
         muscleGroup={isSwapped(s, s.ex) ? null : current?.muscleGroup}
+        trainerName={trainerName}
         library={swapLibrary}
         onClose={() => setSheet(null)}
         onConfirm={confirmAdjust}

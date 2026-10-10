@@ -58,6 +58,7 @@ export function AdjustmentModal({
   exerciseName,
   exerciseLabel,
   muscleGroup,
+  trainerName,
   library,
   onClose,
   onConfirm,
@@ -70,6 +71,8 @@ export function AdjustmentModal({
   exerciseLabel?: string;
   /** The current exercise's muscle group — its matches are suggested first. */
   muscleGroup?: string | null;
+  /** The trainer's first name for "… יופיעו אצל אלון", when known. */
+  trainerName?: string | null;
   library: AdjustmentLibraryItem[]; // substitutes (current exercise excluded)
   onClose: () => void;
   onConfirm: (result: AdjustmentResult) => void;
@@ -84,6 +87,7 @@ export function AdjustmentModal({
           exerciseName={exerciseName}
           exerciseLabel={exerciseLabel}
           muscleGroup={muscleGroup}
+          trainerName={trainerName}
           library={library}
           onClose={onClose}
           onConfirm={onConfirm}
@@ -98,6 +102,7 @@ function AdjustmentBody({
   exerciseName,
   exerciseLabel,
   muscleGroup,
+  trainerName,
   library,
   onClose,
   onConfirm,
@@ -106,6 +111,7 @@ function AdjustmentBody({
   exerciseName: string;
   exerciseLabel?: string;
   muscleGroup?: string | null;
+  trainerName?: string | null;
   library: AdjustmentLibraryItem[];
   onClose: () => void;
   onConfirm: (result: AdjustmentResult) => void;
@@ -243,7 +249,11 @@ function AdjustmentBody({
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
         <Icon icon={Info} size={16} color={colors.ash} />
         <AppText size={13} tone="ash" style={{ flexShrink: 1 }}>
-          {mode === "swap" ? t("workout.adjust.trainerSeesSwap") : t("workout.adjust.trainerSeesSkip")}
+          {trainerName
+            ? t(mode === "swap" ? "workout.adjust.trainerSeesSwapName" : "workout.adjust.trainerSeesSkipName", {
+                name: trainerName,
+              })
+            : t(mode === "swap" ? "workout.adjust.trainerSeesSwap" : "workout.adjust.trainerSeesSkip")}
         </AppText>
       </View>
 

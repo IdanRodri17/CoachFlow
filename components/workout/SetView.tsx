@@ -55,7 +55,7 @@ const NUMBER_ACCESSORY_ID = "workout-number-entry";
 export function SetView({
   session,
   title,
-  trainerInitial,
+  trainerName,
   onMinimize,
   onOverview,
   onDemo,
@@ -65,8 +65,8 @@ export function SetView({
   session: WorkoutSession;
   /** Workout (template) name for the header. */
   title: string;
-  /** First letter of the trainer's name for the target line, when known. */
-  trainerInitial?: string;
+  /** The trainer's first name for the target line (rpc my_trainer), when known. */
+  trainerName?: string | null;
   onMinimize: () => void;
   onOverview: () => void;
   onDemo?: () => void;
@@ -134,7 +134,7 @@ export function SetView({
           </Display>
           {target != null ? (
             <View style={{ flexDirection: "row", alignItems: "center", gap: 8, marginTop: 6 }}>
-              {trainerInitial ? (
+              {trainerName ? (
                 <View
                   style={{
                     width: 22,
@@ -146,12 +146,14 @@ export function SetView({
                   }}
                 >
                   <AppText size={11} weight="bold" lineHeight={14} center>
-                    {trainerInitial}
+                    {trainerName.slice(0, 1)}
                   </AppText>
                 </View>
               ) : null}
               <AppText size={14} tone="ash">
-                {t("workout.mode.targetRaised", { weight: ltr(formatWeight(target)) })}
+                {trainerName
+                  ? t("workout.mode.targetRaisedBy", { name: trainerName, weight: ltr(formatWeight(target)) })
+                  : t("workout.mode.targetRaised", { weight: ltr(formatWeight(target)) })}
               </AppText>
             </View>
           ) : null}

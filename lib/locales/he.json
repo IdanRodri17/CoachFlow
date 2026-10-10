@@ -498,7 +498,8 @@
       "leave": "יציאה",
       "closeDemo": "סגירת ההדגמה",
       "tapToType": "הקשה כדי להקליד מספר",
-      "doneTyping": "סיום"
+      "doneTyping": "סיום",
+      "targetRaisedBy": "{{name}}: יעד חדש {{weight}} ק״ג"
     },
     "adjust": {
       "close": "סגירה",
@@ -517,7 +518,9 @@
       "trainerSeesSwap": "המאמן שלך יראה את ההחלפה ואת הסיבה",
       "trainerSeesSkip": "המאמן שלך יראה שדילגת ולמה",
       "skipCta": "דילוג על התרגיל",
-      "swapCta": "החלפה ל{{name}}"
+      "swapCta": "החלפה ל{{name}}",
+      "trainerSeesSwapName": "ההחלפה והסיבה יופיעו אצל {{name}}",
+      "trainerSeesSkipName": "הדילוג והסיבה יופיעו אצל {{name}}"
     },
     "overview": {
       "close": "סגירה",
@@ -559,7 +562,8 @@
       },
       "freePlaceholder": "הערה למאמן",
       "save": "שמירה וסיום",
-      "share": "שיתוף ההתקדמות"
+      "share": "שיתוף ההתקדמות",
+      "notesTitleName": "משהו לספר ל{{name}}?"
     },
     "alerts": {
       "channelName": "סוף מנוחה",
@@ -767,7 +771,9 @@
       "startedHours_one": "התחלת לפני שעה",
       "startedHours_two": "התחלת לפני שעתיים",
       "startedHours_other": "התחלת לפני {{count}} שעות"
-    }
+    },
+    "noteFrom": "הערה מ{{name}}",
+    "withName": "עם {{name}}"
   },
   "trainerHome": {
     "settings": "הגדרות ופרופיל",

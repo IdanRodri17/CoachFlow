@@ -37,6 +37,12 @@ export const qk = {
     byClient: (clientId: Id) => ["my-trainer-links", clientId] as const,
   },
 
+  /** rpc("my_trainer") — the client's trainer (name on the client screens). */
+  myTrainer: {
+    all: ["my-trainer"] as const,
+    own: (clientId: Id) => ["my-trainer", clientId] as const,
+  },
+
   /** The trainer's scheduled workouts — calendar, Home's today list, busy times, edit screen. */
   scheduledTrainer: {
     all: ["scheduled-trainer"] as const,

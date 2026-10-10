@@ -11,8 +11,9 @@
 // Nothing here is stored or faked: statuses are derived on read (SRS §4.1),
 // the streak comes from client_streaks, sessions left from packages.
 //
-// The trainer's name isn't readable by clients yet (my_trainer(), main B1), so
-// the copy says "your trainer" for now.
+// The trainer's first name comes from rpc("my_trainer") (lib/useMyTrainer.ts):
+// "עם אלון", "הערה מאלון"; the generic copy shows while it loads or when the
+// client has no trainer.
 //
 // D20g: while a workout is open (saved on the phone, not finished), a dark
 // "חזרה לאימון" card sits at the top and reopens it where it was left.
@@ -44,6 +45,7 @@ import { useAuth } from "@/lib/auth";
 import { addDays, todayISO, weekStartOf } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
 import { listOpenWorkouts, type OpenWorkout } from "@/lib/useWorkoutSession";
+import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import {
   AppText,
   Button,
@@ -494,6 +496,7 @@ function HeroCard({
   moving: boolean;
 }) {
   const { t, i18n } = useTranslation();
+  const trainer = trainerFirstName(useMyTrainer().data);
   const done = item.status === "completed";
 
   const preview = useQuery({
@@ -532,7 +535,16 @@ function HeroCard({
           </AppText>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             {done ? <Chip kind="done" label={t("today.done")} /> : null}
-            <DarkChip icon={item.with_trainer ? Users : User} label={item.with_trainer ? t("today.withTrainer") : t("today.solo")} />
+            <DarkChip
+              icon={item.with_trainer ? Users : User}
+              label={
+                item.with_trainer
+                  ? trainer
+                    ? t("today.withName", { name: trainer })
+                    : t("today.withTrainer")
+                  : t("today.solo")
+              }
+            />
             {item.scheduled_time ? <DarkChip icon={Clock} label={ltr(item.scheduled_time.slice(0, 5))} /> : null}
           </View>
         </View>
@@ -574,7 +586,7 @@ function HeroCard({
           </View>
           <View style={{ flex: 1, gap: 2 }}>
             <AppText size={13} tone="ash">
-              {t("today.noteFromTrainer")}
+              {trainer ? t("today.noteFrom", { name: trainer }) : t("today.noteFromTrainer")}
             </AppText>
             <AppText size={15} lineHeight={22} tone="bone">
               {`"${item.notes}"`}
@@ -665,6 +677,7 @@ function UpNextRow({
   onLater: () => void;
 }) {
   const { t, i18n } = useTranslation();
+  const trainer = trainerFirstName(useMyTrainer().data);
   return (
     <View style={{ flexDirection: "row", alignItems: "center", gap: 14, paddingVertical: 12, paddingHorizontal: 16, minHeight: 72 }}>
       <Pressable
@@ -687,7 +700,13 @@ function UpNextRow({
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 6 }}>
             <Chip
               kind={item.with_trainer ? "trainer" : "solo"}
-              label={item.with_trainer ? t("today.withTrainer") : t("today.solo")}
+              label={
+                item.with_trainer
+                  ? trainer
+                    ? t("today.withName", { name: trainer })
+                    : t("today.withTrainer")
+                  : t("today.solo")
+              }
             />
             {item.scheduled_time ? <Chip kind="neutral" icon={Clock} label={ltr(item.scheduled_time.slice(0, 5))} /> : null}
           </View>

@@ -498,7 +498,8 @@
       "leave": "Leave",
       "closeDemo": "Close the demo",
       "tapToType": "Tap to type the number",
-      "doneTyping": "Done"
+      "doneTyping": "Done",
+      "targetRaisedBy": "{{name}} raised the target to {{weight}} kg"
     },
     "adjust": {
       "close": "Close",
@@ -517,7 +518,9 @@
       "trainerSeesSwap": "Your trainer will see the swap and the reason",
       "trainerSeesSkip": "Your trainer will see that you skipped and why",
       "skipCta": "Skip the exercise",
-      "swapCta": "Swap for {{name}}"
+      "swapCta": "Swap for {{name}}",
+      "trainerSeesSwapName": "{{name}} will see the swap and the reason",
+      "trainerSeesSkipName": "{{name}} will see that you skipped and why"
     },
     "overview": {
       "close": "Close",
@@ -559,7 +562,8 @@
       },
       "freePlaceholder": "Write a note for your trainer",
       "save": "Save and finish",
-      "share": "Share your progress"
+      "share": "Share your progress",
+      "notesTitleName": "Anything {{name}} should know?"
     },
     "alerts": {
       "channelName": "Rest timer",
@@ -767,7 +771,9 @@
       "startedHours_one": "started an hour ago",
       "startedHours_two": "started {{count}} hours ago",
       "startedHours_other": "started {{count}} hours ago"
-    }
+    },
+    "noteFrom": "Note from {{name}}",
+    "withName": "With {{name}}"
   },
   "trainerHome": {
     "settings": "Settings and profile",

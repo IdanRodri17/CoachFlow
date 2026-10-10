@@ -42,6 +42,7 @@ export default function JoinScreen() {
       // The client's Home reads both: the join card disappears and the
       // trainer's scheduled workouts show up.
       queryClient.invalidateQueries({ queryKey: qk.myTrainerLinks.all });
+      queryClient.invalidateQueries({ queryKey: qk.myTrainer.all });
       queryClient.invalidateQueries({ queryKey: qk.scheduledClient.all });
       router.replace("/");
     },
