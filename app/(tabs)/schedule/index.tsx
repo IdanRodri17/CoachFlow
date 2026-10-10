@@ -9,9 +9,12 @@
 // Client management (add app/offline client, roster, contact phone) moved
 // to app/clients.tsx (V14) so this tab stays purely "what's next" — reached
 // from a button on the trainer Home instead.
+//
+// V19 (Step 2c): pull down on the day list to refetch the calendar, the
+// roster and template names (lib/usePullToRefresh.ts).
 
 import { useState } from "react";
-import { ActivityIndicator, Linking, Pressable, ScrollView, Text, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Link, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -22,6 +25,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
+import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import {
   addDays,
   addMonths,
@@ -152,6 +156,8 @@ function ScheduleHomeScreenBody() {
 
   const dayItems = byDay.get(selectedDate) ?? [];
 
+  const refresh = usePullToRefresh([qk.scheduledTrainer.all, qk.roster.all, qk.templates.all]);
+
   return (
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <View className="flex-row items-center gap-2 px-6 pt-4">
@@ -188,7 +194,7 @@ function ScheduleHomeScreenBody() {
         />
       )}
 
-      <ScrollView contentContainerClassName="px-6 pb-6 pt-4">
+      <ScrollView contentContainerClassName="px-6 pb-6 pt-4" refreshControl={<RefreshControl {...refresh} />}>
         <Text className="w-full text-left text-lg font-bold text-slate-900">
           {formatDisplayDate(selectedDate, localeName(i18n.language))}
         </Text>

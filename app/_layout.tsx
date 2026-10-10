@@ -27,12 +27,19 @@
 // from its own subpath: the package roots require every weight's .ttf, and
 // Metro doesn't tree-shake, so that would bundle 28 files instead of 7. The
 // map keys are the fontFamily names tailwind.config.js uses.
+//
+// V19 (Step 2c): one AppState listener tells TanStack Query and Supabase Auth
+// whether the app is in the foreground. React Native has no window focus
+// event, so without it nothing refetched when the app came back: a workout a
+// client completed on their phone never reached the trainer's open calendar.
+// Now returning to the app refetches every stale query on screen (staleTime
+// below), and Supabase only runs its token-refresh timer while in front.
 
 import "../global.css";
 import "@/lib/i18n";
 
 import { useEffect } from "react";
-import { View } from "react-native";
+import { AppState, Platform, View } from "react-native";
 import { LocaleProvider, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -45,11 +52,12 @@ import { IBMPlexSansHebrew_600SemiBold } from "@expo-google-fonts/ibm-plex-sans-
 import { IBMPlexSansHebrew_700Bold } from "@expo-google-fonts/ibm-plex-sans-hebrew/700Bold";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { layoutDirection, restoreSavedLocale } from "@/lib/i18n";
 import { AuthProvider } from "@/lib/auth";
+import { supabase } from "@/lib/supabase";
 
 // Keep the splash up until the fonts are in (hidden in RootLayout below).
 // Module scope, per the SDK 57 docs, so it runs before the first render.
@@ -83,6 +91,21 @@ export default function RootLayout() {
   // from the device-locale default lib/i18n started with.
   useEffect(() => {
     restoreSavedLocale();
+  }, []);
+
+  // Per TanStack Query's and Supabase's React Native guides. On web both
+  // libraries already follow the page's visibility themselves.
+  useEffect(() => {
+    if (Platform.OS === "web") return;
+    const subscription = AppState.addEventListener("change", (status) => {
+      const active = status === "active";
+      // Token refresh first: refetches that start before it finishes still
+      // wait for a valid token (supabase-js checks the session per request).
+      if (active) supabase.auth.startAutoRefresh();
+      else supabase.auth.stopAutoRefresh();
+      focusManager.setFocused(active);
+    });
+    return () => subscription.remove();
   }, []);
 
   // A font that fails to load must not lock the app behind the splash: text
