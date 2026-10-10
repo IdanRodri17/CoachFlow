@@ -2,6 +2,7 @@
 // index (roster + upcoming) -> new (assign a workout).
 //
 // D24b: native headers styled to the design — chalk, no shadow, 17/600 title.
+// D24a: the calendar draws its own "יומן" header.
 
 import { Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -21,7 +22,7 @@ export default function ScheduleStackLayout() {
         contentStyle: { backgroundColor: colors.chalk },
       }}
     >
-      <Stack.Screen name="index" options={{ title: t("schedule.home.title") }} />
+      <Stack.Screen name="index" options={{ title: t("schedule.home.title"), headerShown: false }} />
       <Stack.Screen name="new" options={{ title: t("schedule.home.scheduleWorkout") }} />
       <Stack.Screen name="[id]" options={{ title: t("schedule.home.editWorkout") }} />
     </Stack>

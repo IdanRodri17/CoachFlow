@@ -29,7 +29,8 @@ function NewScheduleScreenBody() {
   const router = useRouter();
   const queryClient = useQueryClient();
   // D29a: "קביעה" on a template card opens this form with it already picked.
-  const { templateId } = useLocalSearchParams<{ templateId?: string }>();
+  // D24a: "קביעה" on a free calendar slot opens it at that date and time.
+  const { templateId, date, time } = useLocalSearchParams<{ templateId?: string; date?: string; time?: string }>();
 
   const trainerId = session!.user.id;
 
@@ -101,7 +102,7 @@ function NewScheduleScreenBody() {
       submitting={mutation.isPending}
       errorMessage={mutation.error ? (mutation.error as Error).message : null}
       onSubmit={(payload) => mutation.mutate(payload)}
-      initial={templateId ? { templateId } : undefined}
+      initial={templateId || date ? { templateId: templateId ?? null, date, time: time ?? null } : undefined}
       allowRepeat
     />
   );
