@@ -146,3 +146,113 @@ export function frequentClientsQuery(trainerId: string, from: string, to: string
     },
   });
 }
+
+export type ClientContext = {
+  /** The intake answers that matter at session time (app clients). */
+  intake: { goals: string | null; injuries: string | null } | null;
+  pkg: { total_sessions: number; used_sessions: number } | null;
+  /** The last completed workout the client logged (app clients). */
+  last: {
+    id: string;
+    completedAt: string;
+    effort: number | null;
+    note: string | null;
+    minutes: number | null;
+    templateName: string | null;
+    sets: number;
+    prs: { exercise: string; weight: number | null; reps: number | null }[];
+    changes: { action: "skipped" | "swapped"; exercise: string; swappedFor: string | null; reason: string | null }[];
+  } | null;
+};
+
+/** The client at session time (DESIGN.md §8, roadmap V26): intake goal and
+ * injuries, the last completed session (effort, note, duration, sets, PRs,
+ * swaps/skips with reasons) and the package balance. The trainer Home's
+ * next-up card and the client card (D26b) both read it. Offline clients have
+ * no logs or intake yet, so only their package comes back. */
+export function clientContextQuery(kind: "app" | "managed", refId: string) {
+  return queryOptions({
+    queryKey: qk.clientContext.subject(kind, refId),
+    queryFn: async (): Promise<ClientContext> => {
+      const [intakeRes, logRes, pkgRes] = await Promise.all([
+        kind === "app"
+          ? supabase.from("profiles").select("intake").eq("id", refId).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        kind === "app"
+          ? supabase
+              .from("workout_logs")
+              .select("id, scheduled_workout_id, completed_at, effort_rating, client_note, duration_seconds")
+              .eq("client_id", refId)
+              .order("completed_at", { ascending: false })
+              .limit(1)
+              .maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        supabase
+          .from("packages")
+          .select("total_sessions, used_sessions")
+          .eq(kind === "app" ? "client_id" : "managed_client_id", refId)
+          .maybeSingle(),
+      ]);
+      if (intakeRes.error) throw intakeRes.error;
+      if (logRes.error) throw logRes.error;
+      if (pkgRes.error) throw pkgRes.error;
+
+      // intake is client-written jsonb: only strings count.
+      const raw = (intakeRes.data?.intake ?? null) as Record<string, unknown> | null;
+      const text = (v: unknown) => (typeof v === "string" && v.trim() ? v.trim() : null);
+      const intake = raw ? { goals: text(raw.goals), injuries: text(raw.injuries) } : null;
+
+      const log = logRes.data;
+      if (!log) return { intake, pkg: pkgRes.data, last: null };
+
+      const [swRes, setsRes, adjRes] = await Promise.all([
+        supabase.from("scheduled_workouts").select("template_id").eq("id", log.scheduled_workout_id).maybeSingle(),
+        supabase.from("set_logs").select("exercise_id, reps, weight, is_pr").eq("workout_log_id", log.id),
+        supabase
+          .from("exercise_adjustments")
+          .select("action, exercise_id, swapped_for_exercise_id, reason")
+          .eq("workout_log_id", log.id),
+      ]);
+      if (setsRes.error) throw setsRes.error;
+      if (adjRes.error) throw adjRes.error;
+
+      const prSets = setsRes.data.filter((s) => s.is_pr);
+      const exIds = [
+        ...new Set([
+          ...prSets.map((s) => s.exercise_id),
+          ...adjRes.data.flatMap((a) => [a.exercise_id, a.swapped_for_exercise_id].filter(Boolean) as string[]),
+        ]),
+      ];
+      const [tplRes, exRes] = await Promise.all([
+        swRes.data?.template_id
+          ? supabase.from("workout_templates").select("name").eq("id", swRes.data.template_id).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
+        exIds.length > 0
+          ? supabase.from("exercises").select("id, name").in("id", exIds)
+          : Promise.resolve({ data: [] as { id: string; name: string }[], error: null }),
+      ]);
+      const exName = new Map((exRes.data ?? []).map((e) => [e.id, e.name]));
+
+      return {
+        intake,
+        pkg: pkgRes.data,
+        last: {
+          id: log.id,
+          completedAt: log.completed_at,
+          effort: log.effort_rating,
+          note: log.client_note,
+          minutes: log.duration_seconds != null ? Math.round(log.duration_seconds / 60) : null,
+          templateName: tplRes.data?.name ?? null,
+          sets: setsRes.data.length,
+          prs: prSets.map((s) => ({ exercise: exName.get(s.exercise_id) ?? "—", weight: s.weight, reps: s.reps })),
+          changes: adjRes.data.map((a) => ({
+            action: a.action,
+            exercise: exName.get(a.exercise_id) ?? "—",
+            swappedFor: a.swapped_for_exercise_id ? (exName.get(a.swapped_for_exercise_id) ?? null) : null,
+            reason: a.reason,
+          })),
+        },
+      };
+    },
+  });
+}

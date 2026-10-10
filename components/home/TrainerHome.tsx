@@ -48,7 +48,7 @@ import {
   Num,
 } from "@/components/ui";
 
-import { todaySessionsQuery, type TodaySession } from "@/lib/queries";
+import { clientContextQuery, todaySessionsQuery, type TodaySession } from "@/lib/queries";
 
 import { AttentionFeed } from "./AttentionFeed";
 import { formatMoney, greetingKey, localMinutesNow, longDate, minutesOf, monthName, firstName } from "./format";
@@ -355,31 +355,9 @@ function NextUpCard({
   const kind = s.client_id ? "app" : "managed";
   const refId = (s.client_id ?? s.managed_client_id) as string;
 
-  // Last effort / note (app clients log their own) + the package balance.
-  const context = useQuery({
-    queryKey: qk.clientContext.subject(kind, refId),
-    queryFn: async () => {
-      const [logRes, pkgRes] = await Promise.all([
-        kind === "app"
-          ? supabase
-              .from("workout_logs")
-              .select("effort_rating, client_note")
-              .eq("client_id", refId)
-              .order("completed_at", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
-        supabase
-          .from("packages")
-          .select("total_sessions, used_sessions")
-          .eq(kind === "app" ? "client_id" : "managed_client_id", refId)
-          .maybeSingle(),
-      ]);
-      if (logRes.error) throw logRes.error;
-      if (pkgRes.error) throw pkgRes.error;
-      return { log: logRes.data, pkg: pkgRes.data };
-    },
-  });
+  // Last effort / note (app clients log their own) + the package balance —
+  // the shared client context (lib/queries.ts), also on the client card.
+  const context = useQuery(clientContextQuery(kind, refId));
 
   const until =
     minutesUntil <= 0
@@ -388,15 +366,15 @@ function NextUpCard({
         ? t("trainerHome.inMinutes", { count: minutesUntil })
         : t("trainerHome.inHours", { hours: Math.floor(minutesUntil / 60), minutes: minutesUntil % 60 });
 
-  const log = context.data?.log;
+  const log = context.data?.last;
   const pkg = context.data?.pkg;
   const effortLine =
-    log?.effort_rating != null && log.client_note
-      ? t("trainerHome.lastEffortNote", { effort: log.effort_rating, note: log.client_note })
-      : log?.effort_rating != null
-        ? t("trainerHome.lastEffort", { effort: log.effort_rating })
-        : log?.client_note
-          ? t("trainerHome.lastNote", { note: log.client_note })
+    log?.effort != null && log.note
+      ? t("trainerHome.lastEffortNote", { effort: log.effort, note: log.note })
+      : log?.effort != null
+        ? t("trainerHome.lastEffort", { effort: log.effort })
+        : log?.note
+          ? t("trainerHome.lastNote", { note: log.note })
           : null;
   const packageLine =
     pkg && pkg.total_sessions > 0
