@@ -31,6 +31,8 @@ export type Database = {
           // B3 (0025): trainer's business defaults; null = not set.
           default_price_per_session: number | null;
           business_name: string | null;
+          // B4 (0028): client opt-out for SMS reminders; default on.
+          sms_reminders_enabled: boolean;
         };
         Insert: {
           id: string;
@@ -45,6 +47,7 @@ export type Database = {
           created_at?: string;
           default_price_per_session?: number | null;
           business_name?: string | null;
+          sms_reminders_enabled?: boolean;
         };
         Update: {
           id?: string;
@@ -59,6 +62,7 @@ export type Database = {
           created_at?: string;
           default_price_per_session?: number | null;
           business_name?: string | null;
+          sms_reminders_enabled?: boolean;
         };
         Relationships: [];
       };
