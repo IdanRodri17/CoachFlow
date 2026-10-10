@@ -87,3 +87,62 @@ export function clientStreakQuery(clientId: string) {
     },
   });
 }
+
+export type TodaySession = {
+  id: string;
+  client_id: string | null;
+  managed_client_id: string | null;
+  template_id: string | null;
+  scheduled_time: string | null;
+  status: "scheduled" | "completed";
+  with_trainer: boolean;
+  template_name: string;
+};
+
+/** The trainer's sessions on one day, in time order, with template names — the
+ * trainer Home's "היום" and quick-add's "מחכה לך". Under scheduled-trainer, so
+ * every schedule mutation refreshes it. */
+export function todaySessionsQuery(trainerId: string, date: string) {
+  return queryOptions({
+    queryKey: qk.scheduledTrainer.today(date),
+    queryFn: async (): Promise<TodaySession[]> => {
+      const { data, error } = await supabase
+        .from("scheduled_workouts")
+        .select("id, client_id, managed_client_id, template_id, scheduled_time, status, with_trainer")
+        .eq("trainer_id", trainerId)
+        .eq("scheduled_date", date)
+        .order("scheduled_time", { ascending: true, nullsFirst: false });
+      if (error) throw error;
+      const tplIds = [...new Set(data.map((x) => x.template_id).filter(Boolean) as string[])];
+      const names = new Map<string, string>();
+      if (tplIds.length > 0) {
+        const { data: tpls } = await supabase.from("workout_templates").select("id, name").in("id", tplIds);
+        tpls?.forEach((tpl) => names.set(tpl.id, tpl.name));
+      }
+      return data.map((x) => ({ ...x, template_name: x.template_id ? (names.get(x.template_id) ?? "—") : "—" }));
+    },
+  });
+}
+
+/** The five clients with the most sessions in the last 30 days (up to today),
+ * as subject keys — quick-add's "קביעה מהירה ל…". */
+export function frequentClientsQuery(trainerId: string, from: string, to: string) {
+  return queryOptions({
+    queryKey: qk.scheduledTrainer.frequent(from),
+    queryFn: async (): Promise<string[]> => {
+      const { data, error } = await supabase
+        .from("scheduled_workouts")
+        .select("client_id, managed_client_id")
+        .eq("trainer_id", trainerId)
+        .gte("scheduled_date", from)
+        .lte("scheduled_date", to);
+      if (error) throw error;
+      const count = new Map<string, number>();
+      data.forEach((w) => {
+        const key = w.client_id ?? `m:${w.managed_client_id}`;
+        count.set(key, (count.get(key) ?? 0) + 1);
+      });
+      return [...count.entries()].sort((a, b) => b[1] - a[1]).slice(0, 5).map(([key]) => key);
+    },
+  });
+}

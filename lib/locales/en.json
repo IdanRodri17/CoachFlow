@@ -877,7 +877,10 @@
     "client": "New client",
     "template": "New template",
     "exercise": "New exercise",
-    "exerciseLibrary": "Exercise library"
+    "exerciseLibrary": "Exercise library",
+    "quickSchedule": "Quick schedule for…",
+    "scheduleFor": "Schedule {{name}}",
+    "waiting": "Waiting for you"
   },
   "today": {
     "greetingMorning": "Good morning, {{name}}",

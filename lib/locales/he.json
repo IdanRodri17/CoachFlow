@@ -877,7 +877,10 @@
     "client": "מתאמן חדש",
     "template": "תבנית חדשה",
     "exercise": "תרגיל חדש",
-    "exerciseLibrary": "ספריית התרגילים"
+    "exerciseLibrary": "ספריית התרגילים",
+    "quickSchedule": "קביעה מהירה ל…",
+    "scheduleFor": "קביעת אימון ל{{name}}",
+    "waiting": "מחכה לך"
   },
   "today": {
     "greetingMorning": "בוקר טוב, {{name}}",

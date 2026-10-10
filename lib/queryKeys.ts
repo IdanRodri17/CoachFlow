@@ -59,6 +59,8 @@ export const qk = {
     /** ₪ owed per client (completed, unpaid × package price) — the clients list.
      * The paid toggle and package price edits invalidate it explicitly. */
     owed: ["scheduled-trainer", "owed"] as const,
+    /** Most-booked clients of the last 30 days — quick-add (D21b). */
+    frequent: (from: string) => ["scheduled-trainer", "frequent", from] as const,
   },
 
   /** The signed-in client's own scheduled workouts. */

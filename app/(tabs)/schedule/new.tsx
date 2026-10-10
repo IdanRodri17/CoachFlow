@@ -30,7 +30,15 @@ function NewScheduleScreenBody() {
   const queryClient = useQueryClient();
   // D29a: "קביעה" on a template card opens this form with it already picked.
   // D24a: "קביעה" on a free calendar slot opens it at that date and time.
-  const { templateId, date, time } = useLocalSearchParams<{ templateId?: string; date?: string; time?: string }>();
+  // D21b: a quick-add avatar opens it with that client picked.
+  const { templateId, date, time, clientKind, clientId } = useLocalSearchParams<{
+    templateId?: string;
+    date?: string;
+    time?: string;
+    clientKind?: "app" | "managed";
+    clientId?: string;
+  }>();
+  const client = clientKind && clientId ? { kind: clientKind, refId: clientId } : undefined;
 
   const trainerId = session!.user.id;
 
@@ -102,7 +110,9 @@ function NewScheduleScreenBody() {
       submitting={mutation.isPending}
       errorMessage={mutation.error ? (mutation.error as Error).message : null}
       onSubmit={(payload) => mutation.mutate(payload)}
-      initial={templateId || date ? { templateId: templateId ?? null, date, time: time ?? null } : undefined}
+      initial={
+        templateId || date || client ? { templateId: templateId ?? null, date, time: time ?? null, client } : undefined
+      }
       allowRepeat
     />
   );

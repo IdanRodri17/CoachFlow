@@ -48,19 +48,12 @@ import {
   Num,
 } from "@/components/ui";
 
+import { todaySessionsQuery, type TodaySession } from "@/lib/queries";
+
 import { AttentionFeed } from "./AttentionFeed";
 import { formatMoney, greetingKey, localMinutesNow, longDate, minutesOf, monthName, firstName } from "./format";
 
-type Session = {
-  id: string;
-  client_id: string | null;
-  managed_client_id: string | null;
-  template_id: string | null;
-  scheduled_time: string | null;
-  status: "scheduled" | "completed";
-  with_trainer: boolean;
-  template_name: string;
-};
+type Session = TodaySession;
 
 /** A session counts as "next" until 10 minutes after its start. */
 const NEXT_GRACE_MINUTES = 10;
@@ -85,28 +78,7 @@ export function TrainerHome() {
   const roster = useRosterClients(trainerId);
 
   // Under "scheduled-trainer", so every existing schedule mutation refreshes it.
-  const todays = useQuery({
-    queryKey: qk.scheduledTrainer.today(today),
-    queryFn: async (): Promise<Session[]> => {
-      const { data, error } = await supabase
-        .from("scheduled_workouts")
-        .select("id, client_id, managed_client_id, template_id, scheduled_time, status, with_trainer")
-        .eq("trainer_id", trainerId)
-        .eq("scheduled_date", today)
-        .order("scheduled_time", { ascending: true, nullsFirst: false });
-      if (error) throw error;
-      const tplIds = [...new Set(data.map((s) => s.template_id).filter(Boolean) as string[])];
-      const names = new Map<string, string>();
-      if (tplIds.length > 0) {
-        const { data: tpls } = await supabase.from("workout_templates").select("id, name").in("id", tplIds);
-        tpls?.forEach((tpl) => names.set(tpl.id, tpl.name));
-      }
-      return data.map((s) => ({
-        ...s,
-        template_name: s.template_id ? names.get(s.template_id) ?? "—" : "—",
-      }));
-    },
-  });
+  const todays = useQuery(todaySessionsQuery(trainerId, today));
 
   const monthKey = `${today.slice(0, 7)}-01`;
   const money = useQuery({
