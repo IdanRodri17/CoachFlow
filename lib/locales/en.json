@@ -1089,6 +1089,39 @@
     "noneHintName": "The menu from {{name}} will show up here.",
     "disclaimer": "General suggestions only — not medical or nutrition advice.",
     "askOnWhatsApp": "Ask {{name}} on WhatsApp",
-    "waQuestion": "Hi {{name}}, a question about my menu: "
+    "waQuestion": "Hi {{name}}, a question about my menu: ",
+    "mealMacros": "Protein {{protein}} · carbs {{carbs}} · fat {{fat}} (g)"
+  },
+  "nutritionAi": {
+    "title": "Nutrition plan",
+    "targetsTitle": "Daily targets",
+    "calories": "Calories",
+    "macroHintClose": "The macros come to {{kcal}} kcal — close to the target.",
+    "macroHintOver": "The macros come to {{kcal}} kcal — {{diff}} over the target.",
+    "macroHintUnder": "The macros come to {{kcal}} kcal — {{diff}} under the target.",
+    "macroHintOnly": "The macros come to {{kcal}} kcal.",
+    "macroHintEmpty": "Protein and carbs are 4 kcal a gram, fat is 9.",
+    "prefsTitle": "Preferences",
+    "diet": {
+      "vegetarian": "Vegetarian",
+      "vegan": "Vegan",
+      "kosher": "Kosher",
+      "glutenFree": "Gluten-free",
+      "lactoseFree": "Lactose-free",
+      "nutFree": "Nut-free"
+    },
+    "notePlaceholder": "Anything else? e.g. no fish (optional)",
+    "mealsPerDay": "Meals a day",
+    "mealsPrompt": "{{count}} meals a day",
+    "generate": "Create a plan",
+    "resultTitle": "A sample day",
+    "justCreated": "Just created",
+    "savedTitle": "Current plan",
+    "savedOn": "Saved {{date}}",
+    "saveShare": "Save and share with {{name}}",
+    "saveOnly": "Save",
+    "regenerate": "Create again",
+    "disclaimer": "General suggestions only — not medical or dietary advice.",
+    "disclaimerName": "General suggestions only — not medical or dietary advice. {{name}} sees the same note."
   }
 }

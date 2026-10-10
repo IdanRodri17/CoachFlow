@@ -9,9 +9,9 @@
 // carbs and fat tiles, from nutrition_plans.targets); the day's meals as
 // cards; the disclaimer; and "שאלה ל{trainer} בוואטסאפ" (the trainer's phone
 // from rpc my_trainer — hidden without one). The plan is stored as plain text
-// (supabase/functions/nutrition-suggest): a blank line before each meal, the
-// meal's name on its first line, the disclaimer as the last line — so each
-// block becomes a card and the disclaimer line moves to the footer.
+// (supabase/functions/nutrition-suggest); lib/nutritionPlan.ts reads it into
+// meals with their kcal and macros, the disclaimer line moves to the footer,
+// and a plan that reads as no meals shows as plain text.
 
 import { Linking, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
@@ -27,26 +27,11 @@ import { useAuth } from "@/lib/auth";
 import { toDateString } from "@/lib/dates";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { parsePlan, type PlanMeal } from "@/lib/nutritionPlan";
 import { formatMoney } from "@/components/home/format";
 import { AppText, Button, Card, colors, Display, Icon, Num } from "@/components/ui";
 
 type Targets = { calories?: number; protein_g?: number; carbs_g?: number; fat_g?: number };
-
-/** The edge function's last line (both languages), shown in the footer instead. */
-const DISCLAIMER_HINTS = ["לא ייעוץ רפואי", "not medical"];
-
-/** Plain-text plan → meal blocks: { title, body }. */
-function mealBlocks(plan: string): { title: string; body: string }[] {
-  return plan
-    .replace(/\r/g, "")
-    .split(/\n\s*\n/)
-    .map((b) => b.trim())
-    .filter((b) => b && !DISCLAIMER_HINTS.some((h) => b.includes(h) && b.split("\n").length === 1))
-    .map((b) => {
-      const [first, ...rest] = b.split("\n");
-      return rest.length > 0 ? { title: first.trim(), body: rest.join("\n").trim() } : { title: "", body: first.trim() };
-    });
-}
 
 export default function NutritionScreen() {
   return (
@@ -80,6 +65,7 @@ function NutritionScreenBody() {
   });
 
   const plan = nutritionPlan.data;
+  const meals = plan ? parsePlan(plan.plan_markdown).meals : [];
   const targets = (plan?.targets ?? {}) as Targets;
   const updated = plan ? toDateString(new Date(plan.created_at)) : null;
   const wa =
@@ -139,18 +125,15 @@ function NutritionScreenBody() {
                 {t("nutrition.oneDay")}
               </AppText>
             </View>
-            {mealBlocks(plan.plan_markdown).map((m, i) => (
-              <Card key={i} style={{ padding: 12, gap: 8 }}>
-                {m.title ? (
-                  <AppText size={14} weight="semibold" tone="graphite">
-                    {m.title}
-                  </AppText>
-                ) : null}
+            {meals.length > 0 ? (
+              meals.map((m, i) => <MealCard key={i} meal={m} />)
+            ) : (
+              <Card style={{ padding: 14 }}>
                 <AppText size={16} lineHeight={24}>
-                  {m.body}
+                  {plan.plan_markdown}
                 </AppText>
               </Card>
-            ))}
+            )}
           </View>
         </>
       ) : nutritionPlan.isSuccess ? (
@@ -184,6 +167,40 @@ function NutritionScreenBody() {
         />
       ) : null}
     </ScrollView>
+  );
+}
+
+function MealCard({ meal }: { meal: PlanMeal }) {
+  const { t } = useTranslation();
+  const hasMacros = meal.protein != null && meal.carbs != null && meal.fat != null;
+  return (
+    <Card style={{ padding: 14, gap: 8 }}>
+      {meal.title || meal.kcal != null ? (
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <AppText size={14} weight="semibold" tone="graphite" style={{ flexShrink: 1 }}>
+            {meal.title}
+          </AppText>
+          {meal.kcal != null ? (
+            <View style={{ flexDirection: "row", alignItems: "baseline", gap: 4 }}>
+              <Num size={20} weight="semibold">
+                {String(meal.kcal)}
+              </Num>
+              <AppText size={13} tone="graphite">
+                {t("nutrition.kcal")}
+              </AppText>
+            </View>
+          ) : null}
+        </View>
+      ) : null}
+      <AppText size={16} lineHeight={24}>
+        {meal.items.join(", ")}
+      </AppText>
+      {hasMacros ? (
+        <AppText size={13} tone="graphite">
+          {t("nutrition.mealMacros", { protein: meal.protein, carbs: meal.carbs, fat: meal.fat })}
+        </AppText>
+      ) : null}
+    </Card>
   );
 }
 

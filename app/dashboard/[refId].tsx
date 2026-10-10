@@ -7,13 +7,16 @@
 // scores, PRs, and their weight chart. Offline/managed clients have no
 // account — they never create workout_logs or progress_entries — so they just
 // get their completed-workout history and the "mark complete" action.
+// D26a: the AI nutrition assistant moved to app/dashboard/nutrition/[refId].tsx;
+// this screen links to it.
 
 import { useState } from "react";
-import { useLocalSearchParams } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { ActivityIndicator, Alert, Pressable, ScrollView, Text, TextInput, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import ChevronRight from "lucide-react-native/icons/chevron-right";
 
 import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
@@ -22,6 +25,7 @@ import { useAuth } from "@/lib/auth";
 import { directionalTextClassName, LTR_INPUT_STYLE } from "@/lib/i18n";
 import { DEFAULT_TIME_ZONE, formatDisplayDate, toDateString } from "@/lib/dates";
 import { LineChart } from "@/components/LineChart";
+import { colors, Icon } from "@/components/ui";
 import type { Database } from "@/lib/database.types";
 
 type WorkoutStatus = Database["public"]["Views"]["client_workout_status"]["Row"];
@@ -84,7 +88,8 @@ export default function ClientDetailScreen() {
 }
 
 function ClientDetailScreenBody() {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
+  const router = useRouter();
   const { refId, kind: kindParam } = useLocalSearchParams<{ refId: string; kind?: string }>();
   const kind: "app" | "managed" = kindParam === "managed" ? "managed" : "app";
   const { session } = useAuth();
@@ -437,77 +442,6 @@ function ClientDetailScreenBody() {
     ]);
   }
 
-  // AI nutrition assistant (V15). The edge function only calls Claude and
-  // returns text — saving is a normal RLS-protected insert from here, same
-  // as every other write in this app; both client kinds supported.
-  const [calorieInput, setCalorieInput] = useState("");
-  const [proteinInput, setProteinInput] = useState("");
-  const [carbsInput, setCarbsInput] = useState("");
-  const [fatInput, setFatInput] = useState("");
-  const [preferencesInput, setPreferencesInput] = useState("");
-  const [suggestedPlan, setSuggestedPlan] = useState<string | null>(null);
-
-  const latestNutritionPlan = useQuery({
-    queryKey: qk.nutritionPlan.subject(kind, refId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("nutrition_plans")
-        .select("*")
-        .eq("trainer_id", trainerId)
-        .eq(streakCol, refId)
-        .order("created_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const suggestNutrition = useMutation({
-    mutationFn: async () => {
-      const { data, error } = await supabase.functions.invoke("nutrition-suggest", {
-        body: {
-          calories: Number.parseFloat(calorieInput),
-          protein_g: Number.parseFloat(proteinInput),
-          carbs_g: Number.parseFloat(carbsInput),
-          fat_g: Number.parseFloat(fatInput),
-          preferences: preferencesInput.trim() || undefined,
-          locale: i18n.language,
-        },
-      });
-      if (error) throw error;
-      if (data?.error) throw new Error(data.error);
-      return data.plan_markdown as string;
-    },
-    onSuccess: (planMarkdown) => setSuggestedPlan(planMarkdown),
-  });
-
-  const saveNutritionPlan = useMutation({
-    mutationFn: async () => {
-      if (!suggestedPlan) return;
-      const targets = {
-        calories: Number.parseFloat(calorieInput),
-        protein_g: Number.parseFloat(proteinInput),
-        carbs_g: Number.parseFloat(carbsInput),
-        fat_g: Number.parseFloat(fatInput),
-        preferences: preferencesInput.trim() || null,
-      };
-      const { error } =
-        kind === "app"
-          ? await supabase
-              .from("nutrition_plans")
-              .insert({ trainer_id: trainerId, client_id: refId, targets, plan_markdown: suggestedPlan })
-          : await supabase
-              .from("nutrition_plans")
-              .insert({ trainer_id: trainerId, managed_client_id: refId, targets, plan_markdown: suggestedPlan });
-      if (error) throw error;
-    },
-    onSuccess: () => {
-      setSuggestedPlan(null);
-      queryClient.invalidateQueries({ queryKey: qk.nutritionPlan.subject(kind, refId) });
-    },
-  });
-
   if (detail.isLoading) {
     return (
       <View className="flex-1 items-center justify-center bg-white">
@@ -669,95 +603,15 @@ function ClientDetailScreenBody() {
           </View>
         </View>
 
-        {/* V15: AI nutrition assistant — both client kinds (offline clients
-            just can't see the read-only view on their own side). Promoted
-            above check-in/intake/notes so the trainer's most-used tool is
-            the first thing after the session-package card. */}
-        <View className="mt-7 rounded-2xl border border-slate-200 p-4">
-          <Text className="w-full text-left text-xs font-semibold uppercase tracking-wide text-slate-500">
-            {t("dashboard.nutrition.title")}
-          </Text>
-
-          <View className="mt-3 flex-row flex-wrap gap-2">
-            <NutritionField
-              label={t("dashboard.nutrition.calories")}
-              value={calorieInput}
-              onChangeText={setCalorieInput}
-            />
-            <NutritionField
-              label={t("dashboard.nutrition.protein")}
-              value={proteinInput}
-              onChangeText={setProteinInput}
-            />
-            <NutritionField label={t("dashboard.nutrition.carbs")} value={carbsInput} onChangeText={setCarbsInput} />
-            <NutritionField label={t("dashboard.nutrition.fat")} value={fatInput} onChangeText={setFatInput} />
-          </View>
-
-          <Text className="mb-1 mt-3 w-full text-left text-xs text-slate-500">
-            {t("dashboard.nutrition.preferences")}
-          </Text>
-          <TextInput
-            className={`rounded-lg border border-slate-300 px-3 py-2 text-sm text-slate-900 ${directionalTextClassName()}`}
-            placeholder={t("dashboard.nutrition.preferencesPlaceholder")}
-            placeholderTextColor="#94a3b8"
-            value={preferencesInput}
-            onChangeText={setPreferencesInput}
-          />
-
-          <Pressable
-            className="mt-3 items-center self-start rounded-lg bg-slate-900 px-4 py-2.5 active:opacity-80"
-            disabled={
-              suggestNutrition.isPending ||
-              !calorieInput.trim() ||
-              !proteinInput.trim() ||
-              !carbsInput.trim() ||
-              !fatInput.trim()
-            }
-            onPress={() => suggestNutrition.mutate()}
-          >
-            {suggestNutrition.isPending ? (
-              <ActivityIndicator color="#ffffff" size="small" />
-            ) : (
-              <Text className="text-sm font-semibold text-white">{t("dashboard.nutrition.suggest")}</Text>
-            )}
-          </Pressable>
-          {suggestNutrition.error ? (
-            <Text className="mt-2 w-full text-left text-xs text-red-600">
-              {(suggestNutrition.error as Error).message}
-            </Text>
-          ) : null}
-
-          {suggestedPlan ? (
-            <View className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <Text className="w-full text-left text-sm text-slate-800">{suggestedPlan}</Text>
-              <Pressable
-                className="mt-3 items-center self-start rounded-lg bg-emerald-600 px-4 py-2 active:opacity-80"
-                disabled={saveNutritionPlan.isPending}
-                onPress={() => saveNutritionPlan.mutate()}
-              >
-                {saveNutritionPlan.isPending ? (
-                  <ActivityIndicator color="#ffffff" size="small" />
-                ) : (
-                  <Text className="text-sm font-semibold text-white">{t("common.save")}</Text>
-                )}
-              </Pressable>
-              {saveNutritionPlan.error ? (
-                <Text className="mt-2 w-full text-left text-xs text-red-600">
-                  {(saveNutritionPlan.error as Error).message}
-                </Text>
-              ) : null}
-            </View>
-          ) : latestNutritionPlan.data ? (
-            <View className="mt-4 rounded-lg border border-slate-200 bg-slate-50 p-3">
-              <Text className="w-full text-left text-xs uppercase tracking-wide text-slate-400">
-                {t("dashboard.nutrition.lastSaved")}
-              </Text>
-              <Text className="mt-1 w-full text-left text-sm text-slate-800">
-                {latestNutritionPlan.data.plan_markdown}
-              </Text>
-            </View>
-          ) : null}
-        </View>
+        {/* D26a: the AI nutrition assistant has its own screen. */}
+        <Pressable
+          className="mt-7 flex-row items-center justify-between rounded-2xl border border-slate-200 p-4 active:bg-slate-50"
+          accessibilityRole="link"
+          onPress={() => router.push({ pathname: "/dashboard/nutrition/[refId]", params: { refId, kind } })}
+        >
+          <Text className="text-sm font-semibold text-slate-900">{t("nutritionAi.title")}</Text>
+          <Icon icon={ChevronRight} size={18} color={colors.smoke} mirror />
+        </Pressable>
 
         {d.kind === "app" ? (
           <>
@@ -1038,31 +892,6 @@ function ClientDetailScreenBody() {
         )}
       </ScrollView>
     </SafeAreaView>
-  );
-}
-
-function NutritionField({
-  label,
-  value,
-  onChangeText,
-}: {
-  label: string;
-  value: string;
-  onChangeText: (v: string) => void;
-}) {
-  return (
-    <View className="min-w-[70px] flex-1">
-      <Text className="w-full text-left text-xs text-slate-500">{label}</Text>
-      <TextInput
-        className="mt-1 rounded-lg border border-slate-300 px-2 py-1.5 text-sm text-slate-900"
-        style={LTR_INPUT_STYLE}
-        placeholder="0"
-        placeholderTextColor="#94a3b8"
-        keyboardType="decimal-pad"
-        value={value}
-        onChangeText={onChangeText}
-      />
-    </View>
   );
 }
 

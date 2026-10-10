@@ -1089,6 +1089,39 @@
     "noneHintName": "התפריט מ{{name}} יופיע כאן.",
     "disclaimer": "הצעות כלליות בלבד — לא ייעוץ רפואי או תזונתי.",
     "askOnWhatsApp": "שאלה ל{{name}} בוואטסאפ",
-    "waQuestion": "היי {{name}}, שאלה על התפריט: "
+    "waQuestion": "היי {{name}}, שאלה על התפריט: ",
+    "mealMacros": "חלבון {{protein}} · פחמימות {{carbs}} · שומן {{fat}} (גרם)"
+  },
+  "nutritionAi": {
+    "title": "תפריט תזונה",
+    "targetsTitle": "יעדים יומיים",
+    "calories": "קלוריות",
+    "macroHintClose": "לפי המאקרו יוצא {{kcal}} קק״ל — קרוב ליעד.",
+    "macroHintOver": "לפי המאקרו יוצא {{kcal}} קק״ל — {{diff}} מעל היעד.",
+    "macroHintUnder": "לפי המאקרו יוצא {{kcal}} קק״ל — {{diff}} מתחת ליעד.",
+    "macroHintOnly": "לפי המאקרו יוצא {{kcal}} קק״ל.",
+    "macroHintEmpty": "חלבון ופחמימות: 4 קק״ל לגרם, שומן: 9.",
+    "prefsTitle": "העדפות",
+    "diet": {
+      "vegetarian": "צמחוני",
+      "vegan": "טבעוני",
+      "kosher": "כשר",
+      "glutenFree": "ללא גלוטן",
+      "lactoseFree": "ללא לקטוז",
+      "nutFree": "ללא אגוזים"
+    },
+    "notePlaceholder": "עוד משהו? למשל: בלי דגים (לא חובה)",
+    "mealsPerDay": "ארוחות ביום",
+    "mealsPrompt": "{{count}} ארוחות ביום",
+    "generate": "יצירת תפריט",
+    "resultTitle": "הצעה ליום אחד",
+    "justCreated": "נוצר עכשיו",
+    "savedTitle": "התפריט הנוכחי",
+    "savedOn": "נשמר ב-{{date}}",
+    "saveShare": "שמירה ושיתוף עם {{name}}",
+    "saveOnly": "שמירה",
+    "regenerate": "יצירה מחדש",
+    "disclaimer": "הצעות כלליות בלבד — לא ייעוץ רפואי או תזונתי.",
+    "disclaimerName": "הצעות כלליות בלבד — לא ייעוץ רפואי או תזונתי. {{name}} רואה את אותה הערה."
   }
 }
