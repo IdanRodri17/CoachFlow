@@ -1,25 +1,37 @@
 // app/share-card/[clientId].tsx — client's shareable progress card (V9).
 //
-// Renders a branded card (trainer name/logo, streak, key stat, badges),
-// captures it as an image via react-native-view-shot, and opens the native
-// share sheet via expo-sharing (WhatsApp / Instagram / etc). Free marketing
-// for the trainer whenever a client shares their progress. Client-only, and
-// only for their own card (:clientId must match the signed-in session).
+// Renders a branded card, captures it as an image via react-native-view-shot,
+// and opens the native share sheet via expo-sharing (WhatsApp / Instagram /
+// etc). Free marketing for the trainer whenever a client shares their
+// progress. Client-only, and only for their own card (:clientId must match
+// the signed-in session).
+//
+// D28c: rebuilt to docs/design/screens/client-share-card.html — an ink 9:16
+// card: the trainer's line (business_name, else their name, via rpc
+// my_trainer), the current streak huge in volt, workouts done and PRs this
+// month, the client's first name + month, CoachFlow. Badges moved off the
+// card (Progress shows them, D28a). "שמירה בגלריה" isn't here yet: it needs
+// expo-media-library (a new dependency); the share sheet's "Save image"
+// covers it meanwhile.
 
 import { useRef, useState } from "react";
-import { ActivityIndicator, Image, Pressable, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
-import { Redirect, useLocalSearchParams } from "expo-router";
+import { View } from "react-native";
+import { useSafeAreaInsets } from "react-native-safe-area-context";
+import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
 import { useTranslation } from "react-i18next";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
+import Share from "lucide-react-native/icons/share";
 
 import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { BADGE_INFO, type BadgeType } from "@/lib/badges";
-import { directionalTextClassName } from "@/lib/i18n";
+import { todayISO } from "@/lib/dates";
+import { useMyTrainer } from "@/lib/useMyTrainer";
+import { firstName, monthName } from "@/components/home/format";
+import { AppText, Button, colors, Display, IconButton, Num } from "@/components/ui";
 
 // The two guards run BEFORE the card's hooks mount (Rules of Hooks — see
 // components/RoleGate.tsx); this screen has a second rule RoleGate doesn't
@@ -33,54 +45,45 @@ export default function ShareCardScreen() {
 }
 
 function ShareCardBody() {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const { clientId } = useLocalSearchParams<{ clientId: string }>();
+  const router = useRouter();
+  const insets = useSafeAreaInsets();
   const cardRef = useRef<View>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  // The trainer through rpc my_trainer (B1): a client can't read the trainer's
+  // profile row directly under RLS.
+  const trainer = useMyTrainer();
+  const trainerLine = trainer.data ? trainer.data.business_name?.trim() || trainer.data.display_name : "";
+  const today = todayISO();
+  const monthStart = `${today.slice(0, 7)}-01`;
 
   const card = useQuery({
     queryKey: qk.shareCard.own(clientId),
     queryFn: async () => {
-      const [profileRes, streakRes, badgesRes, workoutCountRes, rosterRes] = await Promise.all([
+      const [profileRes, streakRes, workoutCountRes, prRes] = await Promise.all([
         supabase.from("profiles").select("display_name").eq("id", clientId).single(),
-        supabase.from("client_streaks").select("current_streak").eq("client_id", clientId).maybeSingle(),
-        supabase.from("badges").select("type").eq("client_id", clientId).order("earned_at", { ascending: true }),
+        supabase.from("client_streaks").select("current_streak").eq("client_id", clientId),
         supabase.from("workout_logs").select("id", { count: "exact", head: true }).eq("client_id", clientId),
+        // PR sets logged since the 1st of this month (Jerusalem date).
         supabase
-          .from("trainer_clients")
-          .select("trainer_id")
-          .eq("client_id", clientId)
-          .order("created_at", { ascending: true })
-          .limit(1)
-          .maybeSingle(),
+          .from("set_logs")
+          .select("id, workout_logs!inner(client_id, completed_at)", { count: "exact", head: true })
+          .eq("is_pr", true)
+          .eq("workout_logs.client_id", clientId)
+          .gte("workout_logs.completed_at", new Date(`${monthStart}T00:00:00+03:00`).toISOString()),
       ]);
       if (profileRes.error) throw profileRes.error;
       if (streakRes.error) throw streakRes.error;
-      if (badgesRes.error) throw badgesRes.error;
       if (workoutCountRes.error) throw workoutCountRes.error;
-      if (rosterRes.error) throw rosterRes.error;
-
-      let trainerName = "";
-      let trainerAvatar: string | null = null;
-      if (rosterRes.data?.trainer_id) {
-        const { data: t } = await supabase
-          .from("profiles")
-          .select("display_name, avatar_url, business_name")
-          .eq("id", rosterRes.data.trainer_id)
-          .maybeSingle();
-        // D29c: the trainer's "name on the share card" wins over their own name.
-        trainerName = t?.business_name?.trim() || t?.display_name || "";
-        trainerAvatar = t?.avatar_url ?? null;
-      }
-
+      if (prRes.error) throw prRes.error;
       return {
         name: profileRes.data.display_name,
-        streak: streakRes.data?.current_streak ?? 0,
-        badges: badgesRes.data.map((b) => b.type as BadgeType),
+        // One row per trainer; the card shows the best run.
+        streak: Math.max(0, ...streakRes.data.map((r) => r.current_streak)),
         totalWorkouts: workoutCountRes.count ?? 0,
-        trainerName,
-        trainerAvatar,
+        prsThisMonth: prRes.count ?? 0,
       };
     },
   });
@@ -103,81 +106,117 @@ function ShareCardBody() {
     }
   }
 
-  if (card.isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator />
-      </View>
-    );
-  }
-  if (card.error || !card.data) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-sm text-red-600">
-          {card.error ? (card.error as Error).message : t("shareCard.loadError")}
-        </Text>
-      </View>
-    );
-  }
-
   const d = card.data;
 
   return (
-    <SafeAreaView className="flex-1 bg-slate-100" edges={["bottom"]}>
-      <View className="flex-1 items-center justify-center px-6">
-        <View ref={cardRef} collapsable={false} className="w-full max-w-sm rounded-3xl bg-indigo-900 p-6">
-          <Text className="text-center text-lg font-bold text-white">{d.name}</Text>
-          <Text className="mt-1 text-center text-5xl">🔥</Text>
-          <Text className="text-center text-4xl font-extrabold text-white">{d.streak}</Text>
-          <Text className="text-center text-sm font-medium uppercase tracking-wide text-indigo-200">
-            {t("shareCard.dayStreak")}
-          </Text>
-
-          <View className="mt-6 items-center rounded-2xl bg-white/10 px-4 py-3">
-            <Text className="text-3xl font-extrabold text-white">{d.totalWorkouts}</Text>
-            <Text className="text-xs font-medium uppercase tracking-wide text-indigo-200">
-              {t("shareCard.workoutsCompleted")}
-            </Text>
-          </View>
-
-          {d.badges.length > 0 ? (
-            <View className="mt-6 flex-row flex-wrap justify-center gap-2">
-              {d.badges.map((type) => (
-                <View key={type} className="flex-row items-center gap-1 rounded-full bg-white/15 px-3 py-1.5">
-                  <Text className="text-base">{BADGE_INFO[type].emoji}</Text>
-                  <Text className="text-xs font-semibold text-white">{BADGE_INFO[type].label}</Text>
-                </View>
-              ))}
-            </View>
-          ) : null}
-
-          {d.trainerName ? (
-            <View className="mt-8 flex-row items-center justify-center gap-2">
-              {d.trainerAvatar ? (
-                <Image source={{ uri: d.trainerAvatar }} className="h-6 w-6 rounded-full" />
-              ) : null}
-              <Text className="text-xs font-medium text-indigo-200">
-                {t("shareCard.trainedBy", { name: d.trainerName })}
-              </Text>
-            </View>
-          ) : null}
-        </View>
-
-        <Pressable
-          className="mt-8 w-full max-w-sm items-center rounded-xl bg-slate-900 px-4 py-3.5 active:opacity-80"
-          disabled={sharing}
-          onPress={handleShare}
-        >
-          {sharing ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text className="text-base font-semibold text-white">{t("shareCard.share")}</Text>
-          )}
-        </Pressable>
-        {error ? (
-          <Text className={`mt-3 text-sm text-red-600 ${directionalTextClassName()}`}>{error}</Text>
-        ) : null}
+    <View
+      style={{
+        flex: 1,
+        backgroundColor: colors.chalk,
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 20,
+        paddingBottom: Math.max(insets.bottom, 16) + 14,
+        gap: 18,
+      }}
+    >
+      <View style={{ height: 52, flexDirection: "row", alignItems: "center", gap: 8 }}>
+        <IconButton
+          icon={ChevronLeft}
+          mirror
+          iconSize={22}
+          accessibilityLabel={t("common.back")}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/profile"))}
+        />
+        <AppText size={17} weight="semibold" center style={{ flex: 1 }}>
+          {t("shareCard.title")}
+        </AppText>
+        <View style={{ width: 44 }} />
       </View>
-    </SafeAreaView>
+
+      {card.error ? (
+        <AppText size={14} tone="ember" center>
+          {(card.error as Error).message}
+        </AppText>
+      ) : null}
+
+      {d ? (
+        // The captured image: 9:16, ink, the streak in volt.
+        <View
+          ref={cardRef}
+          collapsable={false}
+          accessibilityLabel={t("shareCard.cardLabel")}
+          style={{
+            alignSelf: "center",
+            width: 290,
+            height: 516,
+            borderRadius: 28,
+            backgroundColor: colors.ink,
+            padding: 24,
+            gap: 16,
+          }}
+        >
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <AppText size={14} weight="semibold" tone="bone" numberOfLines={1} style={{ flex: 1 }}>
+              {trainerLine}
+            </AppText>
+            <View style={{ width: 10, height: 10, borderRadius: 5, backgroundColor: colors.volt }} />
+          </View>
+          <View style={{ flex: 1 }} />
+          <View style={{ gap: 8 }}>
+            <Num size={180} tone="volt" style={{ lineHeight: 160, letterSpacing: -4 }}>
+              {d.streak}
+            </Num>
+            <Display size={40} tone="bone">
+              {t("shareCard.streak")}
+            </Display>
+          </View>
+          <View style={{ height: 1, backgroundColor: colors.ironLine }} />
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Num size={40} tone="bone">
+                {d.totalWorkouts}
+              </Num>
+              <AppText size={13} tone="ash">
+                {t("shareCard.workoutsDone")}
+              </AppText>
+            </View>
+            <View style={{ flex: 1, gap: 4 }}>
+              <Num size={40} tone="bone">
+                {d.prsThisMonth}
+              </Num>
+              <AppText size={13} tone="ash">
+                {t("shareCard.prsThisMonth")}
+              </AppText>
+            </View>
+          </View>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <AppText size={13} tone="ash" numberOfLines={1} style={{ flex: 1 }}>
+              {`${firstName(d.name)} · ${monthName(today, i18n.language)} ${today.slice(0, 4)}`}
+            </AppText>
+            <Num size={14} weight="semibold" tone="ash">
+              CoachFlow
+            </Num>
+          </View>
+        </View>
+      ) : null}
+
+      <View style={{ flex: 1 }} />
+
+      {error ? (
+        <AppText size={14} tone="ember" center>
+          {error}
+        </AppText>
+      ) : null}
+      <Button
+        label={t("shareCard.share")}
+        icon={Share}
+        variant="accent"
+        size={56}
+        block
+        loading={sharing}
+        disabled={!d}
+        onPress={handleShare}
+      />
+    </View>
   );
 }

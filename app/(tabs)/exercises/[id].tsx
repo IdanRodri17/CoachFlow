@@ -26,6 +26,7 @@ import { useAuth } from "@/lib/auth";
 import { toDateString } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
 import { parseVideoUrl } from "@/lib/video";
+import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import { formatWeight } from "@/lib/workoutSession";
 import { ExerciseForm, type ExerciseInput } from "@/components/ExerciseForm";
 import { ExerciseVideo } from "@/components/ExerciseVideo";
@@ -129,6 +130,7 @@ function ClientExercise({ exercise }: { exercise: Exercise }) {
   const { t, i18n } = useTranslation();
   const { session } = useAuth();
   const [playing, setPlaying] = useState(false);
+  const trainerName = trainerFirstName(useMyTrainer().data);
   const video = exercise.video_url ? parseVideoUrl(exercise.video_url) : null;
   const clientId = session?.user.id ?? "";
 
@@ -222,7 +224,7 @@ function ClientExercise({ exercise }: { exercise: Exercise }) {
       {cues.length > 0 ? (
         <Card style={{ padding: 12, gap: 16 }}>
           <AppText size={18} weight="semibold" lineHeight={23}>
-            {t("exercises.view.cues")}
+            {trainerName ? t("exercises.view.cuesFrom", { name: trainerName }) : t("exercises.view.cues")}
           </AppText>
           <View style={{ gap: 10 }}>
             {cues.map((cue, i) => (
