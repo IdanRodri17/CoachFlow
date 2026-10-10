@@ -209,6 +209,9 @@ export type Database = {
           used_by: string | null;
           // 0021: who the invite is for (display only).
           label: string | null;
+          // B5 (0027): the package the client gets on accepting (price needs a package).
+          price_per_session: number | null;
+          package_sessions: number | null;
         };
         Insert: {
           id?: string;
@@ -219,6 +222,8 @@ export type Database = {
           used_at?: string | null;
           used_by?: string | null;
           label?: string | null;
+          price_per_session?: number | null;
+          package_sessions?: number | null;
         };
         Update: {
           id?: string;
@@ -229,6 +234,8 @@ export type Database = {
           used_at?: string | null;
           used_by?: string | null;
           label?: string | null;
+          price_per_session?: number | null;
+          package_sessions?: number | null;
         };
         Relationships: [];
       };
@@ -681,7 +688,7 @@ export type Database = {
       };
       // V18b: the calling trainer gets a fresh single-use invite code.
       create_invite: {
-        Args: { p_label?: string | null };
+        Args: { p_label?: string | null; p_price_per_session?: number | null; p_package_sessions?: number | null };
         Returns: Database["public"]["Tables"]["client_invites"]["Row"];
       };
       // V18b: links the calling client to the code's trainer; returns the trainer id.
