@@ -36,3 +36,41 @@ export const attentionQuery = queryOptions({
     );
   },
 });
+
+export type Owed = { count: number; amount: number };
+
+/** Money owed per client, all time: completed sessions not marked paid × the
+ * package's price per session (sessions without a price owe nothing shown).
+ * Keyed like the views' subject_key: client id, or "m:" + managed id. The
+ * clients list's "₪ לתשלום" chip and Money's "לא שולם" list. */
+export function owedQuery(trainerId: string) {
+  return queryOptions({
+    queryKey: qk.scheduledTrainer.owed,
+    queryFn: async (): Promise<Map<string, Owed>> => {
+      const [unpaidRes, pkgRes] = await Promise.all([
+        supabase
+          .from("scheduled_workouts")
+          .select("client_id, managed_client_id")
+          .eq("trainer_id", trainerId)
+          .eq("status", "completed")
+          .eq("paid", false),
+        supabase.from("packages").select("client_id, managed_client_id, price_per_session").eq("trainer_id", trainerId),
+      ]);
+      if (unpaidRes.error) throw unpaidRes.error;
+      if (pkgRes.error) throw pkgRes.error;
+      const price = new Map<string, number>();
+      pkgRes.data.forEach((p) => {
+        if (p.price_per_session != null) price.set(p.client_id ?? `m:${p.managed_client_id}`, p.price_per_session);
+      });
+      const out = new Map<string, Owed>();
+      unpaidRes.data.forEach((w) => {
+        const key = w.client_id ?? `m:${w.managed_client_id}`;
+        const p = price.get(key);
+        if (p == null) return;
+        const cur = out.get(key) ?? { count: 0, amount: 0 };
+        out.set(key, { count: cur.count + 1, amount: cur.amount + p });
+      });
+      return out;
+    },
+  });
+}
