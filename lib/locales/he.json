@@ -838,7 +838,18 @@
     "edit": "עריכה",
     "editName": "השם שלך",
     "save": "שמירה",
-    "version": "CoachFlow · גרסה {{version}}"
+    "version": "CoachFlow · גרסה {{version}}",
+    "business": "העסק",
+    "shareName": "השם בכרטיס השיתוף",
+    "shareNameHint": "המתאמנים יראו אותו בכרטיס ההתקדמות שהם משתפים. ריק = השם שלך.",
+    "defaultPrice": "מחיר ברירת מחדל לאימון",
+    "defaultPriceHint": "ממולא אוטומטית למתאמן חדש",
+    "defaultPriceSheetHint": "ממולא אוטומטית כשמוסיפים מתאמן חדש, ואפשר לשנות אותו שם. ריק = בלי מחיר.",
+    "notSet": "לא הוגדר",
+    "trainedBy": "מתאמן/ת אצל {{name}} · מאז {{date}}",
+    "reminders": "תזכורות",
+    "smsReminders": "תזכורות SMS לאימונים",
+    "smsRemindersHint": "יום לפני ובבוקר של יום האימון"
   },
   "sessionForm": {
     "client": "מתאמן",

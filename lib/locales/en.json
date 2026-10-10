@@ -838,7 +838,18 @@
     "edit": "Edit",
     "editName": "Your name",
     "save": "Save",
-    "version": "CoachFlow · version {{version}}"
+    "version": "CoachFlow · version {{version}}",
+    "business": "Business",
+    "shareName": "Name on the share card",
+    "shareNameHint": "Your clients see it on the progress card they share. Leave it empty to use your name.",
+    "defaultPrice": "Default price per session",
+    "defaultPriceHint": "Filled in for a new client",
+    "defaultPriceSheetHint": "Filled in when you add a new client; you can still change it there. Empty = no price.",
+    "notSet": "Not set",
+    "trainedBy": "Training with {{name}} · since {{date}}",
+    "reminders": "Reminders",
+    "smsReminders": "Workout reminders by SMS",
+    "smsRemindersHint": "The day before and on the morning of a workout"
   },
   "sessionForm": {
     "client": "Client",

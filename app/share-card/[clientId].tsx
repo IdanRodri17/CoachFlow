@@ -66,10 +66,11 @@ function ShareCardBody() {
       if (rosterRes.data?.trainer_id) {
         const { data: t } = await supabase
           .from("profiles")
-          .select("display_name, avatar_url")
+          .select("display_name, avatar_url, business_name")
           .eq("id", rosterRes.data.trainer_id)
           .maybeSingle();
-        trainerName = t?.display_name ?? "";
+        // D29c: the trainer's "name on the share card" wins over their own name.
+        trainerName = t?.business_name?.trim() || t?.display_name || "";
         trainerAvatar = t?.avatar_url ?? null;
       }
 

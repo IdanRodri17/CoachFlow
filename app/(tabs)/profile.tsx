@@ -3,16 +3,18 @@
 //
 // D28b / D20h / D29c: rebuilt to docs/design/screens/client-profile.html and
 // trainer-settings.html.
-//   Client: avatar + name, the package as a segment meter, the share-card
-//   entry with the current streak, "בזמן אימון" (lib/workoutPrefs.ts — on the
-//   phone only), language, the exercise library, badges (until Progress gets
-//   them, D28a), sign out, delete account.
-//   Trainer: back to Home, profile card with "עריכה" for the name, language,
-//   sign out, delete account, version.
-// Not yet, because their data doesn't exist yet (main session):
-//   "תזכורות" (profiles.sms_reminders_enabled, B4) and "העסק" (business name +
-//   default price, B3). The email digest switch is gone for good: login is
-//   SMS-only and the digest isn't scheduled (0022).
+//   Client: avatar + name + "מתאמן/ת אצל {trainer} · מאז {month}" (rpc
+//   my_trainer), the package as a segment meter, the share-card entry with
+//   the current streak, "בזמן אימון" (lib/workoutPrefs.ts — on the phone
+//   only), "תזכורות" (profiles.sms_reminders_enabled: one switch for both the
+//   day-before and the morning-of SMS), language, the exercise library,
+//   badges (until Progress gets them, D28a), sign out, delete account.
+//   Trainer: back to Home, profile card with "עריכה" for the name, "העסק"
+//   (the name on clients' share cards → profiles.business_name, and the
+//   default price per session → profiles.default_price_per_session, 0025),
+//   language, sign out, delete account, version.
+// The email digest switch is gone for good: login is SMS-only and the digest
+//   isn't scheduled (0022).
 //
 // Delete account calls the delete-account edge function (service-role only,
 // never in the app); every owned row cascades away. Required by Apple/Google.
@@ -24,11 +26,14 @@ import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Constants from "expo-constants";
+import Banknote from "lucide-react-native/icons/banknote";
+import Bell from "lucide-react-native/icons/bell";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Dumbbell from "lucide-react-native/icons/dumbbell";
 import LogOut from "lucide-react-native/icons/log-out";
 import Pencil from "lucide-react-native/icons/pencil";
+import Share from "lucide-react-native/icons/share";
 import Sun from "lucide-react-native/icons/sun";
 import Timer from "lucide-react-native/icons/timer";
 import Trash from "lucide-react-native/icons/trash";
@@ -41,6 +46,8 @@ import { useAuth } from "@/lib/auth";
 import { BADGE_INFO, type BadgeType } from "@/lib/badges";
 import { ltr, setLocale, type SupportedLocale } from "@/lib/i18n";
 import { setWorkoutPref, useWorkoutPrefs } from "@/lib/workoutPrefs";
+import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
+import { formatMoney, monthName } from "@/components/home/format";
 import {
   AppText,
   Avatar,
@@ -56,6 +63,7 @@ import {
   ListCard,
   ListRow,
   Num,
+  parseTypedNumber,
   Segmented,
   SegmentMeter,
   Sheet,
@@ -80,8 +88,9 @@ export default function ProfileScreen() {
   const prefs = useWorkoutPrefs();
   const isClient = profile?.role === "client";
   const userId = session?.user.id ?? "";
-  const [editing, setEditing] = useState(false);
-  const [nameDraft, setNameDraft] = useState("");
+  // Which profile field the edit sheet is open for, and its text.
+  const [editing, setEditing] = useState<null | "name" | "business" | "price">(null);
+  const [draft, setDraft] = useState("");
 
   const badges = useQuery({
     queryKey: qk.badges.own(userId),
@@ -123,17 +132,57 @@ export default function ProfileScreen() {
     },
   });
 
-  const saveName = useMutation({
-    mutationFn: async (name: string) => {
-      const { error } = await supabase.from("profiles").update({ display_name: name }).eq("id", userId);
+  type ProfilePatch = { display_name?: string; business_name?: string | null; default_price_per_session?: number | null };
+  const saveField = useMutation({
+    mutationFn: async (patch: ProfilePatch) => {
+      const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
       if (error) throw error;
-      return name;
+      return patch;
     },
     // patchProfile, not refreshProfile: no global loading state, no remount.
-    onSuccess: (name) => {
-      patchProfile({ display_name: name });
-      setEditing(false);
+    onSuccess: (patch) => {
+      patchProfile(patch);
+      setEditing(null);
     },
+  });
+
+  function openEditor(field: "name" | "business" | "price") {
+    saveField.reset();
+    setDraft(
+      field === "name"
+        ? (profile?.display_name ?? "")
+        : field === "business"
+          ? (profile?.business_name ?? "")
+          : profile?.default_price_per_session != null
+            ? String(profile.default_price_per_session)
+            : "",
+    );
+    setEditing(field);
+  }
+
+  const priceDraft = parseTypedNumber(draft);
+  const canSave =
+    editing === "name" ? draft.trim().length > 0 : editing === "price" ? draft.trim() === "" || priceDraft != null : true;
+  function save() {
+    if (editing === "name") saveField.mutate({ display_name: draft.trim() });
+    else if (editing === "business") saveField.mutate({ business_name: draft.trim() === "" ? null : draft.trim() });
+    else if (editing === "price") saveField.mutate({ default_price_per_session: draft.trim() === "" ? null : priceDraft });
+  }
+
+  const trainer = useMyTrainer();
+  const trainerName = trainerFirstName(trainer.data);
+  const since = trainer.data?.linked_since?.slice(0, 10);
+
+  // D28b: one switch for both SMS reminders. Flipped in place first, put back
+  // if the write fails.
+  const reminders = profile?.sms_reminders_enabled ?? true;
+  const setReminders = useMutation({
+    mutationFn: async (on: boolean) => {
+      const { error } = await supabase.from("profiles").update({ sms_reminders_enabled: on }).eq("id", userId);
+      if (error) throw error;
+    },
+    onMutate: (on) => patchProfile({ sms_reminders_enabled: on }),
+    onError: (_e, on) => patchProfile({ sms_reminders_enabled: !on }),
   });
 
   const deleteAccount = useMutation({
@@ -186,6 +235,14 @@ export default function ProfileScreen() {
               <Avatar id={userId} name={name || "?"} size={72} />
               <View style={{ flex: 1, gap: 4 }}>
                 <Display size={38}>{name}</Display>
+                {trainerName && since ? (
+                  <AppText size={15} tone="graphite">
+                    {t("settings.trainedBy", {
+                      name: trainerName,
+                      date: `${monthName(since, i18n.language)} ${since.slice(0, 4)}`,
+                    })}
+                  </AppText>
+                ) : null}
               </View>
             </View>
 
@@ -281,6 +338,25 @@ export default function ProfileScreen() {
               </ListCard>
             </View>
 
+            <View style={{ gap: 8 }}>
+              <GroupLabel>{t("settings.reminders")}</GroupLabel>
+              <ListCard inset={16} padded>
+                <ListRow
+                  density="setting"
+                  leading={<Icon icon={Bell} size={22} />}
+                  title={t("settings.smsReminders")}
+                  subtitle={t("settings.smsRemindersHint")}
+                  trailing={
+                    <Toggle
+                      value={reminders}
+                      onValueChange={(v) => setReminders.mutate(v)}
+                      accessibilityLabel={t("settings.smsReminders")}
+                    />
+                  }
+                />
+              </ListCard>
+            </View>
+
             {language}
 
             <View style={{ gap: 8 }}>
@@ -342,12 +418,42 @@ export default function ProfileScreen() {
                 icon={Pencil}
                 variant="secondary"
                 size={44}
-                onPress={() => {
-                  setNameDraft(name);
-                  setEditing(true);
-                }}
+                onPress={() => openEditor("name")}
               />
             </Card>
+
+            <View style={{ gap: 8 }}>
+              <GroupLabel>{t("settings.business")}</GroupLabel>
+              <ListCard inset={16} padded>
+                <ListRow
+                  density="setting"
+                  leading={<Icon icon={Share} size={22} />}
+                  title={t("settings.shareName")}
+                  trailing={
+                    <AppText size={15} tone="graphite" numberOfLines={1} style={{ maxWidth: 140 }}>
+                      {profile?.business_name || name}
+                    </AppText>
+                  }
+                  chevron
+                  onPress={() => openEditor("business")}
+                />
+                <ListRow
+                  density="setting"
+                  leading={<Icon icon={Banknote} size={22} />}
+                  title={t("settings.defaultPrice")}
+                  subtitle={t("settings.defaultPriceHint")}
+                  trailing={
+                    <AppText size={15} tone="graphite">
+                      {profile?.default_price_per_session != null
+                        ? ltr(`₪${formatMoney(profile.default_price_per_session, i18n.language)}`)
+                        : t("settings.notSet")}
+                    </AppText>
+                  }
+                  chevron
+                  onPress={() => openEditor("price")}
+                />
+              </ListCard>
+            </View>
 
             {language}
             {account}
@@ -365,29 +471,55 @@ export default function ProfileScreen() {
         ) : null}
       </ScrollView>
 
-      <Sheet visible={editing} onClose={() => setEditing(false)} closeLabel={t("common.cancel")} title={t("settings.editName")}>
-        <Input
-          size="md"
-          value={nameDraft}
-          onChangeText={setNameDraft}
-          autoFocus
-          autoCapitalize="words"
-          maxLength={60}
-          accessibilityLabel={t("settings.editName")}
-        />
-        {saveName.error ? (
-          <AppText size={14} tone="ember">
-            {(saveName.error as Error).message}
+      <Sheet
+        visible={editing != null}
+        onClose={() => setEditing(null)}
+        closeLabel={t("common.cancel")}
+        title={
+          editing === "business"
+            ? t("settings.shareName")
+            : editing === "price"
+              ? t("settings.defaultPrice")
+              : t("settings.editName")
+        }
+      >
+        {editing === "price" ? (
+          <Input
+            size="md"
+            ltr="start"
+            suffix="₪"
+            value={draft}
+            onChangeText={setDraft}
+            autoFocus
+            keyboardType="decimal-pad"
+            placeholder="180"
+            maxLength={7}
+            invalid={!canSave}
+            accessibilityLabel={t("settings.defaultPrice")}
+          />
+        ) : (
+          <Input
+            size="md"
+            value={draft}
+            onChangeText={setDraft}
+            autoFocus
+            autoCapitalize="words"
+            maxLength={60}
+            placeholder={editing === "business" ? name : undefined}
+            accessibilityLabel={editing === "business" ? t("settings.shareName") : t("settings.editName")}
+          />
+        )}
+        {editing === "business" || editing === "price" ? (
+          <AppText size={13} tone="graphite" lineHeight={19}>
+            {editing === "business" ? t("settings.shareNameHint") : t("settings.defaultPriceSheetHint")}
           </AppText>
         ) : null}
-        <Button
-          label={t("settings.save")}
-          size={56}
-          block
-          loading={saveName.isPending}
-          disabled={nameDraft.trim().length === 0}
-          onPress={() => saveName.mutate(nameDraft.trim())}
-        />
+        {saveField.error ? (
+          <AppText size={14} tone="ember">
+            {(saveField.error as Error).message}
+          </AppText>
+        ) : null}
+        <Button label={t("settings.save")} size={56} block loading={saveField.isPending} disabled={!canSave} onPress={save} />
       </Sheet>
     </View>
   );
