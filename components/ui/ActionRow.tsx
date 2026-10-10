@@ -67,7 +67,9 @@ export function ActionRow({
 }: {
   /** Up to three; the first sits nearest the row. */
   actions: RowAction[];
-  children: ReactNode;
+  /** The row; or a function given `openMenu`, for a card with its own "⋯"
+   * button that opens the same sheet as a long-press (D29a). */
+  children: ReactNode | ((openMenu: () => void) => ReactNode);
   /** Title of the long-press sheet (usually the row's name). */
   sheetTitle?: string;
   disabled?: boolean;
@@ -79,7 +81,8 @@ export function ActionRow({
   const shown = actions.slice(0, 3);
   const cancelLabel = t("common.cancel");
 
-  if (disabled || shown.length === 0) return <>{children}</>;
+  const content = typeof children === "function" ? children(() => setMenuOpen(true)) : children;
+  if (disabled || shown.length === 0) return <>{content}</>;
 
   const renderActions = () => (
     <View style={{ flexDirection: "row" }}>
@@ -139,7 +142,7 @@ export function ActionRow({
             if (a) run(a, cancelLabel);
           }}
         >
-          {children}
+          {content}
         </Pressable>
       </ReanimatedSwipeable>
 

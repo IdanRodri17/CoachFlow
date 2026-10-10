@@ -209,7 +209,17 @@
       "editTitle": "עריכת תבנית",
       "createTemplate": "+ יצירת תבנית",
       "emptyTitle": "עדיין אין תבניות",
-      "emptyHint": "בנה אימון לשימוש חוזר פעם אחת, והקצה אותו למספר מתאמנים בהמשך."
+      "emptyHint": "בנה אימון לשימוש חוזר פעם אחת, והקצה אותו למספר מתאמנים בהמשך.",
+      "search": "חיפוש תבנית",
+      "edit": "עריכה",
+      "duplicate": "שכפול",
+      "copyName": "{{name}} (עותק)",
+      "more": "עוד פעולות",
+      "schedule": "קביעה",
+      "noExercises": "עוד אין תרגילים",
+      "clients_one": "מתאמן אחד",
+      "clients_two": "{{count}} מתאמנים",
+      "clients_other": "{{count}} מתאמנים"
     },
     "form": {
       "createTemplate": "צור תבנית",
@@ -238,6 +248,32 @@
       "notFound": "התבנית לא נמצאה.",
       "saveChanges": "שמור שינויים",
       "deleteTemplate": "מחק תבנית"
+    },
+    "builder": {
+      "name": "שם התבנית",
+      "noteToClients": "הערה למתאמנים",
+      "exercises": "תרגילים · {{count}}",
+      "reorderHint": "פותחים תרגיל כדי לערוך או להזיז",
+      "edit": "עריכת {{name}}",
+      "closeEdit": "סגירת העריכה",
+      "moveUp": "הזזה למעלה",
+      "moveDown": "הזזה למטה",
+      "sets": "סטים",
+      "reps": "חזרות",
+      "weight": "משקל",
+      "rest": "מנוחה",
+      "kg": "ק״ג",
+      "bodyweight": "משקל גוף",
+      "restShort": "מנוחה {{time}}",
+      "decrease": "הורדה",
+      "increase": "הוספה",
+      "demo": "הדגמה",
+      "remove": "הסרה מהתבנית",
+      "add": "הוספת תרגיל",
+      "appliesHint": "השינויים יחולו על כל האימונים הבאים עם התבנית הזאת.",
+      "pickTitle": "בחירת תרגיל",
+      "close": "סגירה",
+      "save": "שמירה"
     }
   },
   "schedule": {

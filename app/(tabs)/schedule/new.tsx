@@ -3,7 +3,7 @@
 // first; then we insert one scheduled workout per date (a single date, or every
 // chosen weekday for N weeks).
 
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
@@ -28,6 +28,8 @@ function NewScheduleScreenBody() {
   const { t } = useTranslation();
   const router = useRouter();
   const queryClient = useQueryClient();
+  // D29a: "קביעה" on a template card opens this form with it already picked.
+  const { templateId } = useLocalSearchParams<{ templateId?: string }>();
 
   const trainerId = session!.user.id;
 
@@ -99,6 +101,7 @@ function NewScheduleScreenBody() {
       submitting={mutation.isPending}
       errorMessage={mutation.error ? (mutation.error as Error).message : null}
       onSubmit={(payload) => mutation.mutate(payload)}
+      initial={templateId ? { templateId } : undefined}
       allowRepeat
     />
   );

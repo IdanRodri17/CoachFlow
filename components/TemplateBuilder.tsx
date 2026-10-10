@@ -1,31 +1,54 @@
 // components/TemplateBuilder.tsx — the trainer's create/edit screen body for a
 // workout template. Shared by the "new template" and "edit template" screens.
 //
-// It manages local state for:
-//   - the template fields (name, description, notes)
-//   - an ORDERED list of exercises, each with target sets/reps/weight/rest
-// You add exercises via a modal picker (the exercise library), reorder them with
-// up/down arrows, remove them, and edit each one's targets inline. On save it
-// hands the screen a clean payload (numbers parsed, order = array order).
+// D29a: rebuilt to docs/design/screens/trainer-template-edit.html — "שמירה" in
+// the header, the template name, the note to clients, then the exercises as
+// one card of rows: each row shows its scheme ("4 × 8 · 50 ק״ג · מנוחה 2:00");
+// tapping it opens it in place with 2×2 mini steppers (sets, reps, weight —
+// tap the number to type it — and rest ±15 s), move up / down and remove. A
+// dashed "הוספת תרגיל" opens the library in a sheet.
+//
+// The reference reorders by dragging a grip; we have no drag library, so the
+// open row has move up / down buttons instead.
+//
+// The props and the payload are unchanged: the screens own the queries and
+// the save, this component hands them a clean payload (order = array order).
+// The description field isn't on the design: an existing one is kept as is.
 
-import { useRef, useState } from "react";
-import {
-  ActivityIndicator,
-  FlatList,
-  Modal,
-  Pressable,
-  ScrollView,
-  Text,
-  TextInput,
-  View,
-} from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { useMemo, useState, type ReactNode } from "react";
+import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
+import { Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import ArrowDown from "lucide-react-native/icons/arrow-down";
+import ArrowUp from "lucide-react-native/icons/arrow-up";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
+import ChevronUp from "lucide-react-native/icons/chevron-up";
+import Info from "lucide-react-native/icons/info";
+import Plus from "lucide-react-native/icons/plus";
+import Search from "lucide-react-native/icons/search";
+import Trash from "lucide-react-native/icons/trash";
 
 import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
-import { directionalTextClassName, LTR_WRITING_DIRECTION_ONLY } from "@/lib/i18n";
+import { ltr } from "@/lib/i18n";
+import { formatClock, formatWeight, stepWeight } from "@/lib/workoutSession";
+import { muscleKeyOf } from "@/components/ExerciseForm";
+import {
+  AppText,
+  Button,
+  colors,
+  Divider,
+  FieldLabel,
+  fonts,
+  Icon,
+  IconButton,
+  Input,
+  ListCard,
+  Num,
+  Sheet,
+  Stepper,
+} from "@/components/ui";
 
 // --- payload handed back to the screen on save ---
 export type TemplateExerciseInput = {
@@ -57,27 +80,27 @@ export type TemplateBuilderInitial = {
   }[];
 };
 
-// local row state — inputs are kept as strings, parsed on submit
 type BuilderItem = {
   key: string;
   exercise_id: string;
   exercise_name: string;
-  target_sets: string;
-  target_reps: string;
-  target_weight: string;
-  rest_seconds: string;
+  sets: number | null;
+  reps: number | null;
+  weight: number | null;
+  rest: number | null;
 };
 
-const num = (v: number | null | undefined) => (v === null || v === undefined ? "" : String(v));
+const REST_STEP = 15;
+/** Where an empty field starts on its first "+". */
+const START = { sets: 3, reps: 10, rest: 60 };
+
+/** Row keys only need to be unique; a module counter keeps refs out of render. */
+let keySeq = 0;
+const nextKey = () => String(keySeq++);
+
 const nullable = (v: string) => (v.trim().length === 0 ? null : v.trim());
-const toInt = (v: string) => {
-  const n = Number.parseInt(v.trim(), 10);
-  return v.trim() === "" || !Number.isFinite(n) ? null : n;
-};
-const toNum = (v: string) => {
-  const n = Number.parseFloat(v.trim());
-  return v.trim() === "" || !Number.isFinite(n) ? null : n;
-};
+/** ±1 on a count; an empty one starts at its default, and can't go below 1. */
+const stepCount = (v: number | null, d: 1 | -1, start: number) => (v == null ? (d > 0 ? start : null) : Math.max(1, v + d));
 
 export function TemplateBuilder({
   initial,
@@ -92,58 +115,60 @@ export function TemplateBuilder({
   submitting: boolean;
   onSubmit: (input: TemplateInput) => void;
   errorMessage?: string | null;
-  footer?: React.ReactNode;
+  footer?: ReactNode;
 }) {
   const { t } = useTranslation();
-  const keyCounter = useRef(0);
-  const nextKey = () => String(keyCounter.current++);
 
   const [name, setName] = useState(initial?.name ?? "");
-  const [description, setDescription] = useState(initial?.description ?? "");
   const [notes, setNotes] = useState(initial?.notes ?? "");
-  const [items, setItems] = useState<BuilderItem[]>(
+  const [items, setItems] = useState<BuilderItem[]>(() =>
     (initial?.items ?? []).map((it) => ({
       key: nextKey(),
       exercise_id: it.exercise_id,
       exercise_name: it.exercise_name,
-      target_sets: num(it.target_sets),
-      target_reps: num(it.target_reps),
-      target_weight: num(it.target_weight),
-      rest_seconds: num(it.rest_seconds),
+      sets: it.target_sets,
+      reps: it.target_reps,
+      weight: it.target_weight,
+      rest: it.rest_seconds,
     })),
   );
+  const [openKey, setOpenKey] = useState<string | null>(null);
   const [pickerOpen, setPickerOpen] = useState(false);
   const [validationError, setValidationError] = useState<string | null>(null);
+  const isEdit = initial != null;
 
   function addExercise(ex: { id: string; name: string; default_sets: number | null; default_reps: number | null }) {
+    const key = nextKey();
     setItems((prev) => [
       ...prev,
       {
-        key: nextKey(),
+        key,
         exercise_id: ex.id,
         exercise_name: ex.name,
-        target_sets: num(ex.default_sets),
-        target_reps: num(ex.default_reps),
-        target_weight: "",
-        rest_seconds: "",
+        sets: ex.default_sets,
+        reps: ex.default_reps,
+        weight: null,
+        rest: null,
       },
     ]);
+    setOpenKey(key);
     setPickerOpen(false);
   }
 
-  function updateItem(key: string, field: keyof BuilderItem, value: string) {
-    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, [field]: value } : it)));
+  function update(key: string, patch: Partial<BuilderItem>) {
+    setItems((prev) => prev.map((it) => (it.key === key ? { ...it, ...patch } : it)));
   }
 
-  function removeItem(key: string) {
+  function remove(key: string) {
     setItems((prev) => prev.filter((it) => it.key !== key));
+    setOpenKey(null);
   }
 
   function move(index: number, dir: -1 | 1) {
     setItems((prev) => {
-      const next = [...prev];
       const target = index + dir;
-      if (target < 0 || target >= next.length) return prev;
+      if (target < 0 || target >= prev.length) return prev;
+      const next = [...prev];
       [next[index], next[target]] = [next[target], next[index]];
       return next;
     });
@@ -161,98 +186,356 @@ export function TemplateBuilder({
     setValidationError(null);
     onSubmit({
       name: name.trim(),
-      description: nullable(description),
+      description: nullable(initial?.description ?? ""),
       notes: nullable(notes),
       items: items.map((it) => ({
         exercise_id: it.exercise_id,
-        target_sets: toInt(it.target_sets),
-        target_reps: toInt(it.target_reps),
-        target_weight: toNum(it.target_weight),
-        rest_seconds: toInt(it.rest_seconds),
+        target_sets: it.sets,
+        target_reps: it.reps,
+        target_weight: it.weight,
+        rest_seconds: it.rest,
       })),
     });
   }
 
+  const error = validationError ?? errorMessage ?? null;
+
   return (
-    <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
-      <ScrollView contentContainerClassName="px-6 py-6" keyboardShouldPersistTaps="handled">
-        {/* Template fields */}
-        <Field label={t("templates.form.templateNameLabel")}>
-          <Input value={name} onChangeText={setName} placeholder={t("templates.form.templateNamePlaceholder")} editable={!submitting} />
-        </Field>
-        <Field label={t("templates.form.descriptionLabel")}>
-          <Input value={description} onChangeText={setDescription} placeholder={t("templates.form.descriptionPlaceholder")} editable={!submitting} />
-        </Field>
-        <Field label={t("templates.form.notesLabel")}>
-          <Input value={notes} onChangeText={setNotes} placeholder={t("templates.form.notesPlaceholder")} editable={!submitting} multiline />
-        </Field>
-
-        {/* Exercises */}
-        <Text className="w-full text-left mb-2 mt-2 text-sm font-semibold uppercase tracking-wide text-slate-500">
-          {t("templates.form.exercisesCount", { count: items.length })}
-        </Text>
-
-        {items.map((it, index) => (
-          <View key={it.key} className="mb-3 rounded-xl border border-slate-200 bg-white p-3">
-            <View className="mb-2 flex-row items-center justify-between">
-              <Text className="flex-1 text-left text-base font-semibold text-slate-900">
-                {index + 1}. {it.exercise_name}
-              </Text>
-              <View className="flex-row items-center gap-1">
-                <IconBtn label="↑" onPress={() => move(index, -1)} disabled={submitting || index === 0} />
-                <IconBtn label="↓" onPress={() => move(index, 1)} disabled={submitting || index === items.length - 1} />
-                <IconBtn label="✕" danger onPress={() => removeItem(it.key)} disabled={submitting} />
-              </View>
-            </View>
-            <View className="flex-row gap-2">
-              <Mini label={t("templates.form.setsLabel")} value={it.target_sets} onChangeText={(v) => updateItem(it.key, "target_sets", v)} editable={!submitting} />
-              <Mini label={t("templates.form.repsLabel")} value={it.target_reps} onChangeText={(v) => updateItem(it.key, "target_reps", v)} editable={!submitting} />
-              <Mini label={t("templates.form.weightLabel")} value={it.target_weight} onChangeText={(v) => updateItem(it.key, "target_weight", v)} editable={!submitting} decimal />
-              <Mini label={t("templates.form.restLabel")} value={it.rest_seconds} onChangeText={(v) => updateItem(it.key, "rest_seconds", v)} editable={!submitting} />
-            </View>
-          </View>
-        ))}
-
-        <Pressable
-          className="mb-2 items-center rounded-xl border border-slate-300 px-4 py-3 active:bg-slate-50"
-          disabled={submitting}
-          onPress={() => setPickerOpen(true)}
-        >
-          <Text className="text-base font-semibold text-slate-700">{t("templates.form.addExercise")}</Text>
-        </Pressable>
-
-        {validationError || errorMessage ? (
-          <Text className="w-full text-left mb-3 mt-1 text-sm text-red-600">
-            {validationError ?? errorMessage}
-          </Text>
+    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === "ios" ? "padding" : undefined}>
+      <Stack.Screen
+        options={{
+          headerRight: () => (
+            <Button
+              label={t("templates.builder.save")}
+              accessibilityLabel={submitLabel}
+              size={44}
+              loading={submitting}
+              onPress={handleSubmit}
+            />
+          ),
+        }}
+      />
+      <ScrollView
+        style={{ flex: 1, backgroundColor: colors.chalk }}
+        contentContainerStyle={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 30, gap: 18 }}
+        keyboardShouldPersistTaps="handled"
+      >
+        {error ? (
+          <AppText size={14} tone="ember">
+            {error}
+          </AppText>
         ) : null}
 
-        <Pressable
-          className="mt-2 items-center rounded-xl bg-slate-900 px-4 py-3 active:opacity-80"
-          disabled={submitting}
-          onPress={handleSubmit}
-        >
-          {submitting ? (
-            <ActivityIndicator color="#ffffff" />
-          ) : (
-            <Text className="text-base font-semibold text-white">{submitLabel}</Text>
-          )}
-        </Pressable>
+        <View style={{ gap: 8 }}>
+          <FieldLabel>{t("templates.builder.name")}</FieldLabel>
+          <Input
+            size="md"
+            value={name}
+            onChangeText={setName}
+            placeholder={t("templates.form.templateNamePlaceholder")}
+            editable={!submitting}
+            accessibilityLabel={t("templates.builder.name")}
+          />
+        </View>
 
-        {footer ? <View className="mt-4">{footer}</View> : null}
+        <View style={{ gap: 8 }}>
+          <FieldLabel>{t("templates.builder.noteToClients")}</FieldLabel>
+          <Input
+            size="md"
+            multiline
+            value={notes}
+            onChangeText={setNotes}
+            placeholder={t("templates.form.notesPlaceholder")}
+            editable={!submitting}
+            accessibilityLabel={t("templates.builder.noteToClients")}
+            style={{ minHeight: 48, fontSize: 16, lineHeight: 24, fontFamily: fonts.regular }}
+          />
+        </View>
+
+        <View style={{ gap: 10 }}>
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+            <AppText size={18} weight="semibold" lineHeight={23}>
+              {t("templates.builder.exercises", { count: items.length })}
+            </AppText>
+            {items.length > 1 ? (
+              <AppText size={13} tone="smoke" style={{ flexShrink: 1 }}>
+                {t("templates.builder.reorderHint")}
+              </AppText>
+            ) : null}
+          </View>
+
+          {items.length > 0 ? (
+            <ListCard>
+              {items.map((it, index) =>
+                it.key === openKey ? (
+                  <OpenRow
+                    key={it.key}
+                    item={it}
+                    index={index}
+                    count={items.length}
+                    disabled={submitting}
+                    onClose={() => setOpenKey(null)}
+                    onChange={(patch) => update(it.key, patch)}
+                    onMove={(dir) => move(index, dir)}
+                    onRemove={() => remove(it.key)}
+                  />
+                ) : (
+                  <ClosedRow key={it.key} item={it} index={index} onOpen={() => setOpenKey(it.key)} />
+                ),
+              )}
+            </ListCard>
+          ) : null}
+
+          <Pressable
+            accessibilityRole="button"
+            disabled={submitting}
+            onPress={() => setPickerOpen(true)}
+            style={({ pressed }) => ({
+              height: 56,
+              borderRadius: 16,
+              borderWidth: 1.5,
+              borderStyle: "dashed",
+              borderColor: colors.ash,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "center",
+              gap: 8,
+              opacity: pressed ? 0.6 : 1,
+            })}
+          >
+            <Icon icon={Plus} size={20} />
+            <AppText size={16} weight="semibold">
+              {t("templates.builder.add")}
+            </AppText>
+          </Pressable>
+        </View>
+
+        {isEdit ? (
+          <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
+            <View style={{ paddingTop: 2 }}>
+              <Icon icon={Info} size={16} color={colors.graphite} />
+            </View>
+            <AppText size={13} lineHeight={20} tone="graphite" style={{ flex: 1 }}>
+              {t("templates.builder.appliesHint")}
+            </AppText>
+          </View>
+        ) : null}
+
+        {footer ? <View style={{ marginTop: 8 }}>{footer}</View> : null}
       </ScrollView>
 
-      <ExercisePickerModal
-        visible={pickerOpen}
-        onClose={() => setPickerOpen(false)}
-        onPick={addExercise}
-      />
-    </SafeAreaView>
+      <ExercisePickerSheet visible={pickerOpen} onClose={() => setPickerOpen(false)} onPick={addExercise} />
+    </KeyboardAvoidingView>
   );
 }
 
-// A modal listing the trainer's exercise library to pick from.
-function ExercisePickerModal({
+// ---------------------------------------------------------------------------
+// Rows
+// ---------------------------------------------------------------------------
+
+function useScheme(it: BuilderItem): string {
+  const { t } = useTranslation();
+  return [
+    ltr(`${it.sets ?? "—"} × ${it.reps ?? "—"}`),
+    it.weight != null ? `${formatWeight(it.weight)} ${t("templates.builder.kg")}` : null,
+    it.rest != null ? t("templates.builder.restShort", { time: ltr(formatClock(it.rest * 1000)) }) : null,
+  ]
+    .filter(Boolean)
+    .join(" · ");
+}
+
+function Position({ index }: { index: number }) {
+  return (
+    <View style={{ width: 32, alignItems: "center" }}>
+      <Num size={18} weight="semibold" tone="smoke" center>
+        {index + 1}
+      </Num>
+    </View>
+  );
+}
+
+function ClosedRow({ item, index, onOpen }: { item: BuilderItem; index: number; onOpen: () => void }) {
+  const { t } = useTranslation();
+  const scheme = useScheme(item);
+  return (
+    <Pressable
+      accessibilityRole="button"
+      accessibilityLabel={t("templates.builder.edit", { name: item.exercise_name })}
+      onPress={onOpen}
+      style={({ pressed }) => ({
+        minHeight: 72,
+        paddingVertical: 10,
+        paddingStart: 4,
+        paddingEnd: 10,
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 10,
+        backgroundColor: pressed ? colors.chalk : "transparent",
+      })}
+    >
+      <Position index={index} />
+      <View style={{ flex: 1, gap: 3 }}>
+        <AppText size={16} weight="semibold" numberOfLines={1}>
+          {item.exercise_name}
+        </AppText>
+        <AppText size={13} tone="graphite" numberOfLines={1}>
+          {scheme}
+        </AppText>
+      </View>
+      <View style={{ width: 44, height: 44, alignItems: "center", justifyContent: "center" }}>
+        <Icon icon={ChevronDown} size={20} />
+      </View>
+    </Pressable>
+  );
+}
+
+function OpenRow({
+  item,
+  index,
+  count,
+  disabled,
+  onClose,
+  onChange,
+  onMove,
+  onRemove,
+}: {
+  item: BuilderItem;
+  index: number;
+  count: number;
+  disabled: boolean;
+  onClose: () => void;
+  onChange: (patch: Partial<BuilderItem>) => void;
+  onMove: (dir: -1 | 1) => void;
+  onRemove: () => void;
+}) {
+  const { t } = useTranslation();
+  const dec = t("templates.builder.decrease");
+  const inc = t("templates.builder.increase");
+  const typeHint = t("workout.mode.tapToType");
+  return (
+    <View
+      style={{
+        margin: 4,
+        paddingTop: 10,
+        paddingHorizontal: 14,
+        paddingBottom: 16,
+        gap: 12,
+        borderRadius: 16,
+        borderWidth: 2,
+        borderColor: colors.ink,
+        backgroundColor: colors.paper,
+      }}
+    >
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 10, minHeight: 52 }}>
+        <View style={{ marginStart: -10 }}>
+          <Position index={index} />
+        </View>
+        <AppText size={16} weight="semibold" style={{ flex: 1 }}>
+          {item.exercise_name}
+        </AppText>
+        <IconButton icon={ChevronUp} variant="ghost" accessibilityLabel={t("templates.builder.closeEdit")} onPress={onClose} />
+      </View>
+
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <MiniField label={t("templates.builder.sets")}>
+          <Stepper
+            value={item.sets ?? "—"}
+            onDecrement={() => onChange({ sets: stepCount(item.sets, -1, START.sets) })}
+            onIncrement={() => onChange({ sets: stepCount(item.sets, 1, START.sets) })}
+            decrementLabel={dec}
+            incrementLabel={inc}
+          />
+        </MiniField>
+        <MiniField label={t("templates.builder.reps")}>
+          <Stepper
+            value={item.reps ?? "—"}
+            onDecrement={() => onChange({ reps: stepCount(item.reps, -1, START.reps) })}
+            onIncrement={() => onChange({ reps: stepCount(item.reps, 1, START.reps) })}
+            onSet={(n) => onChange({ reps: Math.max(1, Math.round(n)) })}
+            typeHint={typeHint}
+            decrementLabel={dec}
+            incrementLabel={inc}
+          />
+        </MiniField>
+      </View>
+      <View style={{ flexDirection: "row", gap: 10 }}>
+        <MiniField label={t("templates.builder.weight")}>
+          <Stepper
+            value={item.weight != null ? formatWeight(item.weight) : "—"}
+            unit={item.weight != null ? t("templates.builder.kg") : undefined}
+            // The workout's steps: 1 kg under 10 kg, 2.5 kg from there; 0 = no target.
+            onDecrement={() => {
+              if (item.weight == null) return;
+              const w = stepWeight(item.weight, -1);
+              onChange({ weight: w > 0 ? w : null });
+            }}
+            onIncrement={() => onChange({ weight: stepWeight(item.weight ?? 0, 1) })}
+            onSet={(n) => onChange({ weight: n > 0 ? Math.round(n * 100) / 100 : null })}
+            decimal
+            typeHint={typeHint}
+            decrementLabel={dec}
+            incrementLabel={inc}
+          />
+        </MiniField>
+        <MiniField label={t("templates.builder.rest")}>
+          <Stepper
+            value={item.rest != null ? formatClock(item.rest * 1000) : "—"}
+            onDecrement={() =>
+              onChange({ rest: item.rest == null ? null : Math.max(0, item.rest - REST_STEP) })
+            }
+            onIncrement={() => onChange({ rest: item.rest == null ? START.rest : item.rest + REST_STEP })}
+            decrementLabel={dec}
+            incrementLabel={inc}
+          />
+        </MiniField>
+      </View>
+
+      <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+        <View style={{ flexDirection: "row", gap: 4 }}>
+          <IconButton
+            icon={ArrowUp}
+            variant="soft"
+            accessibilityLabel={t("templates.builder.moveUp")}
+            onPress={() => onMove(-1)}
+            disabled={disabled || index === 0}
+          />
+          <IconButton
+            icon={ArrowDown}
+            variant="soft"
+            accessibilityLabel={t("templates.builder.moveDown")}
+            onPress={() => onMove(1)}
+            disabled={disabled || index === count - 1}
+          />
+        </View>
+        <Button
+          label={t("templates.builder.remove")}
+          icon={Trash}
+          variant="danger"
+          size={44}
+          disabled={disabled}
+          onPress={onRemove}
+        />
+      </View>
+    </View>
+  );
+}
+
+function MiniField({ label, children }: { label: string; children: ReactNode }) {
+  return (
+    <View style={{ flex: 1, minWidth: 0, gap: 6 }}>
+      <AppText size={13} weight="semibold" tone="graphite">
+        {label}
+      </AppText>
+      {children}
+    </View>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// The library, in a sheet
+// ---------------------------------------------------------------------------
+
+function ExercisePickerSheet({
   visible,
   onClose,
   onPick,
@@ -262,6 +545,7 @@ function ExercisePickerModal({
   onPick: (ex: { id: string; name: string; default_sets: number | null; default_reps: number | null }) => void;
 }) {
   const { t } = useTranslation();
+  const [query, setQuery] = useState("");
   const { data, isLoading } = useQuery({
     queryKey: qk.exercises.list,
     queryFn: async () => {
@@ -269,115 +553,74 @@ function ExercisePickerModal({
       if (error) throw error;
       return data;
     },
-    enabled: visible, // only fetch when the modal is open
+    enabled: visible, // only fetch when the sheet is open
   });
 
-  return (
-    <Modal visible={visible} animationType="slide" onRequestClose={onClose}>
-      <SafeAreaView className="flex-1 bg-white">
-        <View className="flex-row items-center justify-between border-b border-slate-200 px-6 py-4">
-          <Text className="flex-1 text-left text-lg font-bold text-slate-900">
-            {t("templates.form.pickExercise")}
-          </Text>
-          <Pressable onPress={onClose} className="active:opacity-60">
-            <Text className="text-base font-semibold text-slate-500">{t("common.cancel")}</Text>
-          </Pressable>
-        </View>
+  const shown = useMemo(() => {
+    const q = query.trim().toLowerCase();
+    return (data ?? []).filter((e) => !q || e.name.toLowerCase().includes(q));
+  }, [data, query]);
 
-        {isLoading ? (
-          <View className="flex-1 items-center justify-center">
-            <ActivityIndicator />
-          </View>
-        ) : (
-          <FlatList
-            data={data ?? []}
-            keyExtractor={(item) => item.id}
-            contentContainerClassName="p-4 gap-2"
-            ListEmptyComponent={
-              <Text className="px-2 py-8 text-center text-sm text-slate-400">
-                {t("templates.form.noExercisesInLibrary")}
-              </Text>
-            }
-            renderItem={({ item }) => (
-              <Pressable
-                className="rounded-xl border border-slate-200 px-4 py-3 active:bg-slate-50"
-                onPress={() => onPick(item)}
-              >
-                <Text className="w-full text-left text-base font-semibold text-slate-900">{item.name}</Text>
-                {item.muscle_group ? (
-                  <Text className="w-full text-left mt-0.5 text-sm text-slate-500">{item.muscle_group}</Text>
-                ) : null}
-              </Pressable>
-            )}
-          />
-        )}
-      </SafeAreaView>
-    </Modal>
-  );
-}
-
-// --- small presentational helpers ---
-function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
-    <View className="mb-4">
-      <Text className="w-full text-left mb-2 text-sm font-medium text-slate-700">{label}</Text>
-      {children}
-    </View>
-  );
-}
-
-function Input(props: React.ComponentProps<typeof TextInput>) {
-  return (
-    <TextInput
-      placeholderTextColor="#94a3b8"
-      className={`rounded-xl border border-slate-300 px-4 py-3 text-base text-slate-900 ${directionalTextClassName()}`}
-      {...props}
-    />
-  );
-}
-
-function Mini({
-  label,
-  decimal,
-  ...props
-}: React.ComponentProps<typeof TextInput> & { label: string; decimal?: boolean }) {
-  return (
-    <View className="flex-1">
-      <Text className="mb-1 text-center text-xs text-slate-400">{label}</Text>
-      <TextInput
-        placeholderTextColor="#cbd5e1"
-        placeholder="—"
-        keyboardType={decimal ? "decimal-pad" : "number-pad"}
-        className="rounded-lg border border-slate-300 px-2 py-2 text-center text-base text-slate-900"
-        style={LTR_WRITING_DIRECTION_ONLY}
-        {...props}
+    <Sheet visible={visible} onClose={onClose} closeLabel={t("templates.builder.close")} title={t("templates.builder.pickTitle")}>
+      <Input
+        size="md"
+        leadingIcon={Search}
+        value={query}
+        onChangeText={setQuery}
+        placeholder={t("exercises.library.search")}
+        accessibilityLabel={t("exercises.library.search")}
+        autoCorrect={false}
       />
-    </View>
-  );
-}
-
-function IconBtn({
-  label,
-  onPress,
-  disabled,
-  danger,
-}: {
-  label: string;
-  onPress: () => void;
-  disabled?: boolean;
-  danger?: boolean;
-}) {
-  return (
-    <Pressable
-      onPress={onPress}
-      disabled={disabled}
-      className={`h-8 w-8 items-center justify-center rounded-lg border ${
-        disabled ? "border-slate-200" : danger ? "border-red-300" : "border-slate-300 active:bg-slate-100"
-      }`}
-    >
-      <Text className={`text-base ${disabled ? "text-slate-300" : danger ? "text-red-600" : "text-slate-700"}`}>
-        {label}
-      </Text>
-    </Pressable>
+      <ScrollView style={{ maxHeight: 420 }} keyboardShouldPersistTaps="handled">
+        {isLoading ? null : shown.length === 0 ? (
+          <AppText size={14} tone="graphite" center style={{ paddingVertical: 24 }}>
+            {t("templates.form.noExercisesInLibrary")}
+          </AppText>
+        ) : (
+          shown.map((e, i) => {
+            const key = muscleKeyOf(e.muscle_group);
+            const muscle = key ? t(`exercises.muscles.${key}`) : e.muscle_group?.trim() || null;
+            const scheme =
+              e.default_sets != null || e.default_reps != null
+                ? ltr(`${e.default_sets ?? "—"} × ${e.default_reps ?? "—"}`)
+                : null;
+            const sub = [muscle, scheme].filter(Boolean).join(" · ");
+            return (
+              <View key={e.id}>
+                {i > 0 ? <Divider inset={0} /> : null}
+                <Pressable
+                  accessibilityRole="button"
+                  onPress={() => {
+                    setQuery("");
+                    onPick(e);
+                  }}
+                  style={({ pressed }) => ({
+                    minHeight: 60,
+                    paddingVertical: 8,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    gap: 12,
+                    opacity: pressed ? 0.6 : 1,
+                  })}
+                >
+                  <View style={{ flex: 1, gap: 2 }}>
+                    <AppText size={16} weight="semibold" numberOfLines={1}>
+                      {e.name}
+                    </AppText>
+                    {sub ? (
+                      <AppText size={13} tone="graphite" numberOfLines={1}>
+                        {sub}
+                      </AppText>
+                    ) : null}
+                  </View>
+                  <Icon icon={Plus} size={20} color={colors.graphite} />
+                </Pressable>
+              </View>
+            );
+          })
+        )}
+      </ScrollView>
+    </Sheet>
   );
 }

@@ -209,7 +209,17 @@
       "editTitle": "Edit template",
       "createTemplate": "+ Create template",
       "emptyTitle": "No templates yet",
-      "emptyHint": "Build a reusable workout once, assign it to many clients later."
+      "emptyHint": "Build a reusable workout once, assign it to many clients later.",
+      "search": "Search templates",
+      "edit": "Edit",
+      "duplicate": "Duplicate",
+      "copyName": "{{name}} (copy)",
+      "more": "More actions",
+      "schedule": "Schedule",
+      "noExercises": "No exercises yet",
+      "clients_one": "1 client",
+      "clients_two": "{{count}} clients",
+      "clients_other": "{{count}} clients"
     },
     "form": {
       "createTemplate": "Create template",
@@ -238,6 +248,32 @@
       "notFound": "Template not found.",
       "saveChanges": "Save changes",
       "deleteTemplate": "Delete template"
+    },
+    "builder": {
+      "name": "Template name",
+      "noteToClients": "Note to clients",
+      "exercises": "Exercises · {{count}}",
+      "reorderHint": "Open an exercise to edit or move it",
+      "edit": "Edit {{name}}",
+      "closeEdit": "Close editing",
+      "moveUp": "Move up",
+      "moveDown": "Move down",
+      "sets": "Sets",
+      "reps": "Reps",
+      "weight": "Weight",
+      "rest": "Rest",
+      "kg": "kg",
+      "bodyweight": "Bodyweight",
+      "restShort": "rest {{time}}",
+      "decrease": "Decrease",
+      "increase": "Increase",
+      "demo": "Demo",
+      "remove": "Remove from template",
+      "add": "Add exercise",
+      "appliesHint": "Changes apply to every upcoming workout with this template.",
+      "pickTitle": "Choose an exercise",
+      "close": "Close",
+      "save": "Save"
     }
   },
   "schedule": {

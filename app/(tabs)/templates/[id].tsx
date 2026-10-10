@@ -4,8 +4,9 @@
 // On save it updates the template and REPLACES its template_exercises (delete +
 // re-insert in the new order) — simplest correct way to persist reordering and
 // added/removed rows. Also supports deleting the whole template.
+// D29a: the loading / error states and the delete button use the kit.
 
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { Alert, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -18,6 +19,7 @@ import {
   type TemplateBuilderInitial,
   type TemplateInput,
 } from "@/components/TemplateBuilder";
+import { AppText, Button, colors } from "@/components/ui";
 
 export default function EditTemplateScreen() {
   return (
@@ -134,20 +136,14 @@ function EditTemplateScreenBody() {
     ]);
   }
 
-  if (isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator />
-      </View>
-    );
-  }
+  if (isLoading) return <View style={{ flex: 1, backgroundColor: colors.chalk }} />;
 
   if (error || !data) {
     return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-sm text-red-600">
+      <View style={{ flex: 1, backgroundColor: colors.chalk, alignItems: "center", justifyContent: "center", padding: 24 }}>
+        <AppText size={14} tone="ember" center>
           {error ? (error as Error).message : t("templates.detail.notFound")}
-        </Text>
+        </AppText>
       </View>
     );
   }
@@ -160,13 +156,14 @@ function EditTemplateScreenBody() {
       errorMessage={updateMutation.error ? (updateMutation.error as Error).message : null}
       onSubmit={(input) => updateMutation.mutate(input)}
       footer={
-        <Pressable
-          className="items-center rounded-xl border border-red-300 px-4 py-3 active:opacity-70"
+        <Button
+          label={t("templates.detail.deleteTemplate")}
+          variant="danger"
+          size={52}
+          block
           disabled={deleteMutation.isPending}
           onPress={confirmDelete}
-        >
-          <Text className="text-base font-semibold text-red-600">{t("templates.detail.deleteTemplate")}</Text>
-        </Pressable>
+        />
       }
     />
   );

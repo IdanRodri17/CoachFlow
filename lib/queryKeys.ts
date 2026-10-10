@@ -60,6 +60,8 @@ export const qk = {
     byIds: (ids: string[]) => ["templates", "by-ids", ids.join(",")] as const,
     exerciseCounts: ["templates", "exercise-counts"] as const,
     preview: (id: Id) => ["templates", "preview", id] as const,
+    /** The Library's template cards: counts, minutes, muscles, assigned clients. */
+    cards: ["templates", "cards"] as const,
   },
 
   exercises: {

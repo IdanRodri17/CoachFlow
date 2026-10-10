@@ -1336,6 +1336,9 @@ export function Stepper({
   decrementLabel,
   incrementLabel,
   background = colors.chalk,
+  onSet,
+  decimal,
+  typeHint,
 }: {
   value: string | number;
   unit?: string;
@@ -1345,7 +1348,15 @@ export function Stepper({
   incrementLabel: string;
   /** chalk inside a paper card (the reference), mist on chalk. */
   background?: string;
+  /** Tap the value to type it (number keyboard); called on every valid keystroke. */
+  onSet?: (value: number) => void;
+  decimal?: boolean;
+  /** Accessibility hint for the tappable value ("tap to type"). */
+  typeHint?: string;
 }) {
+  // null = showing the value; a string = typing.
+  const [draft, setDraft] = useState<string | null>(null);
+  const shown = String(value);
   return (
     <View
       accessibilityRole="adjustable"
@@ -1353,23 +1364,86 @@ export function Stepper({
         flexDirection: "row",
         alignItems: "center",
         height: 52,
-        padding: 4,
+        // The typing border eats into the padding, not the 44 buttons.
+        padding: draft != null ? 2 : 4,
         borderRadius: 14,
         backgroundColor: background,
+        borderWidth: draft != null ? 2 : 0,
+        borderColor: colors.ink,
       }}
     >
-      <IconButton icon={Minus} accessibilityLabel={decrementLabel} onPress={onDecrement} variant="ghost" shape="square" />
-      <View style={{ flex: 1, flexDirection: "row", alignItems: "baseline", justifyContent: "center", gap: 4 }}>
-        <Num size={24}>{value}</Num>
-        {unit ? (
-          <AppText size={13} weight="medium" tone="graphite">
-            {unit}
-          </AppText>
-        ) : null}
-      </View>
-      <IconButton icon={Plus} accessibilityLabel={incrementLabel} onPress={onIncrement} variant="ghost" shape="square" />
+      <IconButton
+        icon={Minus}
+        accessibilityLabel={decrementLabel}
+        onPress={() => {
+          setDraft(null);
+          onDecrement();
+        }}
+        variant="ghost"
+        shape="square"
+      />
+      {draft != null && onSet ? (
+        <TextInput
+          value={draft}
+          onChangeText={(v) => {
+            setDraft(v);
+            const n = parseTypedNumber(v);
+            if (n != null) onSet(n);
+          }}
+          onBlur={() => setDraft(null)}
+          autoFocus
+          selectTextOnFocus
+          keyboardType={decimal ? "decimal-pad" : "number-pad"}
+          returnKeyType="done"
+          maxLength={6}
+          selectionColor={colors.ink}
+          style={{
+            flex: 1,
+            minWidth: 0,
+            paddingVertical: 0,
+            fontFamily: fonts.numBold,
+            fontSize: 24,
+            color: colors.ink,
+            textAlign: "center",
+            writingDirection: "ltr",
+          }}
+        />
+      ) : (
+        <Pressable
+          disabled={!onSet}
+          accessibilityRole={onSet ? "button" : undefined}
+          accessibilityHint={onSet ? typeHint : undefined}
+          onPress={() => setDraft(shown === "—" ? "" : shown)}
+          style={{ flex: 1, flexDirection: "row", alignItems: "baseline", justifyContent: "center", gap: 4 }}
+        >
+          <Num size={24}>{value}</Num>
+          {unit ? (
+            <AppText size={13} weight="medium" tone="graphite">
+              {unit}
+            </AppText>
+          ) : null}
+        </Pressable>
+      )}
+      <IconButton
+        icon={Plus}
+        accessibilityLabel={incrementLabel}
+        onPress={() => {
+          setDraft(null);
+          onIncrement();
+        }}
+        variant="ghost"
+        shape="square"
+      />
     </View>
   );
+}
+
+/** "42.5", "42,5" (a comma keyboard) or "12." → a number; "" or junk → null. */
+export function parseTypedNumber(v: string): number | null {
+  const clean = v.trim().replace(",", ".");
+  if (clean === "") return null;
+  const n = Number(clean);
+  return Number.isFinite(n) && n >= 0 ? n : null;
 }
 
 // ---------------------------------------------------------------------------
