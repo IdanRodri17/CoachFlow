@@ -191,6 +191,13 @@
     }
   },
   "schedule": {
+    "series": {
+      "editTitle": "Change the whole series?",
+      "deleteTitle": "Delete the whole series?",
+      "hint": "Workouts already done or already past won't change.",
+      "onlyThis": "Only this workout",
+      "thisAndFuture": "This and all following ({{n}})"
+    },
     "home": {
       "title": "Schedule",
       "scheduleWorkout": "Schedule a workout",
