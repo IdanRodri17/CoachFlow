@@ -1,8 +1,9 @@
-// app/clients.tsx — V14: add/manage clients.
+// app/(tabs)/clients.tsx — V14: add/manage clients.
 //
 // Moved off the Schedule tab (which is now a calendar, not a client-management
-// hub) so scheduling stays the trainer's main focus. Reached from the tab
-// bar's "מתאמנים".
+// hub) so scheduling stays the trainer's main focus. D21c: the trainer's
+// "מתאמנים" tab (it was a stack screen at app/clients.tsx). `?add=1` (the
+// quick-add sheet's "מתאמן חדש") opens it with the add-client sheet up.
 //
 // V18b: app clients join by INVITE, not by email. The trainer creates a
 // single-use code (create_invite, 0020) and sends it on WhatsApp; the client
@@ -29,10 +30,9 @@
 import { useMemo, useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import Info from "lucide-react-native/icons/info";
 import MessageCircle from "lucide-react-native/icons/message-circle";
 import Phone from "lucide-react-native/icons/phone";
@@ -43,7 +43,7 @@ import UserPlus from "lucide-react-native/icons/user-plus";
 import X from "lucide-react-native/icons/x";
 
 import { qk } from "@/lib/queryKeys";
-import { attentionQuery } from "@/lib/queries";
+import { attentionQuery, owedQuery } from "@/lib/queries";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { toE164IL, useAuth } from "@/lib/auth";
@@ -117,6 +117,14 @@ function ClientsScreenBody() {
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<Filter>("all");
   const [adding, setAdding] = useState(false);
+  // Read in render, not copied into state by an effect: the tab stays
+  // mounted, so each "מתאמן חדש" from quick-add just sets the param again.
+  const { add } = useLocalSearchParams<{ add?: string }>();
+  const showAdd = adding || add === "1";
+  function closeAdd() {
+    setAdding(false);
+    if (add) router.setParams({ add: undefined });
+  }
   const [phoneFor, setPhoneFor] = useState<RosterClient | null>(null);
 
   const roster = useRosterClients(trainerId);
@@ -135,35 +143,8 @@ function ClientsScreenBody() {
     },
   });
 
-  // Money owed per client: completed sessions not marked paid × the package's
-  // price per session (no price → nothing owed is shown).
-  const owed = useQuery({
-    queryKey: qk.scheduledTrainer.owed,
-    queryFn: async () => {
-      const [unpaidRes, pkgRes] = await Promise.all([
-        supabase
-          .from("scheduled_workouts")
-          .select("client_id, managed_client_id")
-          .eq("trainer_id", trainerId)
-          .eq("status", "completed")
-          .eq("paid", false),
-        supabase.from("packages").select("client_id, managed_client_id, price_per_session").eq("trainer_id", trainerId),
-      ]);
-      if (unpaidRes.error) throw unpaidRes.error;
-      if (pkgRes.error) throw pkgRes.error;
-      const price = new Map<string, number>();
-      pkgRes.data.forEach((p) => {
-        if (p.price_per_session != null) price.set(p.client_id ?? `m:${p.managed_client_id}`, p.price_per_session);
-      });
-      const out = new Map<string, number>();
-      unpaidRes.data.forEach((w) => {
-        const k = w.client_id ?? `m:${w.managed_client_id}`;
-        const p = price.get(k);
-        if (p != null) out.set(k, (out.get(k) ?? 0) + p);
-      });
-      return out;
-    },
-  });
+  // Money owed per client (lib/queries.ts — shared with Money's "לא שולם").
+  const owed = useQuery(owedQuery(trainerId));
 
   // Pending invites only: used ones have become roster rows, expired ones are
   // dead. expires_at is an instant, so comparing it to "now" in UTC is right
@@ -204,7 +185,7 @@ function ClientsScreenBody() {
         risk,
         packageLeft: pkg ? (pkg.sessions_left ?? 0) : null,
         usedUp: pkg?.kind === "package_used_up",
-        unpaid: owed.data?.get(key) ?? 0,
+        unpaid: owed.data?.get(key)?.amount ?? 0,
         next: st?.next_scheduled_date ? { date: st.next_scheduled_date, time: st.next_scheduled_time } : null,
       };
     });
@@ -250,13 +231,6 @@ function ClientsScreenBody() {
         contentContainerStyle={{ paddingTop: insets.top + 8, paddingHorizontal: 20, paddingBottom: 30, gap: 18 }}
         refreshControl={<RefreshControl {...refresh} />}
       >
-        <IconButton
-          icon={ChevronLeft}
-          mirror
-          iconSize={22}
-          accessibilityLabel={t("common.back")}
-          onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
-        />
         <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 12 }}>
           <View style={{ flex: 1, gap: 6 }}>
             <Display size={44}>{t("clients.title")}</Display>
@@ -371,7 +345,7 @@ function ClientsScreenBody() {
         ) : null}
       </ScrollView>
 
-      <AddClientSheet visible={adding} onClose={() => setAdding(false)} />
+      <AddClientSheet visible={showAdd} onClose={closeAdd} />
       <PhoneSheet client={phoneFor} onClose={() => setPhoneFor(null)} />
     </View>
   );

@@ -5,8 +5,8 @@
 // middle. Items are laid out in logical order, so the row mirrors in Hebrew.
 //
 // The items are declared here rather than derived from the routes, because
-// two of the trainer's design tabs don't exist as tab routes yet:
-//   - מתאמנים opens /clients (a stack screen) until D21c moves it into the tabs.
+// the trainer's design tabs don't map one-to-one onto the routes:
+//   - מתאמנים is the clients tab (D21c).
 //   - ספרייה is the exercises tab, whose screen carries the תבניות | תרגילים
 //     switch (D29b); it stays highlighted on templates too. Templates gets the
 //     switch back to exercises with its own restyle (D29a).
@@ -45,7 +45,7 @@ export function TabBar({ state, navigation, insets, isTrainer }: BottomTabBarPro
         { kind: "tab", route: "index", label: t("tabs.home"), icon: House },
         { kind: "tab", route: "schedule", label: t("tabBar.calendar"), icon: Calendar },
         { kind: "add" },
-        { kind: "link", href: "/clients", label: t("tabBar.clients"), icon: Users },
+        { kind: "tab", route: "clients", label: t("tabBar.clients"), icon: Users },
         { kind: "tab", route: "exercises", label: t("tabBar.library"), icon: Layers, alsoActiveOn: ["templates"] },
       ]
     : [

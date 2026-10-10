@@ -51,6 +51,11 @@ export default function TabsLayout() {
         name="schedule"
         options={{ title: t("tabs.schedule"), headerShown: false, href: isTrainer ? undefined : null }}
       />
+      {/* D21c: Clients is a trainer tab and draws its own header. */}
+      <Tabs.Screen
+        name="clients"
+        options={{ title: t("tabBar.clients"), headerShown: false, href: isTrainer ? undefined : null }}
+      />
       {/* Progress + Nutrition are client-only. */}
       <Tabs.Screen
         name="progress"

@@ -25,7 +25,8 @@ export function QuickAddSheet({ visible, onClose }: { visible: boolean; onClose:
 
   const tiles: { icon: IconComponent; label: string; href: Href }[] = [
     { icon: CalendarPlus, label: t("quickAdd.schedule"), href: "/schedule/new" },
-    { icon: UserPlus, label: t("quickAdd.client"), href: "/clients" },
+    // Opens the Clients tab with its add-client sheet already up.
+    { icon: UserPlus, label: t("quickAdd.client"), href: "/clients?add=1" },
     { icon: Layers, label: t("quickAdd.template"), href: "/templates/new" },
     { icon: Dumbbell, label: t("quickAdd.exercise"), href: "/exercises/new" },
   ];
