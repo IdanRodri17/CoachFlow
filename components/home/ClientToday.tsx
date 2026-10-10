@@ -13,10 +13,14 @@
 //
 // The trainer's name isn't readable by clients yet (my_trainer(), main B1), so
 // the copy says "your trainer" for now.
+//
+// D20g: while a workout is open (saved on the phone, not finished), a dark
+// "חזרה לאימון" card sits at the top and reopens it where it was left.
 
+import { useCallback } from "react";
 import { Pressable, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
-import { Link, useRouter } from "expo-router";
+import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { LucideProps } from "lucide-react-native";
@@ -26,6 +30,7 @@ import Check from "lucide-react-native/icons/check";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Clock from "lucide-react-native/icons/clock";
+import Dumbbell from "lucide-react-native/icons/dumbbell";
 import Flame from "lucide-react-native/icons/flame";
 import MessageSquare from "lucide-react-native/icons/message-square";
 import Play from "lucide-react-native/icons/play";
@@ -38,6 +43,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { addDays, todayISO, weekStartOf } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
+import { listOpenWorkouts, type OpenWorkout } from "@/lib/useWorkoutSession";
 import {
   AppText,
   Button,
@@ -152,6 +158,20 @@ export function ClientToday() {
     },
   });
 
+  // Open workouts live on the phone, not in the DB: re-read on every focus
+  // (coming back from a minimized workout, or after saving one).
+  const openWorkouts = useQuery({
+    queryKey: qk.workout.open(clientId),
+    queryFn: () => listOpenWorkouts(clientId),
+  });
+  const { refetch: refetchOpen } = openWorkouts;
+  useFocusEffect(
+    useCallback(() => {
+      void refetchOpen();
+    }, [refetchOpen]),
+  );
+  const openWorkout = openWorkouts.data?.[0];
+
   // "Under check-ins", so submitting one on Progress refreshes this too.
   const checkedIn = useQuery({
     queryKey: qk.checkIns.week(clientId, weekStart),
@@ -204,6 +224,10 @@ export function ClientToday() {
           </AppText>
         ) : null}
       </View>
+
+      {openWorkout ? (
+        <ResumeCard item={openWorkout} onPress={() => router.push(`/workout/${openWorkout.scheduledId}`)} />
+      ) : null}
 
       {trainerLinks.data === 0 ? (
         <Link href="/join" asChild>
@@ -290,6 +314,46 @@ export function ClientToday() {
         </Link>
       ) : null}
     </ScrollView>
+  );
+}
+
+/** D20g: the open workout, at the top of Today. */
+function ResumeCard({ item, onPress }: { item: OpenWorkout; onPress: () => void }) {
+  const { t } = useTranslation();
+  const started =
+    item.minutesAgo < 60
+      ? t("today.resume.startedMinutes", { count: item.minutesAgo })
+      : t("today.resume.startedHours", { count: Math.floor(item.minutesAgo / 60) });
+  const meta = item.sets > 0 ? `${t("today.resume.sets", { count: item.sets })} · ${started}` : started;
+  return (
+    <View style={{ backgroundColor: colors.iron, borderRadius: 24, padding: 16, gap: 14 }}>
+      <View style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+        <View
+          style={{
+            width: 48,
+            height: 48,
+            borderRadius: 14,
+            backgroundColor: colors.volt,
+            alignItems: "center",
+            justifyContent: "center",
+          }}
+        >
+          <Icon icon={Dumbbell} size={24} color={colors.ink} />
+        </View>
+        <View style={{ flex: 1, gap: 2 }}>
+          <AppText size={13} weight="semibold" tone="volt">
+            {t("today.resume.label")}
+          </AppText>
+          <AppText size={18} weight="semibold" tone="bone" numberOfLines={1}>
+            {item.title}
+          </AppText>
+          <AppText size={13} tone="ash" numberOfLines={1}>
+            {meta}
+          </AppText>
+        </View>
+      </View>
+      <Button label={t("today.resume.button")} variant="accent" size={52} icon={FilledPlay} block onPress={onPress} />
+    </View>
   );
 }
 

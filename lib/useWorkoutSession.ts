@@ -13,19 +13,33 @@
 // client's sets. Only `mode: "client"` (subject = an app client) is built;
 // V17 changes the subject filter and the insert in these two functions.
 //
-// Still to come, each in its own step: keep-awake and rest-end alerts (D20f),
-// persisting an open session across restarts (D20g).
+// Phone-free (D20f): the screen stays awake during the workout and a rest
+// that ends buzzes in the foreground or notifies in the background
+// (lib/restAlerts.ts), both per the client's lib/workoutPrefs.ts settings.
+// Resume (D20g): the open session is saved on the phone after every change,
+// keyed `${loggedBy}:${scheduledId}` (a trainer can have several open), so
+// minimizing or an app restart loses nothing; the save clears it.
 
-import { useEffect, useMemo, useReducer, useState } from "react";
+import { useEffect, useMemo, useReducer, useRef, useState } from "react";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 
+import i18next from "./i18n";
+import { cancelRestAlert, restEndHaptic, scheduleRestAlert } from "./restAlerts";
 import { supabase } from "./supabase";
 import { detectPRs, type SetPerf } from "./pr";
 import { checkAndAwardBadges } from "./badges";
 import {
   createSession,
+  exerciseName,
+  fromSaved,
+  isPristine,
   REST_STEP_SECONDS,
+  RESUME_MAX_AGE_MS,
   saveRows,
+  toSaved,
   workoutReducer,
+  type SavedSession,
   type SessionExercise,
   type WorkoutState,
 } from "./workoutSession";
@@ -49,21 +63,79 @@ export type WorkoutData = {
 
 export type WorkoutSession = ReturnType<typeof useWorkoutSession>;
 
+const KEEP_AWAKE_TAG = "workout";
+const SAVED_PREFIX = "coachflow.workout:";
+const savedKey = (loggedBy: string, scheduledId: string) => `${SAVED_PREFIX}${loggedBy}:${scheduledId}`;
+const alertKey = (loggedBy: string, scheduledId: string) => `${loggedBy}:${scheduledId}`;
+
 export function useWorkoutSession({
+  scheduledId,
+  title,
   exercises,
   subject,
   loggedBy,
   mode,
+  restored,
   autoRest,
+  restAlerts,
+  keepAwake,
 }: {
+  scheduledId: string;
+  /** The workout's name, saved with the session for Today's "חזרה לאימון" card. */
+  title: string;
   exercises: SessionExercise[];
   subject: WorkoutSubject;
   loggedBy: string;
   mode: WorkoutMode;
+  /** A saved open session to resume (loadSavedWorkout), else a fresh start. */
+  restored?: WorkoutState | null;
   autoRest?: boolean;
+  restAlerts?: boolean;
+  keepAwake?: boolean;
 }) {
-  const [state, dispatch] = useReducer(workoutReducer, exercises, (ex) => createSession(ex, Date.now()));
+  const [state, dispatch] = useReducer(workoutReducer, null, () => restored ?? createSession(exercises, Date.now()));
   const [now, setNow] = useState(() => Date.now());
+
+  // D20g: saved after every change; nothing to resume yet → nothing stored.
+  useEffect(() => {
+    const key = savedKey(loggedBy, scheduledId);
+    if (isPristine(state)) void AsyncStorage.removeItem(key).catch(() => undefined);
+    else void AsyncStorage.setItem(key, JSON.stringify({ ...toSaved(state), title })).catch(() => undefined);
+  }, [state, loggedBy, scheduledId, title]);
+
+  // D20f: the screen stays on while the workout is open.
+  useEffect(() => {
+    if (!keepAwake) return;
+    void activateKeepAwakeAsync(KEEP_AWAKE_TAG).catch(() => undefined);
+    return () => {
+      void deactivateKeepAwake(KEEP_AWAKE_TAG).catch(() => undefined);
+    };
+  }, [keepAwake]);
+
+  // D20f: a running rest has a notification at its end; any change to the
+  // rest (±15, pause, skip, undo, finish) moves or cancels it. Not on
+  // unmount: a minimized workout still buzzes when its rest ends.
+  const rest = state.rest;
+  const alertBody = state.next
+    ? i18next.t("workout.alerts.restOverBody", {
+        n: state.next.set + 1,
+        name: exerciseName(state, state.next.ex),
+      })
+    : "";
+  useEffect(() => {
+    const key = alertKey(loggedBy, scheduledId);
+    if (!restAlerts || !rest || rest.pausedLeftMs != null) void cancelRestAlert(key);
+    else void scheduleRestAlert(key, rest.endsAt, alertBody);
+  }, [rest, restAlerts, alertBody, loggedBy, scheduledId]);
+
+  // D20f: the foreground buzz when a rest runs out (not for one that ended
+  // before this screen opened — that's the resumed state's old stamp).
+  const buzzedFor = useRef(state.restEndedAt);
+  useEffect(() => {
+    if (state.restEndedAt == null || state.restEndedAt === buzzedFor.current) return;
+    buzzedFor.current = state.restEndedAt;
+    if (restAlerts) restEndHaptic();
+  }, [state.restEndedAt, restAlerts]);
 
   const resting = state.screen === "rest";
   useEffect(() => {
@@ -103,7 +175,60 @@ export function useWorkoutSession({
     [autoRest],
   );
 
-  return { state, now, subject, loggedBy, mode, ...actions };
+  return { state, now, scheduledId, subject, loggedBy, mode, ...actions };
+}
+
+/** The saved open session for this workout, if it still fits these exercises. */
+export async function loadSavedWorkout(
+  loggedBy: string,
+  scheduledId: string,
+  exercises: SessionExercise[],
+): Promise<WorkoutState | null> {
+  try {
+    const raw = await AsyncStorage.getItem(savedKey(loggedBy, scheduledId));
+    if (!raw) return null;
+    const state = fromSaved(JSON.parse(raw), exercises, Date.now());
+    if (!state) await AsyncStorage.removeItem(savedKey(loggedBy, scheduledId));
+    return state;
+  } catch {
+    return null;
+  }
+}
+
+export type OpenWorkout = { scheduledId: string; title: string; startedAt: number; minutesAgo: number; sets: number };
+
+/** The open (saved, not yet finished) workouts on this phone for this user,
+ * newest first — Today's "חזרה לאימון" card. Stale ones are dropped. */
+export async function listOpenWorkouts(loggedBy: string): Promise<OpenWorkout[]> {
+  try {
+    const prefix = `${SAVED_PREFIX}${loggedBy}:`;
+    const keys = (await AsyncStorage.getAllKeys()).filter((k) => k.startsWith(prefix));
+    if (keys.length === 0) return [];
+    const open: OpenWorkout[] = [];
+    for (const [key, raw] of await AsyncStorage.multiGet(keys)) {
+      const saved = raw ? (JSON.parse(raw) as Partial<SavedSession> & { title?: string }) : null;
+      if (!saved || saved.v !== 1 || typeof saved.startedAt !== "number" || Date.now() - saved.startedAt > RESUME_MAX_AGE_MS) {
+        await AsyncStorage.removeItem(key);
+        continue;
+      }
+      open.push({
+        scheduledId: key.slice(prefix.length),
+        title: saved.title ?? "",
+        startedAt: saved.startedAt,
+        minutesAgo: Math.max(1, Math.round((Date.now() - saved.startedAt) / 60_000)),
+        sets: (saved.logs ?? []).reduce((n, l) => n + l.length, 0),
+      });
+    }
+    return open.sort((a, b) => b.startedAt - a.startedAt);
+  } catch {
+    return [];
+  }
+}
+
+/** Forget an open session: after the save, or when the workout is already done. */
+export async function clearSavedWorkout(loggedBy: string, scheduledId: string): Promise<void> {
+  await cancelRestAlert(alertKey(loggedBy, scheduledId));
+  await AsyncStorage.removeItem(savedKey(loggedBy, scheduledId)).catch(() => undefined);
 }
 
 // ---------------------------------------------------------------------------
@@ -195,15 +320,10 @@ export async function loadWorkout(
  * the skips and swaps, the scheduled workout marked completed, and (client
  * mode) badges. Swaps log against the substitute. */
 export async function saveWorkout(
-  session: Pick<WorkoutSession, "state" | "subject" | "mode">,
-  {
-    scheduledId,
-    durationSeconds,
-    effort,
-    note,
-  }: { scheduledId: string; durationSeconds: number | null; effort: number | null; note: string | null },
+  session: Pick<WorkoutSession, "state" | "scheduledId" | "subject" | "loggedBy" | "mode">,
+  { durationSeconds, effort, note }: { durationSeconds: number | null; effort: number | null; note: string | null },
 ): Promise<void> {
-  const { state, subject, mode } = session;
+  const { state, scheduledId, subject, loggedBy, mode } = session;
   if (subject.kind !== "app") throw new Error("Logging for an offline client isn't built yet (roadmap V17).");
   const rows = saveRows(state);
 
@@ -249,6 +369,9 @@ export async function saveWorkout(
 
   const { error: swErr } = await supabase.from("scheduled_workouts").update({ status: "completed" }).eq("id", scheduledId);
   if (swErr) throw swErr;
+
+  // Saved: nothing left to resume.
+  await clearSavedWorkout(loggedBy, scheduledId);
 
   // Badges (V9) are the client's own — deterministic, from client_streaks.
   if (mode === "client") await checkAndAwardBadges(subject.id);

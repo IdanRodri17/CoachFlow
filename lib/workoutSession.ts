@@ -529,3 +529,67 @@ export function formatElapsed(ms: number): string {
   const sec = String(t % 60).padStart(2, "0");
   return h > 0 ? `${h}:${String(m).padStart(2, "0")}:${sec}` : `${m}:${sec}`;
 }
+
+// ---------------------------------------------------------------------------
+// Resume (D20g): an open workout survives minimize and an app restart
+// ---------------------------------------------------------------------------
+
+/** Older than this, a saved open workout is dropped instead of resumed. */
+export const RESUME_MAX_AGE_MS = 12 * 60 * 60 * 1000;
+
+/** What's stored on the phone: the state minus the loaded exercises (they're
+ * re-read on open), plus their ids to check the template didn't change. */
+export type SavedSession = Omit<WorkoutState, "exercises"> & { v: 1; exerciseIds: string[] };
+
+/** Nothing worth resuming yet: no set logged, nothing skipped or swapped. */
+export function isPristine(s: WorkoutState): boolean {
+  return setsLogged(s) === 0 && s.adjustments.every((a) => a == null);
+}
+
+export function toSaved(s: WorkoutState): SavedSession {
+  return {
+    v: 1,
+    exerciseIds: s.exercises.map((e) => e.exerciseId),
+    screen: s.screen,
+    ex: s.ex,
+    weight: s.weight,
+    reps: s.reps,
+    logs: s.logs,
+    adjustments: s.adjustments,
+    rest: s.rest,
+    next: s.next,
+    lastLog: s.lastLog,
+    restOfferSeconds: s.restOfferSeconds,
+    startedAt: s.startedAt,
+    restEndedAt: s.restEndedAt,
+  };
+}
+
+/** A saved session back into a state for these freshly loaded exercises, or
+ * null when it doesn't fit (another template version, too old, malformed). */
+export function fromSaved(saved: unknown, exercises: SessionExercise[], now: number): WorkoutState | null {
+  if (!saved || typeof saved !== "object") return null;
+  const v = saved as Partial<SavedSession>;
+  if (v.v !== 1 || typeof v.startedAt !== "number" || now - v.startedAt > RESUME_MAX_AGE_MS) return null;
+  const ids = exercises.map((e) => e.exerciseId);
+  if (!Array.isArray(v.exerciseIds) || v.exerciseIds.join("|") !== ids.join("|")) return null;
+  if (!Array.isArray(v.logs) || v.logs.length !== ids.length) return null;
+  if (!Array.isArray(v.adjustments) || v.adjustments.length !== ids.length) return null;
+  if (typeof v.ex !== "number" || v.ex < 0 || (ids.length > 0 && v.ex >= ids.length)) return null;
+  if (v.screen !== "set" && v.screen !== "rest" && v.screen !== "finish") return null;
+  return {
+    exercises,
+    screen: v.screen,
+    ex: v.ex,
+    weight: v.weight ?? null,
+    reps: typeof v.reps === "number" ? v.reps : DEFAULT_REPS,
+    logs: v.logs,
+    adjustments: v.adjustments,
+    rest: v.rest ?? null,
+    next: v.next ?? null,
+    lastLog: v.lastLog ?? null,
+    restOfferSeconds: v.restOfferSeconds ?? null,
+    startedAt: v.startedAt,
+    restEndedAt: v.restEndedAt ?? null,
+  };
+}

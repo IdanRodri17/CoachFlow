@@ -524,6 +524,15 @@
       "freePlaceholder": "הערה למאמן",
       "save": "שמירה וסיום",
       "share": "שיתוף ההתקדמות"
+    },
+    "alerts": {
+      "channelName": "סוף מנוחה",
+      "permissionTitle": "להתריע כשהמנוחה נגמרת?",
+      "permissionBody": "נשלח התראה כשהמנוחה נגמרת, גם כשהטלפון נעול.",
+      "notNow": "לא עכשיו",
+      "allow": "אישור",
+      "restOverTitle": "המנוחה נגמרה",
+      "restOverBody": "סט {{n}} · {{name}} — קדימה"
     }
   },
   "dashboard": {
@@ -709,7 +718,20 @@
     "checkinTitle": "צ׳ק-אין שבועי",
     "checkinHint": "4 שאלות, חצי דקה. המאמן רואה את התשובות.",
     "noWorkouts": "עוד לא נקבעו אימונים",
-    "noWorkoutsHint": "המאמן יוסיף את האימון הראשון בקרוב."
+    "noWorkoutsHint": "המאמן יוסיף את האימון הראשון בקרוב.",
+    "resume": {
+      "label": "אימון בתהליך",
+      "button": "חזרה לאימון",
+      "sets_one": "סט אחד נרשם",
+      "sets_two": "{{count}} סטים נרשמו",
+      "sets_other": "{{count}} סטים נרשמו",
+      "startedMinutes_one": "התחלת לפני דקה",
+      "startedMinutes_two": "התחלת לפני {{count}} דק׳",
+      "startedMinutes_other": "התחלת לפני {{count}} דק׳",
+      "startedHours_one": "התחלת לפני שעה",
+      "startedHours_two": "התחלת לפני שעתיים",
+      "startedHours_other": "התחלת לפני {{count}} שעות"
+    }
   },
   "trainerHome": {
     "settings": "הגדרות ופרופיל",

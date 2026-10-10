@@ -11,23 +11,27 @@
 // marks the scheduled workout completed — saveWorkout(), unchanged rules.
 // A completed workout opens the read-only summary.
 //
-// Until D20g persists an open session, leaving mid-workout asks first: the
-// logged sets live only on this screen.
+// D20f/g: the screen stays awake, rest ends buzz or notify, and the open
+// session is saved on the phone after every tap — minimizing (or a restart)
+// loses nothing, and opening the workout again resumes it.
 
-import { useEffect, useMemo, useRef, useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, Text, View } from "react-native";
+import { useMemo, useState } from "react";
+import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
-import { Stack, useLocalSearchParams, useNavigation, useRouter } from "expo-router";
+import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { RoleGate } from "@/components/RoleGate";
+import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { formatDisplayDate, toDateString, todayISO } from "@/lib/dates";
 import { useWorkoutPrefs } from "@/lib/workoutPrefs";
 import {
+  clearSavedWorkout,
+  loadSavedWorkout,
   loadWorkout,
   saveWorkout,
   subjectHistory,
@@ -35,7 +39,14 @@ import {
   type WorkoutData,
   type WorkoutSubject,
 } from "@/lib/useWorkoutSession";
-import { exerciseName, isSwapped, sessionPrs, setsLogged, streakAfterCompleting } from "@/lib/workoutSession";
+import {
+  exerciseName,
+  isSwapped,
+  sessionPrs,
+  setsLogged,
+  streakAfterCompleting,
+  type WorkoutState,
+} from "@/lib/workoutSession";
 import { AdjustmentModal, type AdjustmentResult } from "@/components/AdjustmentModal";
 import { ExerciseVideo } from "@/components/ExerciseVideo";
 import { longDate } from "@/components/home/format";
@@ -63,8 +74,18 @@ function WorkoutScreenBody() {
   const subject = useMemo<WorkoutSubject>(() => ({ kind: "app", id: clientId }), [clientId]);
 
   const query = useQuery({
-    queryKey: ["workout-session", id],
-    queryFn: () => loadWorkout(id, subject, t("workout.exerciseFallback")),
+    queryKey: qk.workout.session(id),
+    // Never served from cache: a resumed workout must start from the sets
+    // saved on the phone a moment ago, not from an older copy.
+    gcTime: 0,
+    queryFn: async () => {
+      const data = await loadWorkout(id, subject, t("workout.exerciseFallback"));
+      if (data.status === "completed") {
+        await clearSavedWorkout(clientId, id);
+        return { data, restored: null };
+      }
+      return { data, restored: await loadSavedWorkout(clientId, id, data.exercises) };
+    },
   });
 
   if (query.isLoading) {
@@ -86,11 +107,11 @@ function WorkoutScreenBody() {
     );
   }
 
-  if (query.data.status === "completed") {
-    return <CompletedSummary scheduledId={id} note={query.data.note} />;
+  if (query.data.data.status === "completed") {
+    return <CompletedSummary scheduledId={id} note={query.data.data.note} />;
   }
 
-  return <WorkoutMode data={query.data} subject={subject} loggedBy={clientId} />;
+  return <WorkoutMode data={query.data.data} restored={query.data.restored} subject={subject} loggedBy={clientId} />;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,7 +124,7 @@ type Adj = { action: "skipped" | "swapped"; exerciseName: string; swapName: stri
 function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: string | null }) {
   const { t } = useTranslation();
   const query = useQuery({
-    queryKey: ["workout-summary", scheduledId],
+    queryKey: qk.workout.summary(scheduledId),
     queryFn: async () => {
       const { data: log, error } = await supabase
         .from("workout_logs")
@@ -263,18 +284,32 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
 // ---------------------------------------------------------------------------
 // Workout mode (an open workout)
 // ---------------------------------------------------------------------------
-function WorkoutMode({ data, subject, loggedBy }: { data: WorkoutData; subject: WorkoutSubject; loggedBy: string }) {
+function WorkoutMode({
+  data,
+  restored,
+  subject,
+  loggedBy,
+}: {
+  data: WorkoutData;
+  restored: WorkoutState | null;
+  subject: WorkoutSubject;
+  loggedBy: string;
+}) {
   const router = useRouter();
-  const navigation = useNavigation();
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const prefs = useWorkoutPrefs();
   const session = useWorkoutSession({
+    scheduledId: data.scheduledId,
+    title: data.title ?? t("workout.freeWorkout"),
     exercises: data.exercises,
     subject,
     loggedBy,
     mode: "client",
+    restored,
     autoRest: prefs.autoRest,
+    restAlerts: prefs.restAlerts,
+    keepAwake: prefs.keepAwake,
   });
   const { state: s } = session;
   const [sheet, setSheet] = useState<"adjust" | "overview" | "demo" | null>(null);
@@ -286,7 +321,7 @@ function WorkoutMode({ data, subject, loggedBy }: { data: WorkoutData; subject: 
 
   // The swap list shares the exercise library's cache entry (same shape).
   const library = useQuery({
-    queryKey: ["exercises", "list"],
+    queryKey: qk.exercises.list,
     queryFn: async () => {
       const { data: rows, error } = await supabase.from("exercises").select("*").order("name");
       if (error) throw error;
@@ -296,7 +331,7 @@ function WorkoutMode({ data, subject, loggedBy }: { data: WorkoutData; subject: 
 
   // The finish tile: this trainer's streak for the client, once this workout counts.
   const streak = useQuery({
-    queryKey: ["client-streak", subject.id, data.trainerId],
+    queryKey: qk.clientStreak.byTrainer(subject.id, data.trainerId),
     queryFn: async () => {
       const { data: row, error } = await supabase
         .from("client_streaks")
@@ -311,26 +346,8 @@ function WorkoutMode({ data, subject, loggedBy }: { data: WorkoutData; subject: 
   const finishStreak =
     streak.data != null ? streakAfterCompleting(streak.data, data.scheduledDate, todayISO()) : null;
 
-  // Leaving mid-workout (minimize, Android back) asks first — until D20g
-  // persists the session, logged sets live only here.
-  const dirty = setsLogged(s) > 0 || s.adjustments.some((a) => a != null);
-  const guard = useRef({ dirty, saved: false });
-  useEffect(() => {
-    guard.current.dirty = dirty;
-  }, [dirty]);
-  useEffect(
-    () =>
-      navigation.addListener("beforeRemove", (e) => {
-        if (!guard.current.dirty || guard.current.saved) return;
-        e.preventDefault();
-        Alert.alert(t("workout.mode.leaveTitle"), t("workout.mode.leaveMessage"), [
-          { text: t("workout.mode.keepGoing"), style: "cancel" },
-          { text: t("workout.mode.leave"), style: "destructive", onPress: () => navigation.dispatch(e.data.action) },
-        ]);
-      }),
-    [navigation, t],
-  );
-
+  // Minimize (or back) just leaves: the session is saved on the phone and
+  // opening this workout again resumes it.
   function minimize() {
     if (router.canGoBack()) router.back();
     else router.replace("/");
@@ -339,7 +356,6 @@ function WorkoutMode({ data, subject, loggedBy }: { data: WorkoutData; subject: 
   const save = useMutation({
     mutationFn: (input: FinishInput) =>
       saveWorkout(session, {
-        scheduledId: data.scheduledId,
         // A free workout (no exercises) had no timed session.
         durationSeconds: data.exercises.length > 0 ? input.durationSeconds : null,
         effort: input.effort,
@@ -350,24 +366,24 @@ function WorkoutMode({ data, subject, loggedBy }: { data: WorkoutData; subject: 
   function finish(input: FinishInput, then: "home" | "share") {
     save.mutate(input, {
       onSuccess: () => {
-        guard.current.saved = true;
         const id = subject.id;
         // Stale but not refetched here: this screen is leaving, and a refetch
         // would flash the completed summary on the way out.
-        queryClient.invalidateQueries({ queryKey: ["workout-session", data.scheduledId], refetchType: "none" });
-        queryClient.invalidateQueries({ queryKey: ["workout-summary", data.scheduledId] });
-        queryClient.invalidateQueries({ queryKey: ["scheduled-client"] });
-        queryClient.invalidateQueries({ queryKey: ["scheduled-trainer"] });
-        queryClient.invalidateQueries({ queryKey: ["client-streak"] });
-        queryClient.invalidateQueries({ queryKey: ["badges", id] });
-        queryClient.invalidateQueries({ queryKey: ["package", id] });
-        queryClient.invalidateQueries({ queryKey: ["package", "app", id] });
-        queryClient.invalidateQueries({ queryKey: ["exercises"] });
-        queryClient.invalidateQueries({ queryKey: ["progress"] });
-        queryClient.invalidateQueries({ queryKey: ["share-card"] });
+        queryClient.invalidateQueries({ queryKey: qk.workout.session(data.scheduledId), refetchType: "none" });
+        queryClient.invalidateQueries({ queryKey: qk.workout.summary(data.scheduledId) });
+        queryClient.invalidateQueries({ queryKey: qk.workout.open(loggedBy) });
+        queryClient.invalidateQueries({ queryKey: qk.scheduledClient.all });
+        queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.all });
+        queryClient.invalidateQueries({ queryKey: qk.clientStreak.all });
+        queryClient.invalidateQueries({ queryKey: qk.badges.own(id) });
+        queryClient.invalidateQueries({ queryKey: qk.package.own(id) });
+        queryClient.invalidateQueries({ queryKey: qk.package.subject("app", id) });
+        queryClient.invalidateQueries({ queryKey: qk.exercises.all });
+        queryClient.invalidateQueries({ queryKey: qk.progress.all });
+        queryClient.invalidateQueries({ queryKey: qk.shareCard.all });
         // Trainer-side views (same device, one shared cache in dev).
-        queryClient.invalidateQueries({ queryKey: ["client-detail", "app", id] });
-        queryClient.invalidateQueries({ queryKey: ["trainer-monthly-money"] });
+        queryClient.invalidateQueries({ queryKey: qk.clientDetail.subject("app", id) });
+        queryClient.invalidateQueries({ queryKey: qk.money.all });
         if (then === "share") router.replace(`/share-card/${id}`);
         else minimize();
       },
@@ -414,7 +430,6 @@ function WorkoutMode({ data, subject, loggedBy }: { data: WorkoutData; subject: 
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.iron }}>
-      <Stack.Screen options={{ gestureEnabled: false }} />
       <StatusBar style="light" />
 
       {s.screen === "set" ? (

@@ -9,6 +9,8 @@ import {
   formatClock,
   formatElapsed,
   formatWeight,
+  fromSaved,
+  isPristine,
   isLastSetOverall,
   nextOpen,
   overview,
@@ -22,6 +24,7 @@ import {
   setsLogged,
   stepWeight,
   streakAfterCompleting,
+  toSaved,
   workoutReducer,
   type SessionExercise,
   type WorkoutAction,
@@ -337,5 +340,29 @@ describe("weight stepper and typing (Idan, 2026-10-03)", () => {
     expect(run(s, { type: "setReps", value: 12.4 }).reps).toBe(12);
     expect(run(createSession([legRaise], T0), { type: "setWeight", value: 10 }).weight).toBeNull();
     expect(formatWeight(21.25)).toBe("21.25");
+  });
+});
+
+describe("resume (D20g)", () => {
+  const exercises = [squat, rdl, legRaise];
+
+  it("round-trips through JSON with the logs, position and rest end", () => {
+    const s = run(createSession(exercises, T0), { type: "logSet", now: T0 + 1000 });
+    expect(isPristine(s)).toBe(false);
+    const back = fromSaved(JSON.parse(JSON.stringify(toSaved(s))), exercises, T0 + 60_000);
+    expect(back).toEqual(s);
+  });
+
+  it("a fresh or merely opened session is pristine", () => {
+    expect(isPristine(createSession(exercises, T0))).toBe(true);
+    expect(isPristine(run(createSession(exercises, T0), { type: "jump", ex: 2 }))).toBe(true);
+  });
+
+  it("drops a session from another template version, a stale one, or garbage", () => {
+    const saved = toSaved(run(createSession(exercises, T0), { type: "logSet", now: T0 }));
+    expect(fromSaved(saved, [squat, legRaise, rdl], T0)).toBeNull();
+    expect(fromSaved(saved, exercises, T0 + 13 * 60 * 60 * 1000)).toBeNull();
+    expect(fromSaved({ v: 2 }, exercises, T0)).toBeNull();
+    expect(fromSaved("nope", exercises, T0)).toBeNull();
   });
 });

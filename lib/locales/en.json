@@ -524,6 +524,15 @@
       "freePlaceholder": "Write a note for your trainer",
       "save": "Save and finish",
       "share": "Share your progress"
+    },
+    "alerts": {
+      "channelName": "Rest timer",
+      "permissionTitle": "Buzz when rest is over?",
+      "permissionBody": "We'll send a notification when your rest ends, even with the phone locked.",
+      "notNow": "Not now",
+      "allow": "Allow",
+      "restOverTitle": "Rest is over",
+      "restOverBody": "Set {{n}} · {{name}} — let's go"
     }
   },
   "dashboard": {
@@ -709,7 +718,20 @@
     "checkinTitle": "Weekly check-in",
     "checkinHint": "4 questions, half a minute. Your trainer sees the answers.",
     "noWorkouts": "No workouts scheduled yet",
-    "noWorkoutsHint": "Your trainer will add your first workout soon."
+    "noWorkoutsHint": "Your trainer will add your first workout soon.",
+    "resume": {
+      "label": "Workout in progress",
+      "button": "Back to workout",
+      "sets_one": "1 set logged",
+      "sets_two": "{{count}} sets logged",
+      "sets_other": "{{count}} sets logged",
+      "startedMinutes_one": "started 1 min ago",
+      "startedMinutes_two": "started {{count}} min ago",
+      "startedMinutes_other": "started {{count}} min ago",
+      "startedHours_one": "started an hour ago",
+      "startedHours_two": "started {{count}} hours ago",
+      "startedHours_other": "started {{count}} hours ago"
+    }
   },
   "trainerHome": {
     "settings": "Settings and profile",

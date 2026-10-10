@@ -87,6 +87,8 @@ export const qk = {
   clientStreak: {
     all: ["client-streak"] as const,
     own: (clientId: Id) => ["client-streak", clientId] as const,
+    /** One trainer's streak for the client — the workout finish tile. */
+    byTrainer: (clientId: Id, trainerId: Id) => ["client-streak", clientId, trainerId] as const,
   },
 
   checkIns: {
@@ -141,9 +143,11 @@ export const qk = {
     own: (clientId: Id) => ["share-card", clientId] as const,
   },
 
-  /** app/workout/[id].tsx — still literal there until the redesign's D20a lands. */
+  /** app/workout/[id].tsx and the open-workout card on Today. */
   workout: {
     session: (scheduledId: Id) => ["workout-session", scheduledId] as const,
     summary: (scheduledId: Id) => ["workout-summary", scheduledId] as const,
+    /** Open workouts saved on the phone (D20g) — Today's "חזרה לאימון" card. */
+    open: (userId: Id) => ["workout-open", userId] as const,
   },
 };
