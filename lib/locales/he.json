@@ -813,7 +813,26 @@
     "priceGap_other": "ל-{{count}} מתאמנים עוד לא הוגדר מחיר",
     "noClients": "עוד אין מתאמנים",
     "noClientsHint": "אפשר להזמין את המתאמן הראשון ממסך המתאמנים.",
-    "addClient": "הוספת מתאמן"
+    "addClient": "הוספת מתאמן",
+    "renew": "חידוש",
+    "att": {
+      "usedUp": "החבילה נגמרה ויש עוד אימונים ביומן",
+      "packageEmpty": "החבילה נגמרה",
+      "packageLow_one": "נשאר אימון אחד בחבילה",
+      "packageLow_two": "נשארו {{count}} אימונים בחבילה",
+      "packageLow_other": "נשארו {{count}} אימונים בחבילה",
+      "skipped": "דילוג על {{exercise}}",
+      "swapped": "החלפה של {{exercise}}",
+      "pr": "שיא אישי: {{exercise}} {{weight}} ק״ג",
+      "more": "ועוד {{count}}"
+    },
+    "wa": {
+      "nudge": "היי {{name}}, מה נשמע? מתי נוח לקבוע את האימון הבא?",
+      "renewLeft_one": "היי {{name}}, נשאר אימון אחד בחבילה. רוצה שנחדש?",
+      "renewLeft_two": "היי {{name}}, נשארו {{count}} אימונים בחבילה. רוצה שנחדש?",
+      "renewLeft_other": "היי {{name}}, נשארו {{count}} אימונים בחבילה. רוצה שנחדש?",
+      "renewDone": "היי {{name}}, החבילה הסתיימה. רוצה שנחדש לחבילה הבאה?"
+    }
   },
   "settings": {
     "title": "הגדרות",

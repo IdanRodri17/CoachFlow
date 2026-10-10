@@ -813,7 +813,26 @@
     "priceGap_other": "{{count}} clients have no price yet",
     "noClients": "No clients yet",
     "noClientsHint": "Invite your first client from the Clients screen.",
-    "addClient": "Add a client"
+    "addClient": "Add a client",
+    "renew": "Renew",
+    "att": {
+      "usedUp": "Package used up, with workouts still booked",
+      "packageEmpty": "The package is used up",
+      "packageLow_one": "1 session left in the package",
+      "packageLow_two": "{{count}} sessions left in the package",
+      "packageLow_other": "{{count}} sessions left in the package",
+      "skipped": "Skipped {{exercise}}",
+      "swapped": "Swapped {{exercise}}",
+      "pr": "PR: {{exercise}} {{weight}} kg",
+      "more": "and {{count}} more"
+    },
+    "wa": {
+      "nudge": "Hi {{name}}, how are you doing? When's a good time for our next workout?",
+      "renewLeft_one": "Hi {{name}}, there's 1 session left in your package. Shall we renew?",
+      "renewLeft_two": "Hi {{name}}, there are {{count}} sessions left in your package. Shall we renew?",
+      "renewLeft_other": "Hi {{name}}, there are {{count}} sessions left in your package. Shall we renew?",
+      "renewDone": "Hi {{name}}, your package is used up. Shall we renew for the next one?"
+    }
   },
   "settings": {
     "title": "Settings",

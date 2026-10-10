@@ -19,6 +19,13 @@ export function normalizePhone(raw: string): string | null {
   return digits;
 }
 
+/** A wa.me link to this phone with a prefilled (already translated) message;
+ * null when the phone isn't usable. D23b's nudge and renewal messages. */
+export function buildWhatsAppLink(phone: string | null, text: string): string | null {
+  const digits = phone ? normalizePhone(phone) : null;
+  return digits ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null;
+}
+
 export function buildWhatsAppReminderLink({
   phone,
   clientName,

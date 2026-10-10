@@ -7,10 +7,9 @@
 // with every session today (WhatsApp per row, "סימון כבוצע" for offline
 // clients); "לתשומת לבך"; the month's money card (→ Money).
 //
-// "לתשומת לבך" reads client_risk for now. The full feed (renewals,
-// adjustments, PRs) comes from the trainer_attention view once the main
-// session builds it (D23a / B2). Every number comes from the DB views; none
-// is computed or faked here.
+// "לתשומת לבך" is components/home/AttentionFeed.tsx, from the
+// trainer_attention view (0029): risk, renewals, skips/swaps and PRs. Every
+// number comes from the DB views; none is computed or faked here.
 
 import { useEffect, useState } from "react";
 import { Linking, Pressable, ScrollView, View } from "react-native";
@@ -24,7 +23,6 @@ import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Clock from "lucide-react-native/icons/clock";
 import MessageCircle from "lucide-react-native/icons/message-circle";
 import Ticket from "lucide-react-native/icons/ticket";
-import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import User from "lucide-react-native/icons/user";
 
 import { qk } from "@/lib/queryKeys";
@@ -49,6 +47,7 @@ import {
   Num,
 } from "@/components/ui";
 
+import { AttentionFeed } from "./AttentionFeed";
 import { formatMoney, greetingKey, localMinutesNow, longDate, minutesOf, monthName, firstName } from "./format";
 
 type Session = {
@@ -118,15 +117,6 @@ export function TrainerHome() {
         .eq("trainer_id", trainerId)
         .eq("month", monthKey)
         .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
-
-  const atRisk = useQuery({
-    queryKey: qk.clientRisk.all,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("client_risk").select("*").eq("trainer_id", trainerId);
       if (error) throw error;
       return data;
     },
@@ -293,74 +283,8 @@ export function TrainerHome() {
         ) : null}
       </View>
 
-      {/* Worth a look (client_risk for now) */}
-      {atRisk.data && atRisk.data.length > 0 ? (
-        <View style={{ gap: 10 }}>
-          <View style={{ minHeight: 32, justifyContent: "center" }}>
-            <AppText size={18} weight="semibold" lineHeight={23}>
-              {t("trainerHome.attention")}
-            </AppText>
-          </View>
-          <ListCard>
-            {atRisk.data.map((r) => {
-              const client = clientOf(r);
-              const link = client?.phone
-                ? buildWhatsAppReminderLink({
-                    phone: client.phone,
-                    clientName: client.name,
-                    trainerName: profile?.display_name ?? "",
-                    dateLabel: "today",
-                    timeLabel: null,
-                    templateName: "next",
-                  })
-                : null;
-              return (
-                <View
-                  key={r.subject_key}
-                  style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 14, minHeight: 72 }}
-                >
-                  <View
-                    style={{
-                      width: 40,
-                      height: 40,
-                      borderRadius: 12,
-                      backgroundColor: colors.emberSoft,
-                      alignItems: "center",
-                      justifyContent: "center",
-                    }}
-                  >
-                    <Icon icon={TriangleAlert} size={20} color={colors.ember} />
-                  </View>
-                  <Pressable
-                    accessibilityRole="button"
-                    disabled={!client}
-                    onPress={() => client && router.push(`/dashboard/${client.refId}?kind=${client.kind}`)}
-                    style={({ pressed }) => ({ flex: 1, minWidth: 0, gap: 2, opacity: pressed ? 0.7 : 1 })}
-                  >
-                    <AppText size={16} weight="semibold" numberOfLines={1}>
-                      {client?.name ?? "—"}
-                    </AppText>
-                    <AppText size={14} tone="graphite">
-                      {r.reason === "missed_streak" ? t("home.atRisk.missedStreak") : t("home.atRisk.goneQuiet")}
-                    </AppText>
-                  </Pressable>
-                  {link ? (
-                    <Button
-                      label={t("trainerHome.remind")}
-                      icon={MessageCircle}
-                      variant="secondary"
-                      size={44}
-                      onPress={() => Linking.openURL(link)}
-                    />
-                  ) : (
-                    <Icon icon={ChevronRight} size={20} color={colors.smoke} mirror />
-                  )}
-                </View>
-              );
-            })}
-          </ListCard>
-        </View>
-      ) : null}
+      {/* Worth a look: trainer_attention (risk, renewals, skips/swaps, PRs) */}
+      <AttentionFeed roster={roster.data ?? []} />
 
       {/* Money */}
       {money.data ? (

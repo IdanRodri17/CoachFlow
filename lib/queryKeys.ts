@@ -50,6 +50,10 @@ export const qk = {
     today: (date: string) => ["scheduled-trainer", "today", date] as const,
     day: (date: string) => ["scheduled-trainer", "day", date] as const,
     one: (id: Id) => ["scheduled-trainer", "one", id] as const,
+    /** trainer_attention (0029), "לתשומת לבך" on Home. Nested here because
+     * risk and renewals follow the schedule: every calendar invalidation
+     * refreshes it too. Package edits invalidate it explicitly. */
+    attention: ["scheduled-trainer", "attention"] as const,
   },
 
   /** The signed-in client's own scheduled workouts. */

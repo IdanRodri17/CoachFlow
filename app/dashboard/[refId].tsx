@@ -324,7 +324,11 @@ function ClientDetailScreenBody() {
         if (error) throw error;
       }
     },
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.package.subject(kind, refId) }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.package.subject(kind, refId) });
+      // A bigger package clears a renewal item on the trainer Home.
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.attention });
+    },
   });
 
   const savePrice = useMutation({
