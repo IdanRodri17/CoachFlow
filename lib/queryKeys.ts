@@ -54,6 +54,11 @@ export const qk = {
      * risk and renewals follow the schedule: every calendar invalidation
      * refreshes it too. Package edits invalidate it explicitly. */
     attention: ["scheduled-trainer", "attention"] as const,
+    /** client_workout_status (0008): each client's next session — the clients list. */
+    clientStatus: ["scheduled-trainer", "client-status"] as const,
+    /** ₪ owed per client (completed, unpaid × package price) — the clients list.
+     * The paid toggle and package price edits invalidate it explicitly. */
+    owed: ["scheduled-trainer", "owed"] as const,
   },
 
   /** The signed-in client's own scheduled workouts. */

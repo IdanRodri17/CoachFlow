@@ -24,9 +24,7 @@ import Ticket from "lucide-react-native/icons/ticket";
 import TriangleAlert from "lucide-react-native/icons/triangle-alert";
 import Trophy from "lucide-react-native/icons/trophy";
 
-import { qk } from "@/lib/queryKeys";
-import { supabase } from "@/lib/supabase";
-import type { Database } from "@/lib/database.types";
+import { attentionQuery, type AttentionItem } from "@/lib/queries";
 import type { RosterClient } from "@/lib/useRoster";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { formatWeight } from "@/lib/workoutSession";
@@ -34,28 +32,18 @@ import { AppText, Button, colors, Icon, ListCard, type IconComponent } from "@/c
 
 import { firstName } from "./format";
 
-type Item = Database["public"]["Views"]["trainer_attention"]["Row"];
+type Item = AttentionItem;
 
-/** Renewals first (money and a booked slot at stake), then risk, then news. */
-const ORDER: Record<Item["kind"], number> = { package_used_up: 0, risk: 1, package_low: 2, adjustment: 3, pr: 4 };
 const MAX_ROWS = 8;
 
 export function AttentionFeed({ roster }: { roster: RosterClient[] }) {
   const { t } = useTranslation();
   const router = useRouter();
 
-  const feed = useQuery({
-    queryKey: qk.scheduledTrainer.attention,
-    queryFn: async () => {
-      const { data, error } = await supabase.from("trainer_attention").select("*");
-      if (error) throw error;
-      return [...data]
-        .sort((a, b) => ORDER[a.kind] - ORDER[b.kind] || (b.happened_at ?? "").localeCompare(a.happened_at ?? ""))
-        .slice(0, MAX_ROWS);
-    },
-  });
+  // Shared with the clients list (lib/queries.ts): sorted, all rows.
+  const feed = useQuery(attentionQuery);
 
-  const items = feed.data ?? [];
+  const items = (feed.data ?? []).slice(0, MAX_ROWS);
   if (items.length === 0) return null;
 
   function clientOf(it: Item): RosterClient | undefined {

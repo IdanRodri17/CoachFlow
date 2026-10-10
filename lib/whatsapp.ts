@@ -6,6 +6,8 @@
 // trainer's client-side session, so this is a simple, trainer-owned contact
 // field, not tied to auth (see 0011_reminders.sql).
 
+import i18next from "./i18n";
+
 /**
  * International digits-only, as wa.me requires (country code, no leading 0,
  * no "+"). Converts an Israeli local number (leading 0, e.g. "0501234567")
@@ -24,6 +26,27 @@ export function normalizePhone(raw: string): string | null {
 export function buildWhatsAppLink(phone: string | null, text: string): string | null {
   const digits = phone ? normalizePhone(phone) : null;
   return digits ? `https://wa.me/${digits}?text=${encodeURIComponent(text)}` : null;
+}
+
+/** D25: the invite code on WhatsApp (clients.inviteMessage). With a phone it
+ * opens that chat; without one, WhatsApp's chat picker. */
+export function buildWhatsAppInviteLink({
+  code,
+  label,
+  trainerName,
+  phone,
+}: {
+  code: string;
+  label: string | null;
+  trainerName: string;
+  phone?: string | null;
+}): string {
+  const message = i18next.t("clients.inviteMessage", {
+    greeting: label ? i18next.t("clients.inviteGreetingNamed", { name: label }) : i18next.t("clients.inviteGreeting"),
+    code,
+    trainerName,
+  });
+  return buildWhatsAppLink(phone ?? null, message) ?? `https://wa.me/?text=${encodeURIComponent(message)}`;
 }
 
 export function buildWhatsAppReminderLink({

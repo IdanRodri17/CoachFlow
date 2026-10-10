@@ -278,6 +278,8 @@ function ClientDetailScreenBody() {
       // Paid/unpaid moves money between "collected" and "outstanding" on the
       // Home card and the Money screen — not refreshed before 2d.
       queryClient.invalidateQueries({ queryKey: qk.money.all });
+      // …and the "₪ to pay" chip on the clients list.
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.owed });
     },
   });
 
@@ -354,6 +356,7 @@ function ClientDetailScreenBody() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: qk.package.subject(kind, refId) });
       queryClient.invalidateQueries({ queryKey: qk.money.all });
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.owed });
       setPriceInput("");
     },
   });
