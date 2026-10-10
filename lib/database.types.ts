@@ -342,32 +342,41 @@ export type Database = {
         Row: {
           id: string;
           scheduled_workout_id: string;
-          client_id: string;
+          // V17 (0032): exactly one of client_id (app) / managed_client_id (offline).
+          client_id: string | null;
+          managed_client_id: string | null;
           completed_at: string;
           effort_rating: number | null;
           client_note: string | null;
           duration_seconds: number | null;
           created_at: string;
+          // V17 (0032): who entered it — the client, or the trainer for an offline client.
+          logged_by: string | null;
         };
         Insert: {
           id?: string;
           scheduled_workout_id: string;
-          client_id: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
           completed_at?: string;
           effort_rating?: number | null;
           client_note?: string | null;
           duration_seconds?: number | null;
           created_at?: string;
+          // Defaults to the caller (auth.uid()).
+          logged_by?: string | null;
         };
         Update: {
           id?: string;
           scheduled_workout_id?: string;
-          client_id?: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
           completed_at?: string;
           effort_rating?: number | null;
           client_note?: string | null;
           duration_seconds?: number | null;
           created_at?: string;
+          logged_by?: string | null;
         };
         Relationships: [];
       };
@@ -439,7 +448,9 @@ export type Database = {
       progress_entries: {
         Row: {
           id: string;
-          client_id: string;
+          // V17 (0032): exactly one of client_id (app) / managed_client_id (offline).
+          client_id: string | null;
+          managed_client_id: string | null;
           date: string;
           weight: number | null;
           measurements: Json | null;
@@ -448,7 +459,8 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          client_id: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
           date: string;
           weight?: number | null;
           measurements?: Json | null;
@@ -457,7 +469,8 @@ export type Database = {
         };
         Update: {
           id?: string;
-          client_id?: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
           date?: string;
           weight?: number | null;
           measurements?: Json | null;
@@ -517,7 +530,9 @@ export type Database = {
       check_ins: {
         Row: {
           id: string;
-          client_id: string;
+          // V17 (0032): exactly one of client_id (app) / managed_client_id (offline).
+          client_id: string | null;
+          managed_client_id: string | null;
           week_start: string;
           sleep: number;
           energy: number;
@@ -528,7 +543,8 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          client_id: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
           week_start: string;
           sleep: number;
           energy: number;
@@ -539,7 +555,8 @@ export type Database = {
         };
         Update: {
           id?: string;
-          client_id?: string;
+          client_id?: string | null;
+          managed_client_id?: string | null;
           week_start?: string;
           sleep?: number;
           energy?: number;
