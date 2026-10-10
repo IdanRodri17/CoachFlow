@@ -666,6 +666,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      // --- B2 / V25: 0029_trainer_attention.sql ---
+      // The trainer Home feed, one row per item, only the caller's own items.
+      // Which fields are set depends on `kind`:
+      //   risk             detail = 'missed_streak' | 'gone_quiet'
+      //   package_low      sessions_left (≤ 2)
+      //   package_used_up  sessions_left (≤ 0, with a workout still scheduled)
+      //   adjustment       detail = reason, action, exercise_name, happened_at
+      //   pr               detail = "<exercise> <weight>", exercise_name, weight,
+      //                    item_count (PRs in that workout), happened_at
+      trainer_attention: {
+        Row: {
+          trainer_id: string;
+          kind: "risk" | "package_low" | "package_used_up" | "adjustment" | "pr";
+          client_id: string | null;
+          managed_client_id: string | null;
+          subject_key: string;
+          detail: string | null;
+          action: "skipped" | "swapped" | null;
+          exercise_name: string | null;
+          weight: number | null;
+          item_count: number | null;
+          sessions_left: number | null;
+          happened_at: string | null;
+        };
+        Relationships: [];
+      };
       // --- V17: 0019_reminder_scheduling.sql ---
       // Read only by the send-trainer-digest edge function (service role), not
       // by the app — typed here so the function's .returns<> stays honest.
