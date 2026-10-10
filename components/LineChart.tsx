@@ -1,26 +1,47 @@
-// components/LineChart.tsx — a minimal weight-over-time line chart built on
-// react-native-svg (which IS bundled in Expo Go — no native chart library, so no
-// dev build needed). Measures its own width via onLayout.
+// components/LineChart.tsx — a weight-over-time line chart on react-native-svg
+// (bundled in Expo Go — no native chart library). Measures its own width.
+//
+// D28a: restyled to docs/design/screens/client-progress.html — an ink line
+// over a faint ink area, gridlines at round values with their labels at the
+// end edge, the latest point as a ringed dot with its value, and three dates
+// under the axis. Time runs from the start edge: in Hebrew the newest point
+// is on the left (right→left), mirrored in English. The trainer's client
+// card uses it too.
 
 import { useState } from "react";
-import { Text as RNText, View } from "react-native";
+import { View } from "react-native";
 import { useTranslation } from "react-i18next";
-import Svg, { Circle, Line, Polyline, Text as SvgText } from "react-native-svg";
+import Svg, { Circle, Line, Polygon, Polyline, Text as SvgText } from "react-native-svg";
+
+import { isRTL } from "@/lib/i18n";
+import { formatWeight } from "@/lib/workoutSession";
+import { AppText, colors, fonts } from "@/components/ui";
 
 export type ChartPoint = { label: string; value: number };
 
-const fmt = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(1));
+const AXIS = 28;
+const EDGE = 10;
+const TOP = 12;
+const BOTTOM_PAD = 32;
 
-export function LineChart({ data, height = 200 }: { data: ChartPoint[]; height?: number }) {
+/** A round gridline step: 2 for weights between 63 and 67. */
+function niceStep(range: number): number {
+  const raw = Math.max(range / 2, 0.5);
+  const mag = 10 ** Math.floor(Math.log10(raw));
+  const n = raw / mag;
+  return (n >= 5 ? 5 : n >= 2 ? 2 : 1) * mag;
+}
+
+export function LineChart({ data, height = 172 }: { data: ChartPoint[]; height?: number }) {
   const { t } = useTranslation();
   const [width, setWidth] = useState(0);
 
   return (
     <View onLayout={(e) => setWidth(e.nativeEvent.layout.width)}>
       {data.length === 0 ? (
-        <RNText className="py-8 text-center text-sm text-slate-400">
+        <AppText size={14} tone="smoke" center style={{ paddingVertical: 32 }}>
           {t("progress.logToSeeTrend")}
-        </RNText>
+        </AppText>
       ) : width > 0 ? (
         <Chart data={data} width={width} height={height} />
       ) : null}
@@ -29,56 +50,90 @@ export function LineChart({ data, height = 200 }: { data: ChartPoint[]; height?:
 }
 
 function Chart({ data, width, height }: { data: ChartPoint[]; width: number; height: number }) {
-  const padL = 40;
-  const padR = 12;
-  const padT = 12;
-  const padB = 24;
-  const chartW = width - padL - padR;
-  const chartH = height - padT - padB;
-
+  const rtl = isRTL();
+  const bottom = height - BOTTOM_PAD;
   const values = data.map((d) => d.value);
-  let min = Math.min(...values);
-  let max = Math.max(...values);
-  if (min === max) {
-    min -= 1;
-    max += 1;
-  }
-  const range = max - min;
-  const n = data.length;
-  const x = (i: number) => padL + (n === 1 ? chartW / 2 : (i / (n - 1)) * chartW);
-  const y = (v: number) => padT + chartH - ((v - min) / range) * chartH;
+  const step = niceStep(Math.max(...values) - Math.min(...values));
+  const lo = Math.floor(Math.min(...values) / step) * step;
+  let hi = Math.ceil(Math.max(...values) / step) * step;
+  if (hi === lo) hi = lo + step;
+  const ticks: number[] = [];
+  for (let v = lo; v <= hi + step / 1000; v += step) ticks.push(Math.round(v * 100) / 100);
 
-  const points = data.map((d, i) => `${x(i)},${y(d.value)}`).join(" ");
+  // Laid out in the Hebrew reference's coordinates (axis on the right, newest
+  // point on the left), then mirrored for English.
+  const mx = (x: number) => (rtl ? x : width - x);
+  const anchor = (a: "start" | "end") => (rtl ? a : a === "start" ? "end" : "start");
+  const oldestX = width - AXIS - 6;
+  const n = data.length;
+  const xAt = (i: number) => (n === 1 ? (EDGE + oldestX) / 2 : oldestX - (i / (n - 1)) * (oldestX - EDGE));
+  const yAt = (v: number) => bottom - ((v - lo) / (hi - lo)) * (bottom - TOP);
+
+  const pts = data.map((d, i) => `${mx(xAt(i))},${yAt(d.value)}`);
+  const last = data[n - 1];
+  const lastX = mx(xAt(n - 1));
+  const lastY = yAt(last.value);
+  const dateIdx = n >= 3 ? [0, Math.floor((n - 1) / 2), n - 1] : n === 2 ? [0, 1] : [0];
 
   return (
     <Svg width={width} height={height}>
-      {/* Axes */}
-      <Line x1={padL} y1={padT} x2={padL} y2={padT + chartH} stroke="#e2e8f0" strokeWidth={1} />
-      <Line x1={padL} y1={padT + chartH} x2={padL + chartW} y2={padT + chartH} stroke="#e2e8f0" strokeWidth={1} />
-
-      {/* Y range labels */}
-      <SvgText x={padL - 6} y={padT + 4} fontSize={10} fill="#94a3b8" textAnchor="end">
-        {fmt(max)}
-      </SvgText>
-      <SvgText x={padL - 6} y={padT + chartH} fontSize={10} fill="#94a3b8" textAnchor="end">
-        {fmt(min)}
-      </SvgText>
-
-      {/* Line + dots */}
-      {n > 1 ? <Polyline points={points} fill="none" stroke="#4f46e5" strokeWidth={2} /> : null}
-      {data.map((d, i) => (
-        <Circle key={i} cx={x(i)} cy={y(d.value)} r={3} fill="#4f46e5" />
+      {ticks.map((v) => (
+        <Line key={`g${v}`} x1={mx(EDGE)} x2={mx(width - AXIS)} y1={yAt(v)} y2={yAt(v)} stroke={colors.mist} strokeWidth={1} />
       ))}
-
-      {/* First / last date labels */}
-      <SvgText x={padL} y={height - 6} fontSize={10} fill="#94a3b8" textAnchor="start">
-        {data[0].label}
-      </SvgText>
-      {n > 1 ? (
-        <SvgText x={padL + chartW} y={height - 6} fontSize={10} fill="#94a3b8" textAnchor="end">
-          {data[n - 1].label}
+      {ticks.map((v) => (
+        <SvgText
+          key={`t${v}`}
+          x={mx(width)}
+          y={yAt(v) + 4}
+          textAnchor={anchor("end")}
+          fontSize={11}
+          fontFamily={fonts.regular}
+          fill={colors.smoke}
+        >
+          {formatWeight(v)}
         </SvgText>
+      ))}
+      {n > 1 ? (
+        <>
+          <Polygon
+            points={[`${mx(xAt(0))},${bottom}`, ...pts, `${lastX},${bottom}`].join(" ")}
+            fill={colors.ink}
+            fillOpacity={0.07}
+          />
+          <Polyline
+            points={pts.join(" ")}
+            fill="none"
+            stroke={colors.ink}
+            strokeWidth={2}
+            strokeLinejoin="round"
+            strokeLinecap="round"
+          />
+        </>
       ) : null}
+      <Circle cx={lastX} cy={lastY} r={5} fill={colors.ink} stroke={colors.white} strokeWidth={2} />
+      <SvgText
+        x={rtl ? lastX + 8 : lastX - 8}
+        y={Math.min(lastY + 20, bottom - 4)}
+        textAnchor={rtl ? "start" : "end"}
+        fontSize={13}
+        fontFamily={fonts.semibold}
+        fill={colors.ink}
+      >
+        {formatWeight(last.value)}
+      </SvgText>
+      {dateIdx.map((i) => (
+        <SvgText
+          key={`d${i}`}
+          x={mx(xAt(i))}
+          y={height - 8}
+          textAnchor="middle"
+          fontSize={11}
+          fontFamily={fonts.regular}
+          fill={colors.smoke}
+        >
+          {data[i].label}
+        </SvgText>
+      ))}
     </Svg>
   );
 }

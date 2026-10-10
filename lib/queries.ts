@@ -74,3 +74,16 @@ export function owedQuery(trainerId: string) {
     },
   });
 }
+
+/** The client's current streak: client_streaks has one row per trainer, the
+ * client screens show the best run (Today's week strip, Progress, Profile). */
+export function clientStreakQuery(clientId: string) {
+  return queryOptions({
+    queryKey: qk.clientStreak.own(clientId),
+    queryFn: async (): Promise<number> => {
+      const { data, error } = await supabase.from("client_streaks").select("current_streak").eq("client_id", clientId);
+      if (error) throw error;
+      return Math.max(0, ...data.map((r) => r.current_streak));
+    },
+  });
+}

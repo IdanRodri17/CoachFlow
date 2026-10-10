@@ -8,7 +8,7 @@
 //   the current streak, "בזמן אימון" (lib/workoutPrefs.ts — on the phone
 //   only), "תזכורות" (profiles.sms_reminders_enabled: one switch for both the
 //   day-before and the morning-of SMS), language, the exercise library,
-//   badges (until Progress gets them, D28a), sign out, delete account.
+//   sign out, delete account. (Badges moved to Progress, D28a.)
 //   Trainer: back to Home, profile card with "עריכה" for the name, "העסק"
 //   (the name on clients' share cards → profiles.business_name, and the
 //   default price per session → profiles.default_price_per_session, 0025),
@@ -37,13 +37,11 @@ import Share from "lucide-react-native/icons/share";
 import Sun from "lucide-react-native/icons/sun";
 import Timer from "lucide-react-native/icons/timer";
 import Trash from "lucide-react-native/icons/trash";
-import Trophy from "lucide-react-native/icons/trophy";
 import Vibrate from "lucide-react-native/icons/vibrate";
 
 import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { BADGE_INFO, type BadgeType } from "@/lib/badges";
 import { ltr, setLocale, type SupportedLocale } from "@/lib/i18n";
 import { setWorkoutPref, useWorkoutPrefs } from "@/lib/workoutPrefs";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
@@ -53,7 +51,6 @@ import {
   Avatar,
   Button,
   Card,
-  Chip,
   colors,
   Display,
   GroupLabel,
@@ -91,20 +88,6 @@ export default function ProfileScreen() {
   // Which profile field the edit sheet is open for, and its text.
   const [editing, setEditing] = useState<null | "name" | "business" | "price">(null);
   const [draft, setDraft] = useState("");
-
-  const badges = useQuery({
-    queryKey: qk.badges.own(userId),
-    enabled: isClient && !!session,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("badges")
-        .select("type")
-        .eq("client_id", userId)
-        .order("earned_at", { ascending: true });
-      if (error) throw error;
-      return data.map((b) => b.type as BadgeType);
-    },
-  });
 
   // Same key and shape as the client Home's package query.
   const pkg = useQuery({
@@ -371,17 +354,6 @@ export default function ProfileScreen() {
                 />
               </ListCard>
             </View>
-
-            {badges.data && badges.data.length > 0 ? (
-              <View style={{ gap: 8 }}>
-                <GroupLabel>{t("settings.badges")}</GroupLabel>
-                <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
-                  {badges.data.map((type) => (
-                    <Chip key={type} kind="pr" icon={Trophy} label={BADGE_INFO[type].label} />
-                  ))}
-                </View>
-              </View>
-            ) : null}
 
             {account}
           </>

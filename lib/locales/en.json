@@ -453,7 +453,47 @@
     "history": "History",
     "weightValue": "{{value}} kg",
     "noEntriesYet": "No entries yet — log your first weigh-in above.",
-    "logToSeeTrend": "Log your weight to see the trend."
+    "logToSeeTrend": "Log your weight to see the trend.",
+    "title": "Progress",
+    "weighIn": "Weigh-in",
+    "lastTime": "Last time {{weight}} kg · {{date}}",
+    "firstWeighIn": "Your first weigh-in",
+    "weightToday": "Today's weight",
+    "kg": "kg",
+    "down": "Down 0.1",
+    "up": "Up 0.1",
+    "save": "Save",
+    "measurements": "Add measurements",
+    "photo": "Add a photo",
+    "measurementsTitle": "Measurements",
+    "waist": "Waist",
+    "chest": "Chest",
+    "cm": "cm",
+    "measurementsHint": "Saved with today's weigh-in.",
+    "done": "Done",
+    "weightTitle": "Weight",
+    "lastN_one": "Your last weigh-in",
+    "lastN_two": "The last {{count}} weigh-ins",
+    "lastN_other": "The last {{count}} weigh-ins",
+    "deltaSince": "{{delta}} kg since {{month}}",
+    "photos": "Progress photos",
+    "prsTitle": "My records",
+    "noPrs": "No records yet — they show up here after your workouts.",
+    "badgesTitle": "Badges",
+    "badge": {
+      "first_workout": "First workout",
+      "first_month": "First month",
+      "streak_10": "10 in a row"
+    },
+    "badgeLeft": {
+      "workouts_one": "1 more workout",
+      "workouts_two": "{{count}} more workouts",
+      "workouts_other": "{{count}} more workouts",
+      "days_one": "1 more day",
+      "days_two": "{{count}} more days",
+      "days_other": "{{count}} more days",
+      "afterFirst": "A month after your first workout"
+    }
   },
   "checkin": {
     "thisWeek": "This week",
@@ -469,7 +509,20 @@
     "submit": "Submit check-in",
     "history": "History",
     "weekOf": "Week of {{date}}",
-    "noPastCheckins": "No past check-ins yet."
+    "noPastCheckins": "No past check-ins yet.",
+    "title": "Weekly check-in",
+    "week": "Week {{range}} · half a minute",
+    "notSent": "Not sent yet",
+    "sent": "Sent",
+    "ends": {
+      "sleep": "1 poor · 5 great",
+      "energy": "1 low · 5 high",
+      "soreness": "1 none · 5 a lot",
+      "adherence": "1 barely · 5 fully"
+    },
+    "scoreOf": "{{field}} {{n}} of 5",
+    "notePlaceholderName": "Anything {{name}} should know? (optional)",
+    "send": "Send"
   },
   "workout": {
     "title": "Workout",

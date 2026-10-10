@@ -453,7 +453,47 @@
     "history": "היסטוריה",
     "weightValue": "{{value}} ק\"ג",
     "noEntriesYet": "עדיין אין רשומות — תעדו את השקילה הראשונה שלכם למעלה.",
-    "logToSeeTrend": "תעדו את המשקל שלכם כדי לראות את המגמה."
+    "logToSeeTrend": "תעדו את המשקל שלכם כדי לראות את המגמה.",
+    "title": "התקדמות",
+    "weighIn": "שקילה",
+    "lastTime": "בפעם הקודמת {{weight}} ק״ג · {{date}}",
+    "firstWeighIn": "השקילה הראשונה שלך",
+    "weightToday": "משקל היום",
+    "kg": "ק״ג",
+    "down": "הורדה ב-0.1",
+    "up": "הוספה של 0.1",
+    "save": "שמירה",
+    "measurements": "הוספת מידות",
+    "photo": "הוספת תמונה",
+    "measurementsTitle": "מידות",
+    "waist": "היקף מותניים",
+    "chest": "היקף חזה",
+    "cm": "ס״מ",
+    "measurementsHint": "יישמרו יחד עם השקילה של היום.",
+    "done": "סיום",
+    "weightTitle": "משקל",
+    "lastN_one": "השקילה האחרונה",
+    "lastN_two": "{{count}} השקילות האחרונות",
+    "lastN_other": "{{count}} השקילות האחרונות",
+    "deltaSince": "{{delta}} ק״ג מאז {{month}}",
+    "photos": "תמונות התקדמות",
+    "prsTitle": "השיאים שלי",
+    "noPrs": "עוד אין שיאים — הם יופיעו כאן אחרי האימונים.",
+    "badgesTitle": "תגים",
+    "badge": {
+      "first_workout": "אימון ראשון",
+      "first_month": "חודש ראשון",
+      "streak_10": "10 ברצף"
+    },
+    "badgeLeft": {
+      "workouts_one": "עוד אימון אחד",
+      "workouts_two": "עוד {{count}} אימונים",
+      "workouts_other": "עוד {{count}} אימונים",
+      "days_one": "עוד יום אחד",
+      "days_two": "עוד {{count}} ימים",
+      "days_other": "עוד {{count}} ימים",
+      "afterFirst": "חודש אחרי האימון הראשון"
+    }
   },
   "checkin": {
     "thisWeek": "השבוע",
@@ -469,7 +509,20 @@
     "submit": "שליחת צ׳ק-אין",
     "history": "היסטוריה",
     "weekOf": "שבוע של {{date}}",
-    "noPastCheckins": "אין עדיין צ׳ק-אינים קודמים."
+    "noPastCheckins": "אין עדיין צ׳ק-אינים קודמים.",
+    "title": "צ׳ק-אין שבועי",
+    "week": "שבוע {{range}} · חצי דקה",
+    "notSent": "עוד לא נשלח",
+    "sent": "נשלח",
+    "ends": {
+      "sleep": "1 גרועה · 5 מצוינת",
+      "energy": "1 נמוכה · 5 גבוהה",
+      "soreness": "1 בכלל לא · 5 הרבה",
+      "adherence": "1 בקושי · 5 במלואה"
+    },
+    "scoreOf": "{{field}} {{n}} מתוך 5",
+    "notePlaceholderName": "משהו לספר ל{{name}}? (לא חובה)",
+    "send": "שליחה"
   },
   "workout": {
     "title": "אימון",

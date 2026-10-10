@@ -99,6 +99,8 @@ export const qk = {
   badges: {
     all: ["badges"] as const,
     own: (userId: Id) => ["badges", userId] as const,
+    /** When the client's first workout was logged — the "first month" badge's countdown. */
+    firstWorkout: (userId: Id) => ["badges", userId, "first-workout"] as const,
   },
 
   clientStreak: {
@@ -119,6 +121,8 @@ export const qk = {
   progress: {
     all: ["progress"] as const,
     own: (clientId: Id) => ["progress", clientId] as const,
+    /** "השיאים שלי": the client's latest PR per exercise (D28a). */
+    prs: (clientId: Id) => ["progress", clientId, "prs"] as const,
   },
 
   /** trainer_monthly_money (0014) — Home's card, the Money screen's history. */
