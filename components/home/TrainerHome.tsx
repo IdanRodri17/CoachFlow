@@ -118,7 +118,7 @@ export function TrainerHome() {
       phone: client?.phone ?? null,
       clientName: client?.name ?? "",
       trainerName: profile?.display_name ?? "",
-      dateLabel: "today",
+      dateLabel: t("whatsapp.today"),
       timeLabel: s.scheduled_time ? s.scheduled_time.slice(0, 5) : null,
       templateName: s.template_name,
     });

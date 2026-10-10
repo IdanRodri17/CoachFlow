@@ -22,6 +22,7 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import Check from "lucide-react-native/icons/check";
 
 import { RoleGate } from "@/components/RoleGate";
 import { qk } from "@/lib/queryKeys";
@@ -55,7 +56,7 @@ import { FinishView, type FinishInput } from "@/components/workout/FinishView";
 import { OverviewSheet } from "@/components/workout/OverviewSheet";
 import { RestView } from "@/components/workout/RestView";
 import { SetView } from "@/components/workout/SetView";
-import { AppText, colors, Sheet } from "@/components/ui";
+import { AppText, colors, Icon, Sheet } from "@/components/ui";
 
 export default function WorkoutScreen() {
   return (
@@ -202,7 +203,11 @@ function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: st
     <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
       <ScrollView contentContainerClassName="px-6 py-6">
         <View className="mb-5 items-center">
-          <Text className="text-4xl">✅</Text>
+          <View
+            style={{ width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: colors.voltSoft }}
+          >
+            <Icon icon={Check} size={28} color={colors.voltInk} strokeWidth={2.4} />
+          </View>
           <Text className="mt-2 text-xl font-bold text-slate-900">{t("workout.completedTitle")}</Text>
           {log ? (
             <Text className="mt-1 text-sm text-slate-500">

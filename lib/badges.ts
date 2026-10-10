@@ -59,9 +59,3 @@ export async function checkAndAwardBadges(clientId: string): Promise<BadgeType[]
   if (error) throw error;
   return toAward;
 }
-
-export const BADGE_INFO: Record<BadgeType, { emoji: string; label: string }> = {
-  first_workout: { emoji: "🏅", label: "First Workout" },
-  streak_10: { emoji: "🔥", label: "10-Day Streak" },
-  first_month: { emoji: "📅", label: "One Month Strong" },
-};

@@ -14,7 +14,6 @@
 
 import { useState } from "react";
 import { Pressable, View } from "react-native";
-import { useRouter, type Href } from "expo-router";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import { useTranslation } from "react-i18next";
 import Apple from "lucide-react-native/icons/apple";
@@ -31,12 +30,10 @@ import { QuickAddSheet } from "@/components/QuickAddSheet";
 
 type Item =
   | { kind: "tab"; route: string; label: string; icon: IconComponent; alsoActiveOn?: string[] }
-  | { kind: "link"; href: Href; label: string; icon: IconComponent }
   | { kind: "add" };
 
 export function TabBar({ state, navigation, insets, isTrainer }: BottomTabBarProps & { isTrainer: boolean }) {
   const { t } = useTranslation();
-  const router = useRouter();
   const [quickAdd, setQuickAdd] = useState(false);
   const activeRoute = state.routes[state.index]?.name;
 
@@ -117,7 +114,7 @@ export function TabBar({ state, navigation, insets, isTrainer }: BottomTabBarPro
               accessibilityRole="tab"
               accessibilityState={{ selected: active }}
               accessibilityLabel={item.label}
-              onPress={() => (item.kind === "tab" ? openTab(item.route) : router.push(item.href))}
+              onPress={() => openTab(item.route)}
               style={{ flex: 1, minHeight: 52, alignItems: "center", justifyContent: "center", gap: 3 }}
             >
               <View

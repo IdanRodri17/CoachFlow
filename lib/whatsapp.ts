@@ -67,7 +67,8 @@ export function buildWhatsAppReminderLink({
   const digits = phone ? normalizePhone(phone) : null;
   if (!digits) return null;
 
-  const when = timeLabel ? `${dateLabel} at ${timeLabel}` : dateLabel;
-  const message = `Hi ${clientName}! Just a reminder about your "${templateName}" workout ${when} with ${trainerName}. See you then! 💪`;
+  // D31: in the app's language, like the invite (was English-only, with an emoji).
+  const when = timeLabel ? i18next.t("whatsapp.whenAt", { date: dateLabel, time: timeLabel }) : dateLabel;
+  const message = i18next.t("whatsapp.reminder", { name: clientName, template: templateName, when, trainer: trainerName });
   return `https://wa.me/${digits}?text=${encodeURIComponent(message)}`;
 }
