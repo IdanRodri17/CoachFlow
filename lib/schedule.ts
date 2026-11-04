@@ -6,6 +6,11 @@
 // which clamps month ends). The schedule form counts with it for "קביעת N
 // אימונים" and schedule/new.tsx builds its insert from the same rule, so the
 // button and the insert can't disagree. Unit-tested in lib/schedule.test.ts.
+//
+// V23 (Step 13): a third length, "until the package ends" — unit "sessions",
+// exactly `count` workouts on the chosen weekdays. sessionsUntilPackageEnds()
+// decides that count, so the form's chip, its summary and the insert all
+// come from these two functions.
 
 import { addDays, addMonths, weekdayOf } from "./dates";
 
@@ -13,17 +18,54 @@ export type ScheduleRepeat = {
   /** Weekdays, 0 = Sunday … 6 = Saturday. */
   days: number[];
   count: number;
-  unit: "weeks" | "months";
+  /** "sessions" = exactly `count` workouts (until the package ends). */
+  unit: "weeks" | "months" | "sessions";
 };
+
+/** More than any real package; a bad count can't make the loop run away. */
+export const MAX_SERIES_SESSIONS = 200;
 
 export function expandScheduleDates(date: string, repeat?: ScheduleRepeat): string[] {
   if (!repeat || repeat.days.length === 0) return [date];
+  if (repeat.unit === "sessions") {
+    // Only real weekdays, or the loop below could never find a match.
+    const days = repeat.days.filter((d) => Number.isInteger(d) && d >= 0 && d <= 6);
+    const count = Math.min(Math.floor(repeat.count), MAX_SERIES_SESSIONS);
+    if (days.length === 0 || !(count > 0)) return [date];
+    const dates: string[] = [];
+    for (let d = date; dates.length < count; d = addDays(d, 1)) {
+      if (days.includes(weekdayOf(d))) dates.push(d);
+    }
+    return dates;
+  }
   const end = repeat.unit === "months" ? addMonths(date, repeat.count) : addDays(date, repeat.count * 7);
   const dates: string[] = [];
   for (let d = date; d < end; d = addDays(d, 1)) {
     if (repeat.days.includes(weekdayOf(d))) dates.push(d);
   }
   return dates.length > 0 ? dates : [date];
+}
+
+// ---------------------------------------------------------------------------
+// Until the package ends (V23 Step 13)
+// ---------------------------------------------------------------------------
+
+/** A client's package, plus their workouts already scheduled from today on
+ * (not completed yet, so not in `used` — but each will use a session). */
+export type PackageBalance = { total: number; used: number; upcoming: number };
+
+export type PackagePlan =
+  | { ok: true; sessions: number }
+  | { ok: false; reason: "noPackage" | "nothingLeft" };
+
+/** How many workouts "until the package ends" creates: what's paid for and
+ * neither used nor already on the calendar. Counting only total − used
+ * would book the already-scheduled sessions a second time — sessions given
+ * away, the exact case trainer_attention's package_used_up warns about. */
+export function sessionsUntilPackageEnds(balance: PackageBalance | null): PackagePlan {
+  if (!balance) return { ok: false, reason: "noPackage" };
+  const left = balance.total - balance.used - balance.upcoming;
+  return left > 0 ? { ok: true, sessions: Math.min(left, MAX_SERIES_SESSIONS) } : { ok: false, reason: "nothingLeft" };
 }
 
 // ---------------------------------------------------------------------------

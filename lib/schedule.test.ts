@@ -2,7 +2,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { expandScheduleDates, freeSlots } from "./schedule";
+import { expandScheduleDates, freeSlots, MAX_SERIES_SESSIONS, sessionsUntilPackageEnds } from "./schedule";
 
 describe("expandScheduleDates", () => {
   it("is just the date without a repeat (or with no weekdays chosen)", () => {
@@ -32,6 +32,43 @@ describe("expandScheduleDates", () => {
 
   it("falls back to the start date when no chosen weekday falls in range", () => {
     expect(expandScheduleDates("2026-10-01", { days: [5], count: 0, unit: "weeks" })).toEqual(["2026-10-01"]);
+  });
+});
+
+describe("until the package ends (V23 Step 13)", () => {
+  it("creates exactly the sessions left, on the chosen weekdays", () => {
+    // 2026-10-01 is a Thursday. Sun + Wed, 10 sessions.
+    const dates = expandScheduleDates("2026-10-01", { days: [0, 3], count: 10, unit: "sessions" });
+    expect(dates).toHaveLength(10);
+    expect(dates[0]).toBe("2026-10-04"); // the first Sunday, not the Thursday start
+    expect(dates[9]).toBe("2026-11-04"); // the preview's "ending" date is the last row
+  });
+
+  it("includes the start date when it falls on a chosen weekday", () => {
+    expect(expandScheduleDates("2026-10-01", { days: [4], count: 3, unit: "sessions" })).toEqual([
+      "2026-10-01",
+      "2026-10-08",
+      "2026-10-15",
+    ]);
+  });
+
+  it("never loops forever on bad input", () => {
+    expect(expandScheduleDates("2026-10-01", { days: [9], count: 5, unit: "sessions" })).toEqual(["2026-10-01"]);
+    expect(expandScheduleDates("2026-10-01", { days: [1], count: 0, unit: "sessions" })).toEqual(["2026-10-01"]);
+    expect(expandScheduleDates("2026-10-01", { days: [1], count: 10_000, unit: "sessions" })).toHaveLength(
+      MAX_SERIES_SESSIONS,
+    );
+  });
+
+  it("counts what's paid for and neither used nor already scheduled", () => {
+    expect(sessionsUntilPackageEnds({ total: 12, used: 2, upcoming: 0 })).toEqual({ ok: true, sessions: 10 });
+    expect(sessionsUntilPackageEnds({ total: 12, used: 2, upcoming: 4 })).toEqual({ ok: true, sessions: 6 });
+  });
+
+  it("says why when there's nothing to schedule", () => {
+    expect(sessionsUntilPackageEnds(null)).toEqual({ ok: false, reason: "noPackage" });
+    expect(sessionsUntilPackageEnds({ total: 10, used: 6, upcoming: 4 })).toEqual({ ok: false, reason: "nothingLeft" });
+    expect(sessionsUntilPackageEnds({ total: 10, used: 12, upcoming: 0 })).toEqual({ ok: false, reason: "nothingLeft" });
   });
 });
 

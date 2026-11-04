@@ -782,6 +782,11 @@
     "smsRemindersHint": "The day before and on the morning of a workout"
   },
   "sessionForm": {
+    "untilPackageEnds": "Until the package ends · {{n}}",
+    "untilPackageEndsShort": "Until the package ends",
+    "packageNone": "This client has no package.",
+    "packageNothingLeft": "Every session in the package is already done or scheduled.",
+    "packageUpcoming": "Not counting {{n}} workouts already on the calendar.",
     "client": "Client",
     "other": "Other",
     "oneOffPlaceholder": "Client's name",

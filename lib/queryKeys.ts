@@ -96,6 +96,8 @@ export const qk = {
     all: ["package"] as const,
     own: (userId: Id) => ["package", userId] as const,
     subject: (kind: SubjectKind, refId: Id) => ["package", kind, refId] as const,
+    /** The schedule form's "until the package ends": balance + already-scheduled count. */
+    left: (kind: SubjectKind | null, refId: Id) => ["package", "left", kind, refId] as const,
   },
 
   badges: {

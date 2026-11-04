@@ -782,6 +782,11 @@
     "smsRemindersHint": "יום לפני ובבוקר של יום האימון"
   },
   "sessionForm": {
+    "untilPackageEnds": "עד סוף החבילה · {{n}}",
+    "untilPackageEndsShort": "עד סוף החבילה",
+    "packageNone": "ללקוח אין חבילה.",
+    "packageNothingLeft": "כל האימונים בחבילה כבר בוצעו או נקבעו.",
+    "packageUpcoming": "לא כולל {{n}} אימונים שכבר קבועים ביומן.",
     "client": "מתאמן",
     "other": "אחר",
     "oneOffPlaceholder": "שם המתאמן",

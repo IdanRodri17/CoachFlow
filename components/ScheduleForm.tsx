@@ -16,6 +16,12 @@
 // N comes from lib/schedule.ts expandScheduleDates(), the same rule
 // schedule/new.tsx inserts with, so the button never promises a different count.
 // Props and payload are unchanged.
+//
+// V23 (Step 13): under the length control, "עד סוף החבילה" repeats exactly
+// as many times as the picked client still has paid for — package total,
+// minus used, minus what's already on the calendar (lib/schedule.ts
+// sessionsUntilPackageEnds). No package, or nothing left, shows the chip
+// disabled with the reason; it never falls back to a week count silently.
 
 import { useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
@@ -25,6 +31,7 @@ import { useTranslation } from "react-i18next";
 import Calendar from "lucide-react-native/icons/calendar";
 import CalendarPlus from "lucide-react-native/icons/calendar-plus";
 import Check from "lucide-react-native/icons/check";
+import PackageIcon from "lucide-react-native/icons/package";
 import Plus from "lucide-react-native/icons/plus";
 import User from "lucide-react-native/icons/user";
 import Users from "lucide-react-native/icons/users";
@@ -33,7 +40,7 @@ import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { addDays, todayISO } from "@/lib/dates";
-import { expandScheduleDates } from "@/lib/schedule";
+import { expandScheduleDates, sessionsUntilPackageEnds, type PackageBalance, type ScheduleRepeat } from "@/lib/schedule";
 import type { RosterClient } from "@/lib/useRoster";
 import { DateChips } from "@/components/DateChips";
 import { TimeChips } from "@/components/TimeChips";
@@ -66,8 +73,8 @@ export type SchedulePayload = {
   // false = a solo workout the client can shift.
   withTrainer: boolean;
   // When set, repeat on these weekdays (0=Sun..6=Sat) for `count` weeks/months
-  // from `date`.
-  repeat?: { days: number[]; count: number; unit: "weeks" | "months" };
+  // from `date` — or, unit "sessions", exactly `count` workouts.
+  repeat?: ScheduleRepeat;
 };
 
 export type ScheduleFormInitial = {
@@ -140,7 +147,7 @@ export function ScheduleForm({
   const [note, setNote] = useState(initial?.note ?? "");
   const [withTrainer, setWithTrainer] = useState(initial?.withTrainer ?? true);
   const [repeatDays, setRepeatDays] = useState<number[]>([]);
-  const [duration, setDuration] = useState<Duration>("w4");
+  const [duration, setDuration] = useState<Duration | "package">("w4");
   const [validationError, setValidationError] = useState<string | null>(null);
 
   const quickDates = [0, 1, 2, 3].map((i) => addDays(today, i));
@@ -178,9 +185,49 @@ export function ScheduleForm({
   });
 
   const usingNewName = showNewName && newName.trim().length > 0;
-  const repeat =
+
+  // "Until the package ends": the picked client's package and the workouts
+  // already scheduled for them from today on. Always refetched on open — a
+  // stale count would book sessions twice.
+  const packageClient = allowRepeat && selected && !usingNewName ? selected : null;
+  const balance = useQuery({
+    queryKey: qk.package.left(packageClient?.kind ?? null, packageClient?.refId),
+    enabled: !!session && !!packageClient,
+    staleTime: 0,
+    queryFn: async (): Promise<PackageBalance | null> => {
+      const column = packageClient!.kind === "app" ? "client_id" : "managed_client_id";
+      const [pkg, upcoming] = await Promise.all([
+        supabase
+          .from("packages")
+          .select("total_sessions, used_sessions")
+          .eq("trainer_id", session!.user.id)
+          .eq(column, packageClient!.refId)
+          .maybeSingle(),
+        supabase
+          .from("scheduled_workouts")
+          .select("id", { count: "exact", head: true })
+          .eq("trainer_id", session!.user.id)
+          .eq(column, packageClient!.refId)
+          .eq("status", "scheduled")
+          .gte("scheduled_date", todayISO()),
+      ]);
+      if (pkg.error) throw pkg.error;
+      if (upcoming.error) throw upcoming.error;
+      if (!pkg.data) return null;
+      return { total: pkg.data.total_sessions, used: pkg.data.used_sessions, upcoming: upcoming.count ?? 0 };
+    },
+  });
+  const packagePlan = packageClient && balance.data !== undefined ? sessionsUntilPackageEnds(balance.data) : null;
+  const usePackage = duration === "package" && packagePlan?.ok === true;
+  // Switching to a client without a package drops back to the default length.
+  const weeksOrMonths: Duration = duration === "package" ? "w4" : duration;
+
+  const sortedDays = [...repeatDays].sort((a, b) => a - b);
+  const repeat: ScheduleRepeat | undefined =
     allowRepeat && repeatDays.length > 0
-      ? { days: [...repeatDays].sort((a, b) => a - b), ...DURATIONS[duration] }
+      ? usePackage && packagePlan?.ok
+        ? { days: sortedDays, count: packagePlan.sessions, unit: "sessions" }
+        : { days: sortedDays, ...DURATIONS[weeksOrMonths] }
       : undefined;
   const dates = expandScheduleDates(date, repeat);
 
@@ -213,12 +260,15 @@ export function ScheduleForm({
       : dayNames[0];
   const summary = repeat
     ? [
+        usePackage ? t("sessionForm.untilPackageEndsShort") : null,
         t("sessionForm.sessions", { count: dates.length }),
         [t("sessionForm.onDays", { days: joinedDays }), time ? t("sessionForm.at", { time }) : null]
           .filter(Boolean)
           .join(" "),
         t("sessionForm.until", { date: shortDate(dates[dates.length - 1], lang) }),
-      ].join(" · ")
+      ]
+        .filter(Boolean)
+        .join(" · ")
     : [`${weekdayLetter(date, lang)} ${shortDate(date, lang)}`, time].filter(Boolean).join(" · ");
 
   return (
@@ -458,7 +508,7 @@ export function ScheduleForm({
                 })}
               </View>
               <Segmented
-                value={duration}
+                value={usePackage ? null : weeksOrMonths}
                 onChange={setDuration}
                 options={[
                   { value: "w4", label: t("sessionForm.weeks4") },
@@ -466,6 +516,34 @@ export function ScheduleForm({
                   { value: "m3", label: t("sessionForm.months3") },
                 ]}
               />
+              {/* A chip row under the segmented control: a 4th segment would
+                  squeeze the Hebrew labels at phone width. */}
+              {packageClient ? (
+                <View style={{ alignItems: "flex-start", gap: 6 }}>
+                  <SelectChip
+                    label={
+                      packagePlan?.ok
+                        ? t("sessionForm.untilPackageEnds", { n: packagePlan.sessions })
+                        : t("sessionForm.untilPackageEndsShort")
+                    }
+                    icon={PackageIcon}
+                    selected={usePackage}
+                    disabled={!packagePlan?.ok}
+                    onPress={() => setDuration(usePackage ? "w4" : "package")}
+                  />
+                  {packagePlan && !packagePlan.ok ? (
+                    <AppText size={13} tone="graphite">
+                      {packagePlan.reason === "noPackage"
+                        ? t("sessionForm.packageNone")
+                        : t("sessionForm.packageNothingLeft")}
+                    </AppText>
+                  ) : usePackage && balance.data && balance.data.upcoming > 0 ? (
+                    <AppText size={13} tone="graphite">
+                      {t("sessionForm.packageUpcoming", { n: balance.data.upcoming })}
+                    </AppText>
+                  ) : null}
+                </View>
+              ) : null}
             </View>
           </Section>
         ) : null}
