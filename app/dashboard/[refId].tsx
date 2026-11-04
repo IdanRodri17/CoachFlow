@@ -15,9 +15,10 @@
 //     toggle (V10 add-on).
 //   - הערות: the full private-notes log (V8b) — add, edit, delete.
 //   - פרטים: the intake answers (V12b) and the contact phone.
-// Offline (managed) clients have no account: no logs, check-ins, weight,
-// intake or notes, so they get the package, their last session, today's
-// "סימון כבוצע", and סקירה · אימונים only. The AI nutrition assistant is its
+// Offline (managed) clients have no account, intake or notes, so they get
+// סקירה · אימונים only, plus today's "סימון כבוצע". V17: their check-in and
+// weight cards always show, and the trainer records both for them there
+// (components/ProgressEntrySheets.tsx). The AI nutrition assistant is its
 // own screen (D26a, app/dashboard/nutrition/[refId].tsx).
 
 import { useRef, useState, type ReactNode, type RefObject } from "react";
@@ -52,13 +53,14 @@ import { clientContextQuery, owedQuery, type ClientContext } from "@/lib/queries
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { addDays, DEFAULT_TIME_ZONE, todayISO, toDateString } from "@/lib/dates";
+import { addDays, DEFAULT_TIME_ZONE, todayISO, toDateString, weekStartOf } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
 import { useRosterClients } from "@/lib/useRoster";
 import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { LineChart } from "@/components/LineChart";
 import { firstName, formatMoney, monthName, shortDate, weekdayLetter } from "@/components/home/format";
+import { CheckinSheet, WeighInSheet } from "@/components/ProgressEntrySheets";
 import { ActionRow } from "@/components/ui/ActionRow";
 import {
   AppText,
@@ -119,7 +121,7 @@ type Detail = {
     paid: boolean;
     prs: number;
   }[];
-  /** App clients: weigh-ins, oldest first. */
+  /** Weigh-ins, oldest first. */
   weights: { date: string; value: number }[];
   /** Offline clients: their sessions up to today, newest first. */
   recent: { id: string; scheduled_date: string; status: "scheduled" | "completed"; template_name: string; paid: boolean }[];
@@ -173,6 +175,8 @@ function ClientCardBody() {
   const today = todayISO();
 
   const [tab, setTab] = useState<Tab>("overview");
+  // V17: the trainer's weigh-in / check-in sheet for an offline client.
+  const [entry, setEntry] = useState<"weigh" | "checkin" | null>(null);
   const noteInput = useRef<TextInput>(null);
 
   const refresh = usePullToRefresh([
@@ -188,7 +192,7 @@ function ClientCardBody() {
   const detail = useQuery({
     queryKey: qk.clientDetail.subject(kind, refId),
     queryFn: async (): Promise<Detail> => {
-      const [whoRes, sinceRes, streakRes, statusRes, upcomingRes] = await Promise.all([
+      const [whoRes, sinceRes, streakRes, statusRes, upcomingRes, progressRes] = await Promise.all([
         isApp
           ? supabase.from("profiles").select("display_name, intake").eq("id", refId).single()
           : supabase.from("managed_clients").select("name, created_at").eq("id", refId).single(),
@@ -222,12 +226,20 @@ function ClientCardBody() {
           .order("scheduled_date", { ascending: true })
           .order("scheduled_time", { ascending: true, nullsFirst: false })
           .limit(8),
+        // Weigh-ins: the client's own, or (V17) the trainer's for an offline client.
+        supabase
+          .from("progress_entries")
+          .select("date, weight")
+          .eq(subjectCol, refId)
+          .not("weight", "is", null)
+          .order("date", { ascending: true }),
       ]);
       if (whoRes.error) throw whoRes.error;
       if (sinceRes.error) throw sinceRes.error;
       if (streakRes.error) throw streakRes.error;
       if (statusRes.error) throw statusRes.error;
       if (upcomingRes.error) throw upcomingRes.error;
+      if (progressRes.error) throw progressRes.error;
 
       const who = whoRes.data as { display_name?: string; name?: string; intake?: unknown; created_at?: string };
       const name = who.display_name ?? who.name ?? t("clientCard.client");
@@ -237,28 +249,18 @@ function ClientCardBody() {
       const scheduled = new Map<string, { template_id: string | null; paid: boolean }>();
       let logRows: { id: string; scheduled_workout_id: string; completed_at: string; effort_rating: number | null; client_note: string | null }[] = [];
       const prCount = new Map<string, number>();
-      let weights: Detail["weights"] = [];
+      const weights: Detail["weights"] = progressRes.data.map((p) => ({ date: p.date, value: Number(p.weight) }));
       let recentRows: { id: string; scheduled_date: string; status: "scheduled" | "completed"; template_id: string | null; paid: boolean }[] = [];
 
       if (isApp) {
-        const [logsRes, progressRes] = await Promise.all([
-          supabase
-            .from("workout_logs")
-            .select("id, scheduled_workout_id, completed_at, effort_rating, client_note")
-            .eq("client_id", refId)
-            .order("completed_at", { ascending: false })
-            .limit(10),
-          supabase
-            .from("progress_entries")
-            .select("date, weight")
-            .eq("client_id", refId)
-            .not("weight", "is", null)
-            .order("date", { ascending: true }),
-        ]);
+        const logsRes = await supabase
+          .from("workout_logs")
+          .select("id, scheduled_workout_id, completed_at, effort_rating, client_note")
+          .eq("client_id", refId)
+          .order("completed_at", { ascending: false })
+          .limit(10);
         if (logsRes.error) throw logsRes.error;
-        if (progressRes.error) throw progressRes.error;
         logRows = logsRes.data;
-        weights = progressRes.data.map((p) => ({ date: p.date, value: Number(p.weight) }));
 
         const logIds = logRows.map((l) => l.id);
         const swIds = [...new Set(logRows.map((l) => l.scheduled_workout_id))];
@@ -353,15 +355,15 @@ function ClientCardBody() {
     },
   });
 
-  // Latest weekly check-in (V10) — app clients only (self-reported).
+  // Latest weekly check-in (V10): self-reported by an app client, or (V17)
+  // recorded by the trainer for an offline one.
   const latestCheckin = useQuery({
     queryKey: qk.checkIns.latest(refId),
-    enabled: isApp,
     queryFn: async () => {
       const { data, error } = await supabase
         .from("check_ins")
         .select("*")
-        .eq("client_id", refId)
+        .eq(subjectCol, refId)
         .order("week_start", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -462,6 +464,7 @@ function ClientCardBody() {
 
   const d = detail.data;
   const next = d.upcoming[0];
+  const thisWeekCheckin = latestCheckin.data?.week_start === weekStartOf(today) ? latestCheckin.data : null;
   const wa = phone ? buildWhatsAppLink(phone, t("clients.waHello", { name: firstName(d.name) })) : null;
   const tabs: { value: Tab; label: string }[] = [
     { value: "overview", label: t("clientCard.tabs.overview") },
@@ -626,9 +629,28 @@ function ClientCardBody() {
             </Card>
           ) : null}
 
-          {isApp && latestCheckin.data ? <CheckinCard checkin={latestCheckin.data} /> : null}
+          {/* V17: an offline client's cards always show — the trainer records both. */}
+          {latestCheckin.data || !isApp ? (
+            <CheckinCard
+              checkin={latestCheckin.data ?? null}
+              action={
+                isApp
+                  ? undefined
+                  : {
+                      label: thisWeekCheckin ? t("clientCard.entry.editCheckin") : t("clientCard.entry.addCheckin"),
+                      icon: thisWeekCheckin ? Pencil : Plus,
+                      onPress: () => setEntry("checkin"),
+                    }
+              }
+            />
+          ) : null}
 
-          {isApp && d.weights.length > 0 ? <WeightCard weights={d.weights} /> : null}
+          {d.weights.length > 0 || !isApp ? (
+            <WeightCard
+              weights={d.weights}
+              action={isApp ? undefined : { label: t("clientCard.entry.addWeighIn"), icon: Plus, onPress: () => setEntry("weigh") }}
+            />
+          ) : null}
 
           {isApp ? (
             <NotesCard
@@ -675,6 +697,23 @@ function ClientCardBody() {
       ) : null}
 
       {tab === "details" && isApp ? <DetailsTab intake={d.intake} phone={phone} /> : null}
+
+      {!isApp ? (
+        <>
+          <WeighInSheet
+            visible={entry === "weigh"}
+            onClose={() => setEntry(null)}
+            managedClientId={refId}
+            last={d.weights[d.weights.length - 1] ?? null}
+          />
+          <CheckinSheet
+            visible={entry === "checkin"}
+            onClose={() => setEntry(null)}
+            managedClientId={refId}
+            current={thisWeekCheckin}
+          />
+        </>
+      ) : null}
     </ScrollView>
   );
 }
@@ -1054,41 +1093,99 @@ function Stat({ label, value, unit }: { label: string; value: number | null; uni
   );
 }
 
-function CheckinCard({ checkin }: { checkin: Database["public"]["Tables"]["check_ins"]["Row"] }) {
+/** A card header's action ("עריכה" on the package; V17's add / edit). */
+type CardActionProps = { label: string; icon: IconComponent; onPress: () => void };
+
+function CardAction({ label, icon, onPress }: CardActionProps) {
+  return (
+    <Pressable
+      accessibilityRole="button"
+      onPress={onPress}
+      style={({ pressed }) => ({
+        flexDirection: "row",
+        alignItems: "center",
+        gap: 8,
+        minHeight: 44,
+        paddingHorizontal: 8,
+        opacity: pressed ? 0.6 : 1,
+      })}
+    >
+      <Icon icon={icon} size={16} />
+      <AppText size={14} weight="semibold">
+        {label}
+      </AppText>
+    </Pressable>
+  );
+}
+
+function CheckinCard({
+  checkin,
+  action,
+}: {
+  checkin: Database["public"]["Tables"]["check_ins"]["Row"] | null;
+  action?: CardActionProps;
+}) {
   const { t, i18n } = useTranslation();
   return (
     <Card style={{ padding: 14, gap: 16 }}>
       <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-        <AppText size={18} weight="semibold" lineHeight={23}>
-          {t("clientCard.lastCheckin")}
-        </AppText>
-        <AppText size={13} tone="smoke">
-          {t("clientCard.week", { date: shortDate(checkin.week_start, i18n.language) })}
-        </AppText>
-      </View>
-      {CHECKIN_ROWS.map((row) => (
-        <View key={row.key} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View style={{ width: 124, flexDirection: "row", alignItems: "center", gap: 8 }}>
-            <Icon icon={row.icon} size={18} color={colors.graphite} />
-            <AppText size={14} numberOfLines={1} style={{ flexShrink: 1 }}>
-              {t(`checkin.fields.${row.key}`)}
+        <View style={{ flexShrink: 1, gap: 2 }}>
+          <AppText size={18} weight="semibold" lineHeight={23}>
+            {t("clientCard.lastCheckin")}
+          </AppText>
+          {checkin ? (
+            <AppText size={13} tone="smoke">
+              {t("clientCard.week", { date: shortDate(checkin.week_start, i18n.language) })}
             </AppText>
-          </View>
-          <View style={{ flex: 1 }}>
-            <SegmentMeter total={5} filled={checkin[row.key]} height={8} />
-          </View>
-          <Num size={17} weight="semibold">
-            {`${checkin[row.key]}/5`}
-          </Num>
+          ) : null}
         </View>
-      ))}
-      {checkin.note ? <AppText size={14} tone="graphite">{`"${checkin.note}"`}</AppText> : null}
+        {action ? <CardAction {...action} /> : null}
+      </View>
+      {!checkin ? (
+        <AppText size={15} tone="graphite">
+          {t("clientCard.entry.noCheckinYet")}
+        </AppText>
+      ) : null}
+      {checkin
+        ? CHECKIN_ROWS.map((row) => (
+            <View key={row.key} style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+              <View style={{ width: 124, flexDirection: "row", alignItems: "center", gap: 8 }}>
+                <Icon icon={row.icon} size={18} color={colors.graphite} />
+                <AppText size={14} numberOfLines={1} style={{ flexShrink: 1 }}>
+                  {t(`checkin.fields.${row.key}`)}
+                </AppText>
+              </View>
+              <View style={{ flex: 1 }}>
+                <SegmentMeter total={5} filled={checkin[row.key]} height={8} />
+              </View>
+              <Num size={17} weight="semibold">
+                {`${checkin[row.key]}/5`}
+              </Num>
+            </View>
+          ))
+        : null}
+      {checkin?.note ? <AppText size={14} tone="graphite">{`"${checkin.note}"`}</AppText> : null}
     </Card>
   );
 }
 
-function WeightCard({ weights }: { weights: { date: string; value: number }[] }) {
+function WeightCard({ weights, action }: { weights: { date: string; value: number }[]; action?: CardActionProps }) {
   const { t, i18n } = useTranslation();
+  if (weights.length === 0) {
+    return (
+      <Card style={{ padding: 14, gap: 16 }}>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <AppText size={18} weight="semibold" lineHeight={23} style={{ flexShrink: 1 }}>
+            {t("progress.weightTitle")}
+          </AppText>
+          {action ? <CardAction {...action} /> : null}
+        </View>
+        <AppText size={15} tone="graphite">
+          {t("clientCard.entry.noWeightYet")}
+        </AppText>
+      </Card>
+    );
+  }
   const shown = weights.slice(-10);
   const first = shown[0];
   const last = shown[shown.length - 1];
@@ -1096,9 +1193,12 @@ function WeightCard({ weights }: { weights: { date: string; value: number }[] })
   return (
     <Card style={{ padding: 14, gap: 16 }}>
       <View style={{ gap: 4 }}>
-        <AppText size={18} weight="semibold" lineHeight={23}>
-          {t("progress.weightTitle")}
-        </AppText>
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
+          <AppText size={18} weight="semibold" lineHeight={23} style={{ flexShrink: 1 }}>
+            {t("progress.weightTitle")}
+          </AppText>
+          {action ? <CardAction {...action} /> : null}
+        </View>
         <View style={{ flexDirection: "row", alignItems: "baseline", flexWrap: "wrap", gap: 4 }}>
           <Num size={26}>{String(last.value)}</Num>
           <AppText size={13} tone="graphite">

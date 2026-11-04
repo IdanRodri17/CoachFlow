@@ -949,6 +949,17 @@
     "skipped": "דילוג על {{exercise}}",
     "allWorkouts": "כל האימונים",
     "noWorkoutsYet": "עוד אין אימונים שהושלמו.",
+    "entry": {
+      "addWeighIn": "הוספת שקילה",
+      "addCheckin": "הוספת צ׳ק-אין",
+      "editCheckin": "עריכת השבוע",
+      "noCheckinYet": "עוד אין צ׳ק-אין.",
+      "noWeightYet": "עוד אין שקילות.",
+      "weighInTitle": "השקילה של היום",
+      "checkinTitle": "הצ׳ק-אין של השבוע",
+      "firstWeighIn": "השקילה הראשונה",
+      "notePlaceholder": "איך עבר השבוע? (לא חובה)"
+    },
     "lastCheckin": "צ׳ק-אין אחרון",
     "week": "שבוע {{date}}",
     "notes": {

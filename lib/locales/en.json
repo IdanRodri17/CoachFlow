@@ -949,6 +949,17 @@
     "skipped": "Skipped {{exercise}}",
     "allWorkouts": "All workouts",
     "noWorkoutsYet": "No completed workouts yet.",
+    "entry": {
+      "addWeighIn": "Add a weigh-in",
+      "addCheckin": "Add a check-in",
+      "editCheckin": "Edit this week",
+      "noCheckinYet": "No check-in yet.",
+      "noWeightYet": "No weigh-ins yet.",
+      "weighInTitle": "Today's weigh-in",
+      "checkinTitle": "This week's check-in",
+      "firstWeighIn": "The first weigh-in",
+      "notePlaceholder": "How did the week go? (optional)"
+    },
     "lastCheckin": "Last check-in",
     "week": "Week of {{date}}",
     "notes": {
