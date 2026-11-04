@@ -245,7 +245,9 @@
       "deleteWorkoutConfirm": "לא ניתן לבטל פעולה זו.",
       "delete": "מחק",
       "workoutNotFound": "האימון לא נמצא.",
-      "saveChanges": "שמור שינויים"
+      "saveChanges": "שמור שינויים",
+      "logWorkout": "רישום האימון",
+      "viewWorkout": "צפייה באימון"
     }
   },
   "clients": {
@@ -480,7 +482,9 @@
       "skipCta": "דילוג על התרגיל",
       "swapCta": "החלפה ל{{name}}",
       "trainerSeesSwapName": "ההחלפה והסיבה יופיעו אצל {{name}}",
-      "trainerSeesSkipName": "הדילוג והסיבה יופיעו אצל {{name}}"
+      "trainerSeesSkipName": "הדילוג והסיבה יופיעו אצל {{name}}",
+      "onCardSwap": "ההחלפה והסיבה יישמרו בכרטיס המתאמן.",
+      "onCardSkip": "הדילוג והסיבה יישמרו בכרטיס המתאמן."
     },
     "overview": {
       "close": "סגירה",
@@ -523,7 +527,8 @@
       "freePlaceholder": "הערה למאמן",
       "save": "שמירה וסיום",
       "share": "שיתוף ההתקדמות",
-      "notesTitleName": "משהו לספר ל{{name}}?"
+      "notesTitleName": "משהו לספר ל{{name}}?",
+      "notesTitleTrainer": "הערה על האימון"
     },
     "alerts": {
       "channelName": "סוף מנוחה",
@@ -533,6 +538,9 @@
       "allow": "אישור",
       "restOverTitle": "המנוחה נגמרה",
       "restOverBody": "סט {{n}} · {{name}} — קדימה"
+    },
+    "trainerMode": {
+      "appClientLogsOwn": "את האימון הזה המתאמן רושם מהטלפון שלו."
     }
   },
   "intake": {

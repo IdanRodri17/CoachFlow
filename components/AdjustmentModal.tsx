@@ -59,6 +59,7 @@ export function AdjustmentModal({
   exerciseLabel,
   muscleGroup,
   trainerName,
+  trainerMode,
   library,
   onClose,
   onConfirm,
@@ -73,6 +74,9 @@ export function AdjustmentModal({
   muscleGroup?: string | null;
   /** The trainer's first name for "… יופיעו אצל אלון", when known. */
   trainerName?: string | null;
+  /** V17: the trainer is logging an offline client — the reason lands on
+   * the client's card instead of "your trainer will see it". */
+  trainerMode?: boolean;
   library: AdjustmentLibraryItem[]; // substitutes (current exercise excluded)
   onClose: () => void;
   onConfirm: (result: AdjustmentResult) => void;
@@ -88,6 +92,7 @@ export function AdjustmentModal({
           exerciseLabel={exerciseLabel}
           muscleGroup={muscleGroup}
           trainerName={trainerName}
+          trainerMode={trainerMode}
           library={library}
           onClose={onClose}
           onConfirm={onConfirm}
@@ -103,6 +108,7 @@ function AdjustmentBody({
   exerciseLabel,
   muscleGroup,
   trainerName,
+  trainerMode,
   library,
   onClose,
   onConfirm,
@@ -112,6 +118,7 @@ function AdjustmentBody({
   exerciseLabel?: string;
   muscleGroup?: string | null;
   trainerName?: string | null;
+  trainerMode?: boolean;
   library: AdjustmentLibraryItem[];
   onClose: () => void;
   onConfirm: (result: AdjustmentResult) => void;
@@ -249,11 +256,13 @@ function AdjustmentBody({
       <View style={{ flexDirection: "row", alignItems: "center", gap: 6 }}>
         <Icon icon={Info} size={16} color={colors.ash} />
         <AppText size={13} tone="ash" style={{ flexShrink: 1 }}>
-          {trainerName
-            ? t(mode === "swap" ? "workout.adjust.trainerSeesSwapName" : "workout.adjust.trainerSeesSkipName", {
-                name: trainerName,
-              })
-            : t(mode === "swap" ? "workout.adjust.trainerSeesSwap" : "workout.adjust.trainerSeesSkip")}
+          {trainerMode
+            ? t(mode === "swap" ? "workout.adjust.onCardSwap" : "workout.adjust.onCardSkip")
+            : trainerName
+              ? t(mode === "swap" ? "workout.adjust.trainerSeesSwapName" : "workout.adjust.trainerSeesSkipName", {
+                  name: trainerName,
+                })
+              : t(mode === "swap" ? "workout.adjust.trainerSeesSwap" : "workout.adjust.trainerSeesSkip")}
         </AppText>
       </View>
 

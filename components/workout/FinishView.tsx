@@ -28,6 +28,7 @@ export type FinishInput = { effort: number | null; note: string | null; duration
 export function FinishView({
   subtitle,
   trainerName,
+  trainerMode,
   startedAt,
   showDuration,
   sets,
@@ -42,6 +43,9 @@ export function FinishView({
   subtitle: string;
   /** The trainer's first name for "משהו לספר לאלון?", when known. */
   trainerName?: string | null;
+  /** V17: the trainer is logging an offline client — the note is the
+   * trainer's own, not a message to them. */
+  trainerMode?: boolean;
   startedAt: number;
   /** False for a free workout (no template): there was no timed session. */
   showDuration: boolean;
@@ -220,7 +224,11 @@ export function FinishView({
 
         <View style={{ gap: 12 }}>
           <AppText size={18} weight="semibold" tone="bone">
-            {trainerName ? t("workout.finish.notesTitleName", { name: trainerName }) : t("workout.finish.notesTitle")}
+            {trainerMode
+              ? t("workout.finish.notesTitleTrainer")
+              : trainerName
+                ? t("workout.finish.notesTitleName", { name: trainerName })
+                : t("workout.finish.notesTitle")}
           </AppText>
           <View style={{ flexDirection: "row", flexWrap: "wrap", gap: 8 }}>
             {NOTE_CHIPS.map((c) => (

@@ -245,7 +245,9 @@
       "deleteWorkoutConfirm": "This can't be undone.",
       "delete": "Delete",
       "workoutNotFound": "Workout not found.",
-      "saveChanges": "Save changes"
+      "saveChanges": "Save changes",
+      "logWorkout": "Log this workout",
+      "viewWorkout": "View the workout"
     }
   },
   "clients": {
@@ -480,7 +482,9 @@
       "skipCta": "Skip the exercise",
       "swapCta": "Swap for {{name}}",
       "trainerSeesSwapName": "{{name}} will see the swap and the reason",
-      "trainerSeesSkipName": "{{name}} will see that you skipped and why"
+      "trainerSeesSkipName": "{{name}} will see that you skipped and why",
+      "onCardSwap": "The swap and its reason are saved on the client's card.",
+      "onCardSkip": "The skip and its reason are saved on the client's card."
     },
     "overview": {
       "close": "Close",
@@ -523,7 +527,8 @@
       "freePlaceholder": "Write a note for your trainer",
       "save": "Save and finish",
       "share": "Share your progress",
-      "notesTitleName": "Anything {{name}} should know?"
+      "notesTitleName": "Anything {{name}} should know?",
+      "notesTitleTrainer": "A note on this workout"
     },
     "alerts": {
       "channelName": "Rest timer",
@@ -533,6 +538,9 @@
       "allow": "Allow",
       "restOverTitle": "Rest is over",
       "restOverBody": "Set {{n}} · {{name}} — let's go"
+    },
+    "trainerMode": {
+      "appClientLogsOwn": "This client logs this workout from their own phone."
     }
   },
   "intake": {

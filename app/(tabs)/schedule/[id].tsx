@@ -16,10 +16,12 @@ import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import Dumbbell from "lucide-react-native/icons/dumbbell";
+import Eye from "lucide-react-native/icons/eye";
 
 import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
-import { AppText, Button, Sheet } from "@/components/ui";
+import { AppText, Button, colors, Sheet } from "@/components/ui";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
@@ -242,9 +244,26 @@ function EditScheduleScreenBody() {
   }
 
   const mutationError = updateMutation.error ?? deleteMutation.error;
+  // V17 (Step 7): the trainer logs an offline client's workout themselves,
+  // and can open any completed one. An app client's open workout is logged
+  // from the client's own phone, so it gets no button.
+  const completed = workout.data.row.status === "completed";
+  const openWorkout = completed || workout.data.initial.client?.kind === "managed";
 
   return (
-    <>
+    <View style={{ flex: 1, backgroundColor: colors.chalk }}>
+      {openWorkout ? (
+        <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+          <Button
+            label={completed ? t("schedule.detail.viewWorkout") : t("schedule.detail.logWorkout")}
+            icon={completed ? Eye : Dumbbell}
+            variant={completed ? "secondary" : "accent"}
+            block
+            onPress={() => router.push(`/workout/${id}`)}
+          />
+        </View>
+      ) : null}
+
       <ScheduleForm
         roster={roster.data ?? []}
         templates={templates.data ?? []}
@@ -285,6 +304,6 @@ function EditScheduleScreenBody() {
           />
         </View>
       </Sheet>
-    </>
+    </View>
   );
 }

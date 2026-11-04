@@ -9,9 +9,13 @@
 // workout's `subject` and who is logging it (`loggedBy`) as inputs and never
 // reads the signed-in user as "the client". "Last time" and the PR history are
 // read for the subject explicitly (set_logs filtered through
-// workout_logs.client_id), not left to RLS — for a trainer, RLS returns every
-// client's sets. Only `mode: "client"` (subject = an app client) is built;
-// V17 changes the subject filter and the insert in these two functions.
+// workout_logs.client_id / managed_client_id), not left to RLS — for a
+// trainer, RLS returns every client's sets.
+//
+// V17 (Step 7): both modes are built. Trainer mode logs an offline client's
+// workout (lib/workoutSubject.ts decides who may): history comes from the
+// managed client's own logs, and the save writes managed_client_id plus
+// logged_by = the trainer, which 0032's RLS requires.
 //
 // Phone-free (D20f): the screen stays awake during the workout and a rest
 // that ends buzzes in the foreground or notifies in the background
@@ -240,12 +244,11 @@ type HistoryRow = SetPerf & { exerciseId: string };
 /** Every past set of these exercises for the subject, newest first. */
 export async function subjectHistory(exerciseIds: string[], subject: WorkoutSubject): Promise<HistoryRow[]> {
   if (exerciseIds.length === 0) return [];
-  if (subject.kind !== "app") throw new Error("Logging for an offline client isn't built yet (roadmap V17).");
   const { data, error } = await supabase
     .from("set_logs")
-    .select("exercise_id, weight, reps, set_index, workout_logs!inner(client_id, completed_at)")
+    .select("exercise_id, weight, reps, set_index, workout_logs!inner(client_id, managed_client_id, completed_at)")
     .in("exercise_id", exerciseIds)
-    .eq("workout_logs.client_id", subject.id);
+    .eq(subject.kind === "app" ? "workout_logs.client_id" : "workout_logs.managed_client_id", subject.id);
   if (error) throw error;
   return data
     .map((row) => ({
@@ -324,7 +327,6 @@ export async function saveWorkout(
   { durationSeconds, effort, note }: { durationSeconds: number | null; effort: number | null; note: string | null },
 ): Promise<void> {
   const { state, scheduledId, subject, loggedBy, mode } = session;
-  if (subject.kind !== "app") throw new Error("Logging for an offline client isn't built yet (roadmap V17).");
   const rows = saveRows(state);
 
   // PR flags against the subject's own history (lib/pr.ts) — the same rule
@@ -345,7 +347,9 @@ export async function saveWorkout(
     .from("workout_logs")
     .insert({
       scheduled_workout_id: scheduledId,
-      client_id: subject.id,
+      client_id: subject.kind === "app" ? subject.id : null,
+      managed_client_id: subject.kind === "managed" ? subject.id : null,
+      logged_by: loggedBy,
       duration_seconds: durationSeconds,
       effort_rating: effort,
       client_note: note,

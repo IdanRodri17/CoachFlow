@@ -1,5 +1,12 @@
 // app/workout/[id].tsx — the workout screen (route /workout/:id, where :id is
-// a scheduled_workout id). Client-only.
+// a scheduled_workout id).
+//
+// V17 (Step 7): who opens it decides the mode (lib/workoutSubject.ts). A
+// client logs their own workout, as before. A trainer logs an OFFLINE
+// client's workout in trainer mode — same screens, same rules, the client's
+// name in the header, history and PRs from that client's own logs, and the
+// save writes managed_client_id + logged_by. A trainer can view an app
+// client's completed workout but never log it for them.
 //
 // D20a–e: an open workout runs in the dark workout mode (DESIGN.md §6): one
 // exercise at a time with two big steppers and one tap per set
@@ -15,7 +22,7 @@
 // session is saved on the phone after every tap — minimizing (or a restart)
 // loses nothing, and opening the workout again resumes it.
 
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import { ActivityIndicator, ScrollView, Text, View } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
@@ -24,7 +31,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Check from "lucide-react-native/icons/check";
 
-import { RoleGate } from "@/components/RoleGate";
 import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -39,8 +45,10 @@ import {
   subjectHistory,
   useWorkoutSession,
   type WorkoutData,
+  type WorkoutMode as SessionMode,
   type WorkoutSubject,
 } from "@/lib/useWorkoutSession";
+import { workoutAccess, type WorkoutAccess } from "@/lib/workoutSubject";
 import {
   exerciseName,
   isSwapped,
@@ -58,39 +66,53 @@ import { RestView } from "@/components/workout/RestView";
 import { SetView } from "@/components/workout/SetView";
 import { AppText, colors, Icon, Sheet } from "@/components/ui";
 
-export default function WorkoutScreen() {
-  return (
-    <RoleGate role="client">
-      <WorkoutScreenBody />
-    </RoleGate>
-  );
+// The name shown in trainer mode's header ("דנה · רגליים").
+async function subjectName(subject: WorkoutSubject): Promise<string | null> {
+  if (subject.kind === "managed") {
+    const { data } = await supabase.from("managed_clients").select("name").eq("id", subject.id).maybeSingle();
+    return data?.name ?? null;
+  }
+  const { data } = await supabase.from("profiles").select("display_name").eq("id", subject.id).maybeSingle();
+  return data?.display_name ?? null;
 }
 
-function WorkoutScreenBody() {
+export default function WorkoutScreen() {
   const { id } = useLocalSearchParams<{ id: string }>();
-  const { session } = useAuth();
+  const { session, profile } = useAuth();
   const { t } = useTranslation();
-  const clientId = session!.user.id;
-  // The workout's subject: here always the signed-in client (V17 adds a
-  // trainer logging an offline client — DESIGN.md §6.3).
-  const subject = useMemo<WorkoutSubject>(() => ({ kind: "app", id: clientId }), [clientId]);
+  const userId = session!.user.id;
+  const role = profile?.role ?? null;
 
   const query = useQuery({
     queryKey: qk.workout.session(id),
+    enabled: role != null,
     // Never served from cache: a resumed workout must start from the sets
     // saved on the phone a moment ago, not from an older copy.
     gcTime: 0,
     queryFn: async () => {
-      const data = await loadWorkout(id, subject, t("workout.exerciseFallback"));
+      // Whose workout is it, and may this user log it? Decided first.
+      const { data: sw, error } = await supabase
+        .from("scheduled_workouts")
+        .select("trainer_id, client_id, managed_client_id, status")
+        .eq("id", id)
+        .maybeSingle();
+      if (error) throw error;
+      const access: WorkoutAccess = sw
+        ? workoutAccess(sw, { id: userId, role: role! })
+        : { kind: "denied", reason: "notYours" };
+      if (access.kind === "denied") return { access, data: null, restored: null, name: null };
+
+      const data = await loadWorkout(id, access.subject, t("workout.exerciseFallback"));
+      const name = access.mode === "trainer" ? await subjectName(access.subject) : null;
       if (data.status === "completed") {
-        await clearSavedWorkout(clientId, id);
-        return { data, restored: null };
+        await clearSavedWorkout(userId, id);
+        return { access, data, restored: null, name };
       }
-      return { data, restored: await loadSavedWorkout(clientId, id, data.exercises) };
+      return { access, data, restored: await loadSavedWorkout(userId, id, data.exercises), name };
     },
   });
 
-  if (query.isLoading) {
+  if (role == null || query.isLoading) {
     return (
       <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.iron }}>
         <StatusBar style="light" />
@@ -109,11 +131,34 @@ function WorkoutScreenBody() {
     );
   }
 
-  if (query.data.data.status === "completed") {
-    return <CompletedSummary scheduledId={id} note={query.data.data.note} />;
+  const { access, data, restored, name } = query.data;
+  if (access.kind === "denied" || !data) {
+    return (
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.iron }}>
+        <StatusBar style="light" />
+        <AppText size={14} tone="ash" center>
+          {access.kind === "denied" && access.reason === "appClientLogsOwn"
+            ? t("workout.trainerMode.appClientLogsOwn")
+            : t("workout.notFound")}
+        </AppText>
+      </View>
+    );
   }
 
-  return <WorkoutMode data={query.data.data} restored={query.data.restored} subject={subject} loggedBy={clientId} />;
+  if (data.status === "completed") {
+    return <CompletedSummary scheduledId={id} note={data.note} />;
+  }
+
+  return (
+    <WorkoutMode
+      data={data}
+      restored={restored}
+      subject={access.subject}
+      mode={access.mode}
+      subjectName={name}
+      loggedBy={userId}
+    />
+  );
 }
 
 // ---------------------------------------------------------------------------
@@ -294,25 +339,36 @@ function WorkoutMode({
   data,
   restored,
   subject,
+  mode,
+  subjectName,
   loggedBy,
 }: {
   data: WorkoutData;
   restored: WorkoutState | null;
   subject: WorkoutSubject;
+  mode: SessionMode;
+  /** Trainer mode: the client's name, shown with the workout's title. */
+  subjectName: string | null;
   loggedBy: string;
 }) {
   const router = useRouter();
   const queryClient = useQueryClient();
   const { t, i18n } = useTranslation();
   const prefs = useWorkoutPrefs();
-  const trainerName = trainerFirstName(useMyTrainer().data);
+  const myTrainer = useMyTrainer();
+  // "Your trainer" lines only make sense to a client; in trainer mode the
+  // components show neutral copy instead (trainerMode below).
+  const trainerName = mode === "client" ? trainerFirstName(myTrainer.data) : null;
+  const trainerMode = mode === "trainer";
+  const workoutTitle = data.title ?? t("workout.freeWorkout");
+  const title = trainerMode && subjectName ? `${subjectName} · ${workoutTitle}` : workoutTitle;
   const session = useWorkoutSession({
     scheduledId: data.scheduledId,
-    title: data.title ?? t("workout.freeWorkout"),
+    title,
     exercises: data.exercises,
     subject,
     loggedBy,
-    mode: "client",
+    mode,
     restored,
     autoRest: prefs.autoRest,
     restAlerts: prefs.restAlerts,
@@ -322,7 +378,6 @@ function WorkoutMode({
   const [sheet, setSheet] = useState<"adjust" | "overview" | "demo" | null>(null);
   const [adjustMode, setAdjustMode] = useState<"swap" | "skip">("swap");
 
-  const title = data.title ?? t("workout.freeWorkout");
   const current = data.exercises[s.ex];
   const adj = s.adjustments[s.ex];
 
@@ -343,7 +398,7 @@ function WorkoutMode({
       const { data: row, error } = await supabase
         .from("client_streaks")
         .select("current_streak")
-        .eq("client_id", subject.id)
+        .eq(subject.kind === "app" ? "client_id" : "managed_client_id", subject.id)
         .eq("trainer_id", data.trainerId)
         .maybeSingle();
       if (error) throw error;
@@ -382,14 +437,18 @@ function WorkoutMode({
         queryClient.invalidateQueries({ queryKey: qk.scheduledClient.all });
         queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.all });
         queryClient.invalidateQueries({ queryKey: qk.clientStreak.all });
-        queryClient.invalidateQueries({ queryKey: qk.badges.own(id) });
-        queryClient.invalidateQueries({ queryKey: qk.package.own(id) });
-        queryClient.invalidateQueries({ queryKey: qk.package.subject("app", id) });
+        if (mode === "client") {
+          queryClient.invalidateQueries({ queryKey: qk.badges.own(id) });
+          queryClient.invalidateQueries({ queryKey: qk.package.own(id) });
+        }
+        queryClient.invalidateQueries({ queryKey: qk.package.subject(subject.kind, id) });
         queryClient.invalidateQueries({ queryKey: qk.exercises.all });
         queryClient.invalidateQueries({ queryKey: qk.progress.all });
         queryClient.invalidateQueries({ queryKey: qk.shareCard.all });
-        // Trainer-side views (same device, one shared cache in dev).
-        queryClient.invalidateQueries({ queryKey: qk.clientDetail.subject("app", id) });
+        // Trainer-side views (in trainer mode, and on a shared dev device).
+        queryClient.invalidateQueries({ queryKey: qk.clientDetail.subject(subject.kind, id) });
+        queryClient.invalidateQueries({ queryKey: qk.clientContext.all });
+        queryClient.invalidateQueries({ queryKey: qk.clientRisk.all });
         queryClient.invalidateQueries({ queryKey: qk.money.all });
         if (then === "share") router.replace(`/share-card/${id}`);
         else minimize();
@@ -463,8 +522,10 @@ function WorkoutMode({
           prs={sessionPrs(s)}
           saving={save.isPending}
           errorMessage={save.error ? (save.error as Error).message : null}
+          trainerMode={trainerMode}
           onSave={(input) => finish(input, "home")}
-          onShare={(input) => finish(input, "share")}
+          // The share card is the client's own (an offline client has no app).
+          onShare={mode === "client" ? (input) => finish(input, "share") : undefined}
         />
       )}
 
@@ -475,6 +536,7 @@ function WorkoutMode({
         exerciseLabel={t("workout.mode.exerciseOf", { n: s.ex + 1, total: data.exercises.length })}
         muscleGroup={isSwapped(s, s.ex) ? null : current?.muscleGroup}
         trainerName={trainerName}
+        trainerMode={trainerMode}
         library={swapLibrary}
         onClose={() => setSheet(null)}
         onConfirm={confirmAdjust}
