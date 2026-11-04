@@ -88,6 +88,28 @@ export function clientStreakQuery(clientId: string) {
   });
 }
 
+export type OwnPackage = { total_sessions: number; used_sessions: number };
+
+/** The signed-in client's session package — Today and Profile. A client who
+ * has had two trainers has a package with each (RLS shows both), so the
+ * newest one is shown: the current trainer's. A single-row read errored on
+ * two rows and left both screens without a package. */
+export function ownPackageQuery(clientId: string) {
+  return queryOptions({
+    queryKey: qk.package.own(clientId),
+    queryFn: async (): Promise<OwnPackage | null> => {
+      const { data, error } = await supabase
+        .from("packages")
+        .select("total_sessions, used_sessions")
+        .eq("client_id", clientId)
+        .order("created_at", { ascending: false })
+        .limit(1);
+      if (error) throw error;
+      return data[0] ?? null;
+    },
+  });
+}
+
 export type TodaySession = {
   id: string;
   client_id: string | null;

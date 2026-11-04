@@ -44,6 +44,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { addDays, todayISO, weekStartOf } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
+import { ownPackageQuery } from "@/lib/queries";
 import { listOpenWorkouts, type OpenWorkout } from "@/lib/useWorkoutSession";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import { usePullToRefresh } from "@/lib/usePullToRefresh";
@@ -138,19 +139,8 @@ export function ClientToday() {
     },
   });
 
-  // Same key and shape as the Profile tab's package query.
-  const pkg = useQuery({
-    queryKey: qk.package.own(clientId),
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("packages")
-        .select("total_sessions, used_sessions")
-        .eq("client_id", clientId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Shared with the Profile tab (lib/queries.ts).
+  const pkg = useQuery(ownPackageQuery(clientId));
 
   const streak = useQuery({
     queryKey: qk.clientStreak.own(clientId),

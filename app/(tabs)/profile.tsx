@@ -43,6 +43,7 @@ import { qk } from "@/lib/queryKeys";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { ltr, setLocale, type SupportedLocale } from "@/lib/i18n";
+import { ownPackageQuery } from "@/lib/queries";
 import { setWorkoutPref, useWorkoutPrefs } from "@/lib/workoutPrefs";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import { formatMoney, monthName } from "@/components/home/format";
@@ -89,20 +90,8 @@ export default function ProfileScreen() {
   const [editing, setEditing] = useState<null | "name" | "business" | "price">(null);
   const [draft, setDraft] = useState("");
 
-  // Same key and shape as the client Home's package query.
-  const pkg = useQuery({
-    queryKey: qk.package.own(userId),
-    enabled: isClient && !!session,
-    queryFn: async () => {
-      const { data, error } = await supabase
-        .from("packages")
-        .select("total_sessions, used_sessions")
-        .eq("client_id", userId)
-        .maybeSingle();
-      if (error) throw error;
-      return data;
-    },
-  });
+  // Shared with the client Home (lib/queries.ts).
+  const pkg = useQuery({ ...ownPackageQuery(userId), enabled: isClient && !!session });
 
   // Same key as the client Home's streak.
   const streak = useQuery({
