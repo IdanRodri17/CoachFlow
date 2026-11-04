@@ -79,6 +79,17 @@ export default function ExerciseDetailScreen() {
     ]);
   }
 
+  // 0033: an exercise someone has trained can't be deleted — its sets and PRs
+  // would go with it. The database refuses with 'exercise_in_use'.
+  const deleteError = deleteMutation.error as Error | null;
+  const formError = deleteError
+    ? deleteError.message.includes("exercise_in_use")
+      ? t("exercises.detail.inUse")
+      : deleteError.message
+    : updateMutation.error
+      ? (updateMutation.error as Error).message
+      : null;
+
   if (isLoading) return <View style={{ flex: 1, backgroundColor: colors.chalk }} />;
 
   if (error || !exercise) {
@@ -97,8 +108,11 @@ export default function ExerciseDetailScreen() {
         initial={exercise}
         submitLabel={t("exercises.detail.saveChanges")}
         submitting={updateMutation.isPending}
-        errorMessage={updateMutation.error ? (updateMutation.error as Error).message : null}
-        onSubmit={(input) => updateMutation.mutate(input)}
+        errorMessage={formError}
+        onSubmit={(input) => {
+          deleteMutation.reset();
+          updateMutation.mutate(input);
+        }}
         footer={
           <Button
             label={t("exercises.detail.deleteExercise")}

@@ -84,7 +84,8 @@
       "delete": "Delete",
       "notFound": "Exercise not found.",
       "saveChanges": "Save changes",
-      "deleteExercise": "Delete exercise"
+      "deleteExercise": "Delete exercise",
+      "inUse": "This exercise is already in clients' workout logs, so it can't be deleted. You can rename it instead."
     },
     "library": {
       "title": "Library",
