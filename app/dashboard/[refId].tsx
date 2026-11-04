@@ -18,7 +18,9 @@
 // Offline (managed) clients have no account, intake or notes, so they get
 // סקירה · אימונים only, plus today's "סימון כבוצע". V17: their check-in and
 // weight cards always show, and the trainer records both for them there
-// (components/ProgressEntrySheets.tsx). The AI nutrition assistant is its
+// (components/ProgressEntrySheets.tsx); the workouts the trainer logged show
+// on the last-workout card and in the recent list. A logged workout opens
+// its summary (app/workout/[id].tsx). The AI nutrition assistant is its
 // own screen (D26a, app/dashboard/nutrition/[refId].tsx).
 
 import { useRef, useState, type ReactNode, type RefObject } from "react";
@@ -123,8 +125,16 @@ type Detail = {
   }[];
   /** Weigh-ins, oldest first. */
   weights: { date: string; value: number }[];
-  /** Offline clients: their sessions up to today, newest first. */
-  recent: { id: string; scheduled_date: string; status: "scheduled" | "completed"; template_name: string; paid: boolean }[];
+  /** Offline clients: their sessions up to today, newest first, with the
+   * trainer's log of the session when there is one (V17). */
+  recent: {
+    id: string;
+    scheduled_date: string;
+    status: "scheduled" | "completed";
+    template_name: string;
+    paid: boolean;
+    log: { effort: number | null; note: string | null; prs: number } | null;
+  }[];
 };
 
 const CHECKIN_ROWS: { key: "sleep" | "energy" | "soreness" | "adherence"; icon: IconComponent }[] = [
@@ -251,6 +261,7 @@ function ClientCardBody() {
       const prCount = new Map<string, number>();
       const weights: Detail["weights"] = progressRes.data.map((p) => ({ date: p.date, value: Number(p.weight) }));
       let recentRows: { id: string; scheduled_date: string; status: "scheduled" | "completed"; template_id: string | null; paid: boolean }[] = [];
+      const offlineLogs = new Map<string, Detail["recent"][number]["log"]>();
 
       if (isApp) {
         const logsRes = await supabase
@@ -291,6 +302,30 @@ function ClientCardBody() {
         data.forEach((r) => {
           if (r.template_id) tplIds.add(r.template_id);
         });
+
+        // V17: the sessions the trainer logged, with their PRs.
+        const doneIds = data.filter((r) => r.status === "completed").map((r) => r.id);
+        if (doneIds.length > 0) {
+          const { data: logs, error: logErr } = await supabase
+            .from("workout_logs")
+            .select("id, scheduled_workout_id, effort_rating, client_note")
+            .eq("managed_client_id", refId)
+            .in("scheduled_workout_id", doneIds);
+          if (logErr) throw logErr;
+          const prs = new Map<string, number>();
+          if (logs.length > 0) {
+            const { data: prRows, error: prErr } = await supabase
+              .from("set_logs")
+              .select("workout_log_id")
+              .in("workout_log_id", logs.map((l) => l.id))
+              .eq("is_pr", true);
+            if (prErr) throw prErr;
+            prRows.forEach((p) => prs.set(p.workout_log_id, (prs.get(p.workout_log_id) ?? 0) + 1));
+          }
+          logs.forEach((l) =>
+            offlineLogs.set(l.scheduled_workout_id, { effort: l.effort_rating, note: l.client_note, prs: prs.get(l.id) ?? 0 }),
+          );
+        }
       }
 
       const names = new Map<string, string>();
@@ -330,6 +365,7 @@ function ClientCardBody() {
           status: r.status,
           template_name: tplName(r.template_id),
           paid: r.paid,
+          log: offlineLogs.get(r.id) ?? null,
         })),
       };
     },
@@ -501,6 +537,13 @@ function ClientCardBody() {
   const actionableId = !isApp ? d.status?.actionable_id : null;
   const actionable = actionableId ? d.recent.find((r) => r.id === actionableId) : undefined;
   const lastOffline = !isApp ? d.recent.find((r) => r.status === "completed") : undefined;
+  // V17: an offline client's last session shows its log when the trainer
+  // logged it; a later one only marked done shows by itself.
+  const lastLogged = context.data?.last ?? null;
+  const offlineLastLogged =
+    !isApp &&
+    lastLogged != null &&
+    (!lastOffline || toDateString(new Date(lastLogged.completedAt)) >= lastOffline.scheduled_date);
   const openSchedule = () => router.push({ pathname: "/schedule/new", params: { clientKind: kind, clientId: refId } });
 
   return (
@@ -613,8 +656,8 @@ function ClientCardBody() {
             onMarkPaid={() => markAllPaid.mutate()}
           />
 
-          {isApp ? (
-            <LastWorkoutCard last={context.data?.last ?? null} onAll={() => setTab("workouts")} />
+          {isApp || offlineLastLogged ? (
+            <LastWorkoutCard last={lastLogged} onAll={() => setTab("workouts")} />
           ) : lastOffline ? (
             <Card style={{ padding: 14, flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
               <View style={{ flex: 1, gap: 2 }}>
@@ -674,6 +717,7 @@ function ClientCardBody() {
           paidPending={togglePaid.isPending}
           onTogglePaid={(id, paid) => togglePaid.mutate({ id, paid })}
           onOpen={(id) => router.push({ pathname: "/schedule/[id]", params: { id } })}
+          onView={(id) => router.push(`/workout/${id}`)}
           onSchedule={openSchedule}
         />
       ) : null}
@@ -1471,6 +1515,7 @@ function WorkoutsTab({
   paidPending,
   onTogglePaid,
   onOpen,
+  onView,
   onSchedule,
 }: {
   detail: Detail;
@@ -1478,6 +1523,8 @@ function WorkoutsTab({
   paidPending: boolean;
   onTogglePaid: (id: string, paid: boolean) => void;
   onOpen: (id: string) => void;
+  /** A logged workout's summary (app/workout/[id].tsx, read-only once completed). */
+  onView: (scheduledWorkoutId: string) => void;
   onSchedule: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -1531,7 +1578,12 @@ function WorkoutsTab({
           d.logs.length > 0 ? (
             <ListCard>
               {d.logs.map((l) => (
-                <View key={l.id} style={{ paddingVertical: 12, paddingHorizontal: 14, gap: 6 }}>
+                <Pressable
+                  key={l.id}
+                  accessibilityRole="button"
+                  onPress={() => onView(l.scheduledWorkoutId)}
+                  style={({ pressed }) => ({ paddingVertical: 12, paddingHorizontal: 14, gap: 6, opacity: pressed ? 0.7 : 1 })}
+                >
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
                     <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
                       <AppText size={16} weight="semibold" numberOfLines={1}>
@@ -1550,7 +1602,7 @@ function WorkoutsTab({
                     <PaidChip paid={l.paid} pending={paidPending} onToggle={() => onTogglePaid(l.scheduledWorkoutId, !l.paid)} />
                   </View>
                   {l.note ? <AppText size={14} tone="graphite">{`"${l.note}"`}</AppText> : null}
-                </View>
+                </Pressable>
               ))}
             </ListCard>
           ) : (
@@ -1561,26 +1613,39 @@ function WorkoutsTab({
         ) : d.recent.length > 0 ? (
           <ListCard>
             {d.recent.map((r) => (
-              <View
+              // V17: a session the trainer logged opens its summary.
+              <Pressable
                 key={r.id}
-                style={{ flexDirection: "row", alignItems: "center", gap: 8, paddingVertical: 12, paddingHorizontal: 14 }}
+                accessibilityRole={r.log ? "button" : undefined}
+                disabled={!r.log}
+                onPress={() => onView(r.id)}
+                style={({ pressed }) => ({ paddingVertical: 12, paddingHorizontal: 14, gap: 6, opacity: pressed ? 0.7 : 1 })}
               >
-                <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
-                  <AppText size={16} weight="semibold" numberOfLines={1}>
-                    {r.template_name}
-                  </AppText>
-                  <AppText size={13} tone="graphite">
-                    {dayLabel(r.scheduled_date, lang)}
-                  </AppText>
+                <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
+                  <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+                    <AppText size={16} weight="semibold" numberOfLines={1}>
+                      {r.template_name}
+                    </AppText>
+                    <AppText size={13} tone="graphite">
+                      {[
+                        dayLabel(r.scheduled_date, lang),
+                        r.log?.effort != null ? t("clientCard.effortOf", { effort: r.log.effort }) : null,
+                      ]
+                        .filter(Boolean)
+                        .join(" · ")}
+                    </AppText>
+                  </View>
+                  {r.log && r.log.prs > 0 ? <Chip kind="pr" label={t("clientCard.pr")} /> : null}
+                  {r.status === "completed" ? (
+                    <PaidChip paid={r.paid} pending={paidPending} onToggle={() => onTogglePaid(r.id, !r.paid)} />
+                  ) : r.scheduled_date < today ? (
+                    <Chip kind="missed" label={t("clientCard.notDone")} />
+                  ) : (
+                    <Chip kind="neutral" icon={Clock} label={t("clients.today")} />
+                  )}
                 </View>
-                {r.status === "completed" ? (
-                  <PaidChip paid={r.paid} pending={paidPending} onToggle={() => onTogglePaid(r.id, !r.paid)} />
-                ) : r.scheduled_date < today ? (
-                  <Chip kind="missed" label={t("clientCard.notDone")} />
-                ) : (
-                  <Chip kind="neutral" icon={Clock} label={t("clients.today")} />
-                )}
-              </View>
+                {r.log?.note ? <AppText size={14} tone="graphite">{`"${r.log.note}"`}</AppText> : null}
+              </Pressable>
             ))}
           </ListCard>
         ) : (

@@ -151,7 +151,7 @@ export type ClientContext = {
   /** The intake answers that matter at session time (app clients). */
   intake: { goals: string | null; injuries: string | null } | null;
   pkg: { total_sessions: number; used_sessions: number } | null;
-  /** The last completed workout the client logged (app clients). */
+  /** The last logged workout: by an app client, or by the trainer for an offline one. */
   last: {
     id: string;
     completedAt: string;
@@ -169,7 +169,7 @@ export type ClientContext = {
  * injuries, the last completed session (effort, note, duration, sets, PRs,
  * swaps/skips with reasons) and the package balance. The trainer Home's
  * next-up card and the client card (D26b) both read it. Offline clients have
- * no logs or intake yet, so only their package comes back. */
+ * no intake; their last workout is the one the trainer logged (V17). */
 export function clientContextQuery(kind: "app" | "managed", refId: string) {
   return queryOptions({
     queryKey: qk.clientContext.subject(kind, refId),
@@ -178,15 +178,14 @@ export function clientContextQuery(kind: "app" | "managed", refId: string) {
         kind === "app"
           ? supabase.from("profiles").select("intake").eq("id", refId).maybeSingle()
           : Promise.resolve({ data: null, error: null }),
-        kind === "app"
-          ? supabase
-              .from("workout_logs")
-              .select("id, scheduled_workout_id, completed_at, effort_rating, client_note, duration_seconds")
-              .eq("client_id", refId)
-              .order("completed_at", { ascending: false })
-              .limit(1)
-              .maybeSingle()
-          : Promise.resolve({ data: null, error: null }),
+        // V17: an offline client's workouts are logged by the trainer.
+        supabase
+          .from("workout_logs")
+          .select("id, scheduled_workout_id, completed_at, effort_rating, client_note, duration_seconds")
+          .eq(kind === "app" ? "client_id" : "managed_client_id", refId)
+          .order("completed_at", { ascending: false })
+          .limit(1)
+          .maybeSingle(),
         supabase
           .from("packages")
           .select("total_sessions, used_sessions")
