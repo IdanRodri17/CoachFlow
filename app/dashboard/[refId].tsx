@@ -21,7 +21,7 @@
 // own screen (D26a, app/dashboard/nutrition/[refId].tsx).
 
 import { useRef, useState, type ReactNode, type RefObject } from "react";
-import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, TextInput, View } from "react-native";
+import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, View, type TextInputInstance } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -173,7 +173,7 @@ function ClientCardBody() {
   const today = todayISO();
 
   const [tab, setTab] = useState<Tab>("overview");
-  const noteInput = useRef<TextInput>(null);
+  const noteInput = useRef<TextInputInstance>(null);
 
   const refresh = usePullToRefresh([
     qk.clientDetail.all,
@@ -1150,7 +1150,7 @@ function NotesComposer({
   onChange: (v: string) => void;
   adding: boolean;
   onAdd: () => void;
-  inputRef?: RefObject<TextInput | null>;
+  inputRef?: RefObject<TextInputInstance | null>;
 }) {
   const { t } = useTranslation();
   return (

@@ -32,7 +32,7 @@ type Item =
   | { kind: "tab"; route: string; label: string; icon: IconComponent; alsoActiveOn?: string[] }
   | { kind: "add" };
 
-export function TabBar({ state, navigation, insets, isTrainer }: BottomTabBarProps & { isTrainer: boolean }) {
+export function TabBar({ state, emitter, navigateToTab, insets, isTrainer }: BottomTabBarProps & { isTrainer: boolean }) {
   const { t } = useTranslation();
   const [quickAdd, setQuickAdd] = useState(false);
   const activeRoute = state.routes[state.index]?.name;
@@ -55,8 +55,10 @@ export function TabBar({ state, navigation, insets, isTrainer }: BottomTabBarPro
   function openTab(route: string) {
     const target = state.routes.find((r) => r.name === route);
     if (!target) return;
-    const event = navigation.emit({ type: "tabPress", target: target.key, canPreventDefault: true });
-    if (activeRoute !== route && !event.defaultPrevented) navigation.navigate(route);
+    // SDK 58: the tab bar gets an emitter and navigateToTab(routeKey) instead
+    // of `navigation` — the same calls expo-router's own bar makes.
+    const event = emitter.emit({ type: "tabPress", target: target.key, canPreventDefault: true });
+    if (activeRoute !== route && !event.defaultPrevented) navigateToTab(target.key);
   }
 
   return (

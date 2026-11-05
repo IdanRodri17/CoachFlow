@@ -41,6 +41,7 @@ import {
   View,
   type PressableProps,
   type StyleProp,
+  type TextInputInstance,
   type TextInputProps,
   type TextProps,
   type ViewStyle,
@@ -1107,7 +1108,7 @@ type InputProps = TextInputProps & {
 
 /** Text field: paper, 1px line.strong, radius 14, 17/500. Free text follows the
  * language (directionalTextClassName); `ltr` for phones and numbers. */
-export const Input = forwardRef<TextInput, InputProps>(function Input(
+export const Input = forwardRef<TextInputInstance, InputProps>(function Input(
   { size = "lg", ltr: ltrMode, suffix, leadingIcon, invalid, dark, containerStyle, multiline, style, ...rest },
   ref,
 ) {
