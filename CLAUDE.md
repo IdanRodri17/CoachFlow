@@ -90,6 +90,8 @@ Post-1.0 work (V17+) is specified in `docs/COACHFLOW_ROADMAP.md` and built per
 `docs/PLAYBOOK_V17plus.md`. Read both at session start, starting with the
 roadmap's "Status" box.
 
+Redesign: docs/design/DESIGN.md + docs/design/PLAYBOOK.md (D19–D31)
+
 ---
 
 @AGENTS.md
