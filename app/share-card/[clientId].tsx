@@ -15,7 +15,7 @@
 // covers it meanwhile.
 
 import { useRef, useState } from "react";
-import { View } from "react-native";
+import { View, type ViewInstance } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -49,7 +49,7 @@ function ShareCardBody() {
   const { clientId } = useLocalSearchParams<{ clientId: string }>();
   const router = useRouter();
   const insets = useSafeAreaInsets();
-  const cardRef = useRef<View>(null);
+  const cardRef = useRef<ViewInstance>(null);
   const [sharing, setSharing] = useState(false);
   const [error, setError] = useState<string | null>(null);
   // The trainer through rpc my_trainer (B1): a client can't read the trainer's

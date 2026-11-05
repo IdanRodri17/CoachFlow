@@ -36,4 +36,13 @@ module.exports = defineConfig([
       "react-hooks/refs": "warn",
     },
   },
+  {
+    // SDK 58: expo-notifications now compiles its enums (AndroidImportance,
+    // IosAuthorizationStatus) to a shape eslint-plugin-import can't see
+    // through `export *`, so it reports members that exist at runtime.
+    // tsc already checks every namespace member, so the rule adds nothing.
+    rules: {
+      "import/namespace": "off",
+    },
+  },
 ]);

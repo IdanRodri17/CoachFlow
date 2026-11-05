@@ -54,8 +54,9 @@ submission.
   auto-adds the worklets Babel plugin — do not add it manually.
 - **`.npmrc` sets `legacy-peer-deps=true`** to absorb React 19 / Expo SDK peer
   range lag. Keep it until the ecosystem tightens its ranges.
-- **Expo SDK 57** (upgraded 2026-09-19 from 54 because Expo Go on the iPhone
-  auto-updated past it). Until there's a development build (playbook Step 1),
+- **Expo SDK 58** (upgraded 2026-11-05 from 57, and 2026-09-19 from 54,
+  each time because Expo Go on the iPhone auto-updated past the project's
+  SDK). Until there's a development build (playbook Step 1),
   the test device's Expo Go dictates the SDK: when Expo Go updates, expect to
   upgrade again (`npx expo install expo@^N` → `npx expo install --fix` →
   `npx expo-doctor` → `tsc --noEmit` → `npx expo export --platform ios`).
