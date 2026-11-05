@@ -1002,5 +1002,14 @@
     "reminder": "Hi {{name}}! Just a reminder about your \"{{template}}\" workout {{when}} with {{trainer}}. See you then!",
     "whenAt": "{{date}} at {{time}}",
     "today": "today"
+  },
+  "group": {
+    "attendees": "Attendees",
+    "came": "{{came}}/{{total}} came",
+    "allCame": "Everyone came",
+    "markAll": "Mark everyone present",
+    "opensOnTheDay": "Attendance can be marked on the day of the session.",
+    "logged": "Workout logged",
+    "notFound": "This group session wasn't found."
   }
 }

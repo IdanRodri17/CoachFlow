@@ -1002,5 +1002,14 @@
     "reminder": "היי {{name}}! תזכורת לאימון \"{{template}}\" {{when}} עם {{trainer}}. נתראה!",
     "whenAt": "{{date}} בשעה {{time}}",
     "today": "היום"
+  },
+  "group": {
+    "attendees": "משתתפים",
+    "came": "{{came}}/{{total}} הגיעו",
+    "allCame": "כולם הגיעו",
+    "markAll": "סימון שכולם הגיעו",
+    "opensOnTheDay": "אפשר לסמן נוכחות ביום האימון.",
+    "logged": "האימון נרשם",
+    "notFound": "האימון הקבוצתי לא נמצא."
   }
 }
