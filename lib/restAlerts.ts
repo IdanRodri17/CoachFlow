@@ -3,8 +3,8 @@
 // scheduled for its end (expo-notifications; no push, no server — local
 // notifications work in Expo Go). When the rest changes (±15, pause, skip,
 // undo, finish) it is cancelled or rescheduled. In the foreground the app
-// buzzes itself (expo-haptics) instead: with no notification handler set,
-// expo-notifications doesn't show a notification while the app is open.
+// buzzes itself (expo-haptics) instead: the handler below keeps the
+// notification hidden while the app is open (SDK 58 shows it by default).
 //
 // One alert per open workout, identified by `rest-end:${userId}:${scheduledId}`,
 // so a re-opened (resumed) workout replaces its own alert instead of adding
@@ -24,6 +24,17 @@ import { supabase } from "./supabase";
 const ID_PREFIX = "rest-end:";
 const CHANNEL_ID = "rest-end";
 const ASKED_KEY = "coachflow.restAlertsAsked";
+
+// Set at module load, before any alert can fire: since SDK 58 a notification
+// that arrives in the foreground shows unless a handler says otherwise.
+Notifications.setNotificationHandler({
+  handleNotification: async () => ({
+    shouldShowBanner: false,
+    shouldShowList: false,
+    shouldPlaySound: false,
+    shouldSetBadge: false,
+  }),
+});
 
 let setUp = false;
 /** Per alert: bumped by every schedule/cancel, so a slow schedule (waiting on

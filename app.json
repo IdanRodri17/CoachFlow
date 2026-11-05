@@ -35,7 +35,17 @@
       "expo-secure-store"
     ],
     "extra": {
-      "supportsRTL": true
+      "supportsRTL": true,
+      "eas": {
+        "projectId": "dad06d81-16b5-4bf1-ba4c-138a1f38ca82"
+      }
+    },
+    "owner": "idanrodri",
+    "runtimeVersion": {
+      "policy": "appVersion"
+    },
+    "updates": {
+      "url": "https://u.expo.dev/dad06d81-16b5-4bf1-ba4c-138a1f38ca82"
     }
   }
 }
