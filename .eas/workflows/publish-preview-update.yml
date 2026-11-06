@@ -1,0 +1,22 @@
+# Publishes an EAS Update for every push, named after the git branch, so a
+# branch can be opened on the phone in Expo Go without a computer running
+# (expo.dev → the project's updates → the branch → Preview → scan).
+#
+# Needs, once, on expo.dev: the GitHub repository linked to the project, and
+# EXPO_PUBLIC_SUPABASE_URL / EXPO_PUBLIC_SUPABASE_ANON_KEY as `preview`
+# environment variables (the .env file is not in git). Never the
+# service_role key, never the Anthropic key: whatever is set here ends up in
+# the app.
+name: Publish preview update
+
+on:
+  push:
+    branches: ['main', 'cloud/**', 'handoff/**']
+
+jobs:
+  publish_preview_update:
+    name: Publish preview update
+    type: update
+    environment: preview
+    params:
+      branch: ${{ github.ref_name || 'test' }}
