@@ -34,6 +34,10 @@
 // client completed on their phone never reached the trainer's open calendar.
 // Now returning to the app refetches every stale query on screen (staleTime
 // below), and Supabase only runs its token-refresh timer while in front.
+//
+// V19: the same for the network. TanStack's onlineManager follows NetInfo, so
+// queries that failed or went stale while the phone was offline (the gym's
+// basement) refetch as soon as the connection is back.
 
 import "../global.css";
 import "@/lib/i18n";
@@ -52,7 +56,8 @@ import { IBMPlexSansHebrew_600SemiBold } from "@expo-google-fonts/ibm-plex-sans-
 import { IBMPlexSansHebrew_700Bold } from "@expo-google-fonts/ibm-plex-sans-hebrew/700Bold";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { focusManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { focusManager, onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import NetInfo from "@react-native-community/netinfo";
 import { useTranslation } from "react-i18next";
 
 import { layoutDirection, restoreSavedLocale } from "@/lib/i18n";
@@ -60,7 +65,7 @@ import { AuthProvider } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 
 // Keep the splash up until the fonts are in (hidden in RootLayout below).
-// Module scope, per the SDK 57 docs, so it runs before the first render.
+// Module scope, per the SDK 58 docs, so it runs before the first render.
 SplashScreen.preventAutoHideAsync();
 
 const queryClient = new QueryClient({
@@ -68,6 +73,13 @@ const queryClient = new QueryClient({
     queries: { staleTime: 30_000, retry: 1 },
   },
 });
+
+// Back online → refetch (TanStack Query's React Native guide).
+onlineManager.setEventListener((setOnline) =>
+  NetInfo.addEventListener((state) => {
+    setOnline(!!state.isConnected);
+  }),
+);
 
 export default function RootLayout() {
   // Subscribes this component to i18next's language-changed event so the
