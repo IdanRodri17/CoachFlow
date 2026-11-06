@@ -6,6 +6,9 @@
 //
 // D21a: the bar itself is components/TabBar.tsx (icons, volt pill, the
 // trainer's [+]). This file still owns which routes exist and the guards.
+//
+// 0038: it also opens the live schedule subscription for whoever is signed
+// in (lib/useScheduleRealtime.ts), once, for every tab.
 
 import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
@@ -13,10 +16,13 @@ import { useTranslation } from "react-i18next";
 
 import { profileComplete, useAuth } from "@/lib/auth";
 import { TabBar } from "@/components/TabBar";
+import { useScheduleRealtime } from "@/lib/useScheduleRealtime";
 
 export default function TabsLayout() {
   const { loading, session, profile } = useAuth();
   const { t } = useTranslation();
+  // Before the guards below (rules of hooks); it waits for a profile itself.
+  useScheduleRealtime(session?.user.id, profileComplete(profile) ? profile?.role : null);
 
   // While auth is resolving, show a spinner (avoids flashing the wrong screen).
   if (loading) {
