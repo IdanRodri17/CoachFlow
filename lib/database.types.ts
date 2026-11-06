@@ -747,6 +747,19 @@ export type Database = {
         Args: { p_code: string };
         Returns: string;
       };
+      // F3 (0037): saves a workout in one transaction; a second save of the
+      // same workout returns the first log's id and writes nothing.
+      complete_workout: {
+        Args: {
+          p_scheduled_workout_id: string;
+          p_duration_seconds: number | null;
+          p_effort_rating: number | null;
+          p_client_note: string | null;
+          p_sets: Json;
+          p_adjustments: Json;
+        };
+        Returns: string;
+      };
       // B1 (0026): the calling client's active trainer — zero rows for a
       // trainer or an unlinked client. phone is local 05X… (or null).
       my_trainer: {

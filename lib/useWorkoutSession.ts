@@ -320,8 +320,10 @@ export async function loadWorkout(
 }
 
 /** The one save: the workout log (+ effort and note), its sets with PR flags,
- * the skips and swaps, the scheduled workout marked completed, and (client
- * mode) badges. Swaps log against the substitute. */
+ * the skips and swaps, the scheduled workout marked completed — all in one
+ * transaction (rpc complete_workout, 0037), safe to retry — then (client
+ * mode) badges. Swaps log against the substitute. logged_by is the caller
+ * (0032's default). */
 export async function saveWorkout(
   session: Pick<WorkoutSession, "state" | "scheduledId" | "subject" | "loggedBy" | "mode">,
   { durationSeconds, effort, note }: { durationSeconds: number | null; effort: number | null; note: string | null },
@@ -343,36 +345,18 @@ export async function saveWorkout(
     idxs.forEach((i, k) => (isPr[i] = flags[k]));
   });
 
-  const { data: log, error: logErr } = await supabase
-    .from("workout_logs")
-    .insert({
-      scheduled_workout_id: scheduledId,
-      client_id: subject.kind === "app" ? subject.id : null,
-      managed_client_id: subject.kind === "managed" ? subject.id : null,
-      logged_by: loggedBy,
-      duration_seconds: durationSeconds,
-      effort_rating: effort,
-      client_note: note,
-    })
-    .select("id")
-    .single();
-  if (logErr) throw logErr;
-
-  if (rows.sets.length > 0) {
-    const { error } = await supabase
-      .from("set_logs")
-      .insert(rows.sets.map((r, i) => ({ ...r, workout_log_id: log.id, is_pr: isPr[i] })));
-    if (error) throw error;
-  }
-  if (rows.adjustments.length > 0) {
-    const { error } = await supabase
-      .from("exercise_adjustments")
-      .insert(rows.adjustments.map((a) => ({ ...a, workout_log_id: log.id })));
-    if (error) throw error;
-  }
-
-  const { error: swErr } = await supabase.from("scheduled_workouts").update({ status: "completed" }).eq("id", scheduledId);
-  if (swErr) throw swErr;
+  // F3 (0037): one transaction — the log, its sets with PR flags, the
+  // skips and swaps, and the status. A retry after a dropped connection
+  // gets the first save back instead of a second log.
+  const { error } = await supabase.rpc("complete_workout", {
+    p_scheduled_workout_id: scheduledId,
+    p_duration_seconds: durationSeconds,
+    p_effort_rating: effort,
+    p_client_note: note,
+    p_sets: rows.sets.map((r, i) => ({ ...r, is_pr: isPr[i] })),
+    p_adjustments: rows.adjustments,
+  });
+  if (error) throw error;
 
   // Saved: nothing left to resume.
   await clearSavedWorkout(loggedBy, scheduledId);
