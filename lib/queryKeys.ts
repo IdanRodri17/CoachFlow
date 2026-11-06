@@ -61,6 +61,8 @@ export const qk = {
     owed: ["scheduled-trainer", "owed"] as const,
     /** Most-booked clients of the last 30 days — quick-add (D21b). */
     frequent: (from: string) => ["scheduled-trainer", "frequent", from] as const,
+    /** A group session's attendees (0035) — the attendance sheet (V23 Step 15). */
+    group: (groupId: Id) => ["scheduled-trainer", "group", groupId] as const,
   },
 
   /** The signed-in client's own scheduled workouts. */

@@ -267,6 +267,8 @@ export type Database = {
           morning_sms_reminded_at: string | null;
           // V23 (0031): shared by the rows of one repeat insert; null = a one-off.
           series_id: string | null;
+          // V23 (0035): shared by the attendees of one group slot; null = solo.
+          session_group_id: string | null;
         };
         Insert: {
           id?: string;
@@ -286,6 +288,7 @@ export type Database = {
           morning_reminded_at?: string | null;
           morning_sms_reminded_at?: string | null;
           series_id?: string | null;
+          session_group_id?: string | null;
         };
         Update: {
           id?: string;
@@ -305,6 +308,7 @@ export type Database = {
           morning_reminded_at?: string | null;
           morning_sms_reminded_at?: string | null;
           series_id?: string | null;
+          session_group_id?: string | null;
         };
         Relationships: [];
       };

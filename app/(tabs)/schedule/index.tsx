@@ -21,6 +21,12 @@
 // 07:00 to 21:00 show as "פנוי" rows whose "קביעה" opens the schedule form at
 // that date and time (lib/schedule.ts freeSlots). Tapping a session edits it
 // (as before); swipe or long-press for edit / client card / mark done.
+//
+// V23 (Step 15): a group session's rows (0035 session_group_id) show as one
+// card (template, time, "קבוצה · N מתאמנים", how many came) and one dot;
+// tapping it opens the attendance sheet (app/group/[groupId].tsx). Its
+// status is derived from the attendees' rows (lib/groups.ts). Solo rows are
+// unchanged.
 
 import { useState } from "react";
 import { Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
@@ -55,6 +61,7 @@ import {
 import { buildWhatsAppReminderLink } from "@/lib/whatsapp";
 import { ltr } from "@/lib/i18n";
 import { freeSlots, type FreeSlot } from "@/lib/schedule";
+import { collapseGroups, groupStatus, type DayEntry } from "@/lib/groups";
 import { localMinutesNow, minutesOf, weekdayLetter } from "@/components/home/format";
 import { ActionRow } from "@/components/ui/ActionRow";
 import {
@@ -64,6 +71,7 @@ import {
   Chip,
   colors,
   Display,
+  Icon,
   IconButton,
   ListCard,
   Num,
@@ -82,6 +90,7 @@ type Workout = {
   template_id: string | null;
   notes: string | null;
   with_trainer: boolean;
+  session_group_id: string | null;
 };
 
 type DerivedStatus = "completed" | "missed" | "today" | "upcoming";
@@ -168,7 +177,9 @@ function ScheduleHomeScreenBody() {
     queryFn: async (): Promise<Workout[]> => {
       const { data, error } = await supabase
         .from("scheduled_workouts")
-        .select("id, scheduled_date, scheduled_time, status, client_id, managed_client_id, template_id, notes, with_trainer")
+        .select(
+          "id, scheduled_date, scheduled_time, status, client_id, managed_client_id, template_id, notes, with_trainer, session_group_id",
+        )
         .eq("trainer_id", trainerId)
         .gte("scheduled_date", rangeStart)
         .lte("scheduled_date", rangeEnd)
@@ -216,28 +227,45 @@ function ScheduleHomeScreenBody() {
     byDay.set(w.scheduled_date, list);
   });
 
+  // One dot per session: a group counts once, done when anyone came.
+  const dotsByDay = new Map<string, Workout[]>();
+  byDay.forEach((list, day) =>
+    dotsByDay.set(
+      day,
+      collapseGroups(list).map((e) =>
+        e.kind === "session"
+          ? e.w
+          : { ...e.rows[0], status: e.rows.some((r) => r.status === "completed") ? "completed" : "scheduled" },
+      ),
+    ),
+  );
+
   const dayItems = byDay.get(selectedDate) ?? [];
-  const timed = dayItems.filter((w) => w.scheduled_time);
-  const untimed = dayItems.filter((w) => !w.scheduled_time);
+  const entries = collapseGroups(dayItems);
+  const lead = (e: DayEntry<Workout>) => (e.kind === "session" ? e.w : e.rows[0]);
+  const timed = entries.filter((e) => lead(e).scheduled_time);
+  const untimed = entries.filter((e) => !lead(e).scheduled_time);
   const nowMin = localMinutesNow();
   const isToday = selectedDate === today;
-  const nextId = isToday
-    ? timed.find((w) => w.status === "scheduled" && minutesOf(w.scheduled_time!) >= nowMin - NEXT_GRACE_MINUTES)?.id
+  const nextEntry = isToday
+    ? timed.find((e) => {
+        const open = e.kind === "session" ? e.w.status === "scheduled" : e.rows.some((r) => r.status === "scheduled");
+        return open && minutesOf(lead(e).scheduled_time!) >= nowMin - NEXT_GRACE_MINUTES;
+      })
     : undefined;
   const slots =
-    selectedDate < today ? [] : freeSlots(timed.map((w) => w.scheduled_time!), isToday ? nowMin : 0);
+    selectedDate < today ? [] : freeSlots(timed.map((e) => lead(e).scheduled_time!), isToday ? nowMin : 0);
 
-  // Sessions and free slots in time order; untimed sessions last.
-  type Line = { kind: "session"; w: Workout } | { kind: "free"; slot: FreeSlot };
-  const lines: Line[] = [
-    ...timed.map((w): Line => ({ kind: "session", w })),
-    ...slots.map((slot): Line => ({ kind: "free", slot })),
-  ].sort((a, b) => {
-    const ta = a.kind === "session" ? a.w.scheduled_time!.slice(0, 5) : a.slot.start;
-    const tb = b.kind === "session" ? b.w.scheduled_time!.slice(0, 5) : b.slot.start;
+  // Sessions, groups and free slots in time order; untimed ones last.
+  type Line = DayEntry<Workout> | { kind: "free"; slot: FreeSlot };
+  const lines: Line[] = [...timed, ...slots.map((slot): Line => ({ kind: "free", slot }))].sort((a, b) => {
+    const ta = a.kind === "free" ? a.slot.start : lead(a).scheduled_time!.slice(0, 5);
+    const tb = b.kind === "free" ? b.slot.start : lead(b).scheduled_time!.slice(0, 5);
     return ta.localeCompare(tb);
   });
-  untimed.forEach((w) => lines.push({ kind: "session", w }));
+  untimed.forEach((e) => lines.push(e));
+  const templateName = (id: string | null) =>
+    id ? (templates.data?.get(id) ?? t("schedule.home.workout")) : t("schedule.home.workout");
 
   const refresh = usePullToRefresh([qk.scheduledTrainer.all, qk.roster.all, qk.templates.all]);
 
@@ -294,9 +322,9 @@ function ScheduleHomeScreenBody() {
         </View>
 
         {mode === "week" ? (
-          <WeekStrip days={weekDays} selected={selectedDate} today={today} byDay={byDay} onSelect={setSelectedDate} />
+          <WeekStrip days={weekDays} selected={selectedDate} today={today} byDay={dotsByDay} onSelect={setSelectedDate} />
         ) : (
-          <MonthGrid monthStart={monthStart} selected={selectedDate} today={today} byDay={byDay} onSelect={setSelectedDate} />
+          <MonthGrid monthStart={monthStart} selected={selectedDate} today={today} byDay={dotsByDay} onSelect={setSelectedDate} />
         )}
 
         <Legend />
@@ -307,9 +335,9 @@ function ScheduleHomeScreenBody() {
           <AppText size={18} weight="semibold" lineHeight={23} style={{ flexShrink: 1 }}>
             {fmt(selectedDate, lang, { weekday: "long", day: "numeric", month: "long" })}
           </AppText>
-          {dayItems.length > 0 ? (
+          {entries.length > 0 ? (
             <AppText size={14} tone="graphite">
-              {t("schedule.home.count", { count: dayItems.length })}
+              {t("schedule.home.count", { count: entries.length })}
             </AppText>
           ) : null}
         </View>
@@ -325,17 +353,21 @@ function ScheduleHomeScreenBody() {
             {lines.map((line) =>
               line.kind === "free" ? (
                 <FreeRow key={`free-${line.slot.start}`} slot={line.slot} onSchedule={() => schedule(selectedDate, line.slot.start)} />
+              ) : line.kind === "group" ? (
+                <GroupRow
+                  key={`group-${line.id}`}
+                  rows={line.rows}
+                  next={line === nextEntry}
+                  templateName={templateName(line.rows[0].template_id)}
+                  onOpen={() => router.push({ pathname: "/group/[groupId]", params: { groupId: line.id } })}
+                />
               ) : (
                 <SessionRow
                   key={line.w.id}
                   w={line.w}
-                  next={line.w.id === nextId}
+                  next={line === nextEntry}
                   client={rosterByKey.get(subjectKey(line.w.client_id, line.w.managed_client_id))}
-                  templateName={
-                    line.w.template_id
-                      ? templates.data?.get(line.w.template_id) ?? t("schedule.home.workout")
-                      : t("schedule.home.workout")
-                  }
+                  templateName={templateName(line.w.template_id)}
                   trainerName={profile?.display_name ?? t("schedule.home.yourTrainer")}
                   marking={markDone.isPending}
                   onEdit={() => router.push(`/schedule/${line.w.id}`)}
@@ -370,6 +402,68 @@ function ScheduleHomeScreenBody() {
 // ---------------------------------------------------------------------------
 // The day list
 // ---------------------------------------------------------------------------
+
+/** V23 (Step 15): one card for a group slot. Tapping opens attendance. */
+function GroupRow({
+  rows,
+  next,
+  templateName,
+  onOpen,
+}: {
+  rows: Workout[];
+  next: boolean;
+  templateName: string;
+  onOpen: () => void;
+}) {
+  const { t } = useTranslation();
+  const lead = rows[0];
+  const came = rows.filter((r) => r.status === "completed").length;
+  const status = groupStatus(rows);
+  return (
+    <View style={{ backgroundColor: next ? colors.voltSoft : "transparent" }}>
+      <Pressable
+        accessibilityRole="button"
+        onPress={onOpen}
+        style={({ pressed }) => ({
+          flexDirection: "row",
+          alignItems: "center",
+          gap: 12,
+          paddingVertical: 12,
+          paddingHorizontal: 14,
+          minHeight: 72,
+          opacity: pressed ? 0.7 : 1,
+        })}
+      >
+        <View style={{ width: 50 }}>
+          <Num size={21} weight="semibold" tone={status === "completed" ? "smoke" : "ink"}>
+            {lead.scheduled_time ? lead.scheduled_time.slice(0, 5) : "—"}
+          </Num>
+        </View>
+        <View style={{ flex: 1, minWidth: 0, gap: 5 }}>
+          <AppText size={16} weight="semibold" numberOfLines={1}>
+            {templateName}
+          </AppText>
+          <AppText size={14} tone="graphite" numberOfLines={1}>
+            {t("sessionForm.groupSummary", { count: rows.length })}
+          </AppText>
+          {next ? (
+            <View style={{ flexDirection: "row", gap: 6 }}>
+              <Chip kind="next" label={t("schedule.home.next")} />
+            </View>
+          ) : null}
+        </View>
+        {status === "completed" ? (
+          <Chip kind="done" label={t("group.allCame")} />
+        ) : status === "missed" ? (
+          <Chip kind="missed" label={t("schedule.home.missed")} />
+        ) : came > 0 ? (
+          <Chip kind="neutral" label={t("group.came", { came, total: rows.length })} />
+        ) : null}
+        <Icon icon={ChevronRight} size={18} color={colors.smoke} mirror />
+      </Pressable>
+    </View>
+  );
+}
 
 function SessionRow({
   w,

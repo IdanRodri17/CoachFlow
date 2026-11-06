@@ -6,6 +6,10 @@
 // V23 (Step 11): a repeat that creates more than one workout stamps one shared
 // series_id on every row, so the edit screen can later offer "this and all
 // future" (lib/series.ts). A single workout stays a one-off (null).
+//
+// V23 (Step 14): a group session inserts one row per attendee per date. Each
+// date's rows share a session_group_id (0035); with a repeat, every row of
+// every date also shares the one series_id — the two ids are independent.
 
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -85,18 +89,29 @@ function NewScheduleScreenBody() {
       const dates = expandScheduleDates(payload.date, payload.repeat);
       const series_id = dates.length > 1 ? randomUUID() : null;
 
-      const rows = dates.map((d) => ({
-        trainer_id: trainerId,
-        client_id,
-        managed_client_id,
-        template_id: payload.templateId,
-        scheduled_date: d,
-        scheduled_time: payload.time,
-        notes: payload.note,
-        with_trainer: payload.withTrainer,
-        status: "scheduled" as const,
-        series_id,
-      }));
+      // Solo: the one client resolved above. Group: every attendee picked.
+      const attendees = payload.group
+        ? payload.group.map((a) => ({
+            client_id: a.kind === "app" ? a.refId : null,
+            managed_client_id: a.kind === "managed" ? a.refId : null,
+          }))
+        : [{ client_id, managed_client_id }];
+
+      const rows = dates.flatMap((d) => {
+        const session_group_id = payload.group ? randomUUID() : null;
+        return attendees.map((a) => ({
+          trainer_id: trainerId,
+          ...a,
+          template_id: payload.templateId,
+          scheduled_date: d,
+          scheduled_time: payload.time,
+          notes: payload.note,
+          with_trainer: payload.withTrainer,
+          status: "scheduled" as const,
+          series_id,
+          session_group_id,
+        }));
+      });
       const { error } = await supabase.from("scheduled_workouts").insert(rows);
       if (error) throw error;
     },

@@ -22,6 +22,11 @@
 // minus used, minus what's already on the calendar (lib/schedule.ts
 // sessionsUntilPackageEnds). No package, or nothing left, shows the chip
 // disabled with the reason; it never falls back to a week count silently.
+//
+// V23 (Step 14): when creating, "מתאמן אחד | קבוצה" — a group picks two or
+// more roster clients (app and offline mixed) for one slot, and the screen
+// inserts one row per attendee (0035 session_group_id). No one-off name in a
+// group, and no "עד סוף החבילה": each attendee has their own package.
 
 import { useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
@@ -75,6 +80,9 @@ export type SchedulePayload = {
   // When set, repeat on these weekdays (0=Sun..6=Sat) for `count` weeks/months
   // from `date` — or, unit "sessions", exactly `count` workouts.
   repeat?: ScheduleRepeat;
+  // A group session (2+ attendees): one row each per date. `client` is then
+  // the first attendee, so the single-client path still type-checks.
+  group?: ClientRef[];
 };
 
 export type ScheduleFormInitial = {
@@ -138,6 +146,8 @@ export function ScheduleForm({
   const today = todayISO();
 
   const [selected, setSelected] = useState<ClientRef | null>(initial?.client ?? null);
+  const [groupMode, setGroupMode] = useState(false);
+  const [group, setGroup] = useState<ClientRef[]>([]);
   const [showNewName, setShowNewName] = useState(false);
   const [newName, setNewName] = useState("");
   const [templateId, setTemplateId] = useState<string | null>(initial?.templateId ?? null);
@@ -189,7 +199,7 @@ export function ScheduleForm({
   // "Until the package ends": the picked client's package and the workouts
   // already scheduled for them from today on. Always refetched on open — a
   // stale count would book sessions twice.
-  const packageClient = allowRepeat && selected && !usingNewName ? selected : null;
+  const packageClient = allowRepeat && !groupMode && selected && !usingNewName ? selected : null;
   const balance = useQuery({
     queryKey: qk.package.left(packageClient?.kind ?? null, packageClient?.refId),
     enabled: !!session && !!packageClient,
@@ -233,7 +243,13 @@ export function ScheduleForm({
 
   function handleSubmit() {
     let client: ClientChoice | null = null;
-    if (usingNewName) client = { mode: "new", name: newName.trim() };
+    if (groupMode) {
+      if (group.length < 2) {
+        setValidationError(t("sessionForm.groupPickTwo"));
+        return;
+      }
+      client = { mode: "existing", kind: group[0].kind, refId: group[0].refId };
+    } else if (usingNewName) client = { mode: "new", name: newName.trim() };
     else if (selected) client = { mode: "existing", kind: selected.kind, refId: selected.refId };
     if (!client) {
       setValidationError(t("schedule.form.pickClientError"));
@@ -249,8 +265,11 @@ export function ScheduleForm({
       note: fullNote.length > 0 ? fullNote : null,
       withTrainer,
       repeat,
+      group: groupMode ? group : undefined,
     });
   }
+
+  const inGroup = (c: ClientRef) => group.some((g) => g.kind === c.kind && g.refId === c.refId);
 
   // "16 אימונים · ימי א׳ וה׳ ב-09:30 · עד 22.11" / "ו׳ 2.10 · 09:30"
   const dayNames = (repeat?.days ?? []).map((d) => t(WEEKDAY_KEYS[d]));
@@ -258,7 +277,7 @@ export function ScheduleForm({
     dayNames.length > 1
       ? `${dayNames.slice(0, -1).join(", ")}${t("sessionForm.and")}${dayNames[dayNames.length - 1]}`
       : dayNames[0];
-  const summary = repeat
+  const when = repeat
     ? [
         usePackage ? t("sessionForm.untilPackageEndsShort") : null,
         t("sessionForm.sessions", { count: dates.length }),
@@ -270,6 +289,7 @@ export function ScheduleForm({
         .filter(Boolean)
         .join(" · ")
     : [`${weekdayLetter(date, lang)} ${shortDate(date, lang)}`, time].filter(Boolean).join(" · ");
+  const summary = groupMode ? `${t("sessionForm.groupSummary", { count: group.length })} · ${when}` : when;
 
   return (
     <KeyboardAvoidingView
@@ -283,6 +303,29 @@ export function ScheduleForm({
       >
         {/* Client */}
         <Section title={t("sessionForm.client")}>
+          {allowRepeat ? (
+            <View style={{ paddingHorizontal: 20 }}>
+              <Segmented
+                value={groupMode ? "group" : "one"}
+                onChange={(v) => {
+                  setGroupMode(v === "group");
+                  setValidationError(null);
+                  // Carry the picked client into the group, and back out.
+                  if (v === "group") {
+                    setGroup(selected && !usingNewName ? [selected] : []);
+                    setShowNewName(false);
+                    setNewName("");
+                  } else {
+                    setSelected(group[0] ?? null);
+                  }
+                }}
+                options={[
+                  { value: "one", label: t("sessionForm.oneClient"), icon: User },
+                  { value: "group", label: t("sessionForm.group"), icon: Users },
+                ]}
+              />
+            </View>
+          ) : null}
           {loadingRoster ? null : (
             <ScrollView
               horizontal
@@ -290,7 +333,9 @@ export function ScheduleForm({
               contentContainerStyle={{ paddingHorizontal: 20, gap: 6, paddingTop: 4 }}
             >
               {roster.map((c) => {
-                const on = !usingNewName && selected?.kind === c.kind && selected?.refId === c.refId;
+                const on = groupMode
+                  ? inGroup(c)
+                  : !usingNewName && selected?.kind === c.kind && selected?.refId === c.refId;
                 return (
                   <Pressable
                     key={`${c.kind}-${c.refId}`}
@@ -298,6 +343,11 @@ export function ScheduleForm({
                     accessibilityState={{ selected: on }}
                     accessibilityLabel={c.name}
                     onPress={() => {
+                      if (groupMode) {
+                        const ref = { kind: c.kind, refId: c.refId };
+                        setGroup((prev) => (inGroup(ref) ? prev.filter((g) => g.kind !== ref.kind || g.refId !== ref.refId) : [...prev, ref]));
+                        return;
+                      }
                       setSelected({ kind: c.kind, refId: c.refId });
                       setShowNewName(false);
                       setNewName("");
@@ -332,35 +382,42 @@ export function ScheduleForm({
                   </Pressable>
                 );
               })}
-              <Pressable
-                accessibilityRole="button"
-                accessibilityState={{ selected: showNewName }}
-                onPress={() => {
-                  setShowNewName(true);
-                  setSelected(null);
-                }}
-                style={{ width: 62, alignItems: "center", gap: 6 }}
-              >
-                <View
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 26,
-                    borderWidth: 1.5,
-                    borderStyle: "dashed",
-                    borderColor: showNewName ? colors.ink : colors.ash,
-                    alignItems: "center",
-                    justifyContent: "center",
+              {groupMode ? null : (
+                <Pressable
+                  accessibilityRole="button"
+                  accessibilityState={{ selected: showNewName }}
+                  onPress={() => {
+                    setShowNewName(true);
+                    setSelected(null);
                   }}
+                  style={{ width: 62, alignItems: "center", gap: 6 }}
                 >
-                  <Icon icon={Plus} size={22} color={colors.graphite} />
-                </View>
-                <AppText size={13} weight="medium" tone="graphite" center>
-                  {t("sessionForm.other")}
-                </AppText>
-              </Pressable>
+                  <View
+                    style={{
+                      width: 52,
+                      height: 52,
+                      borderRadius: 26,
+                      borderWidth: 1.5,
+                      borderStyle: "dashed",
+                      borderColor: showNewName ? colors.ink : colors.ash,
+                      alignItems: "center",
+                      justifyContent: "center",
+                    }}
+                  >
+                    <Icon icon={Plus} size={22} color={colors.graphite} />
+                  </View>
+                  <AppText size={13} weight="medium" tone="graphite" center>
+                    {t("sessionForm.other")}
+                  </AppText>
+                </Pressable>
+              )}
             </ScrollView>
           )}
+          {groupMode ? (
+            <AppText size={13} tone="graphite" style={{ paddingHorizontal: 20 }}>
+              {group.length >= 2 ? t("sessionForm.groupPicked", { count: group.length }) : t("sessionForm.groupPickTwo")}
+            </AppText>
+          ) : null}
           {showNewName ? (
             <View style={{ paddingHorizontal: 20 }}>
               <Input
