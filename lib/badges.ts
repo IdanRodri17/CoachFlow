@@ -26,7 +26,9 @@ export async function checkAndAwardBadges(clientId: string): Promise<BadgeType[]
       .eq("client_id", clientId)
       .order("completed_at", { ascending: true })
       .limit(1),
-    supabase.from("client_streaks").select("current_streak").eq("client_id", clientId).maybeSingle(),
+    // One row per trainer (a client may have had two): a single-row read
+    // errored after the workout was already saved, and a retry saved it twice.
+    supabase.from("client_streaks").select("current_streak").eq("client_id", clientId),
     supabase.from("badges").select("type").eq("client_id", clientId),
   ]);
   if (firstLogRes.error) throw firstLogRes.error;
@@ -40,7 +42,9 @@ export async function checkAndAwardBadges(clientId: string): Promise<BadgeType[]
   if (firstCompletedAt && !already.has("first_workout")) {
     toAward.push("first_workout");
   }
-  if ((streakRes.data?.current_streak ?? 0) >= 10 && !already.has("streak_10")) {
+  // The best run, as the client screens show it (clientStreakQuery).
+  const streak = Math.max(0, ...streakRes.data.map((r) => r.current_streak));
+  if (streak >= 10 && !already.has("streak_10")) {
     toAward.push("streak_10");
   }
   if (firstCompletedAt && !already.has("first_month")) {
