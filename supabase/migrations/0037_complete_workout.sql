@@ -19,9 +19,10 @@
 -- (0032 *_trainer_managed_all; logged_by defaults to auth.uid()). The
 -- subject comes from the locked scheduled workout, never from the caller.
 --
--- Not added here: a unique index on workout_logs(scheduled_workout_id).
--- Duplicates may already exist in the live data and would make it fail.
--- Check first, then add it in its own migration:
+-- And the database itself now holds one log per scheduled workout: a unique
+-- index on workout_logs(scheduled_workout_id). Checked on the live data on
+-- 2026-11-06: 17 logs, no workout with more than one. If this index fails
+-- to build, duplicates appeared since; find them with
 --   select scheduled_workout_id, count(*) from public.workout_logs
 --   group by 1 having count(*) > 1;
 --
@@ -98,6 +99,9 @@ begin
   return v_log_id;
 end;
 $$;
+
+create unique index if not exists workout_logs_scheduled_workout_uidx
+  on public.workout_logs (scheduled_workout_id);
 
 revoke all on function public.complete_workout(uuid, integer, integer, text, jsonb, jsonb) from public, anon;
 grant execute on function public.complete_workout(uuid, integer, integer, text, jsonb, jsonb) to authenticated;
