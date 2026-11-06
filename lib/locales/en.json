@@ -247,7 +247,8 @@
       "workoutNotFound": "Workout not found.",
       "saveChanges": "Save changes",
       "logWorkout": "Log this workout",
-      "viewWorkout": "View the workout"
+      "viewWorkout": "View the workout",
+      "completedLocked": "This workout is done, so it stays in the history as it is: its date, client and workout can't change, and it can't be deleted."
     }
   },
   "clients": {

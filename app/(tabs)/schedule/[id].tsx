@@ -10,9 +10,14 @@
 // completed and past workouts are never touched) live in lib/series.ts.
 // A one-off, the last of a series, or a date/client-only edit behaves
 // exactly as before, with no question.
+//
+// F2: a completed workout is history. It opens read-only — who, what, when,
+// the note — with "צפייה באימון", and no form and no delete. The database
+// enforces the same (0036, 'completed_workout_locked'): no delete, and its
+// day, client and workout can't change.
 
 import { useState } from "react";
-import { ActivityIndicator, Alert, Pressable, Text, View } from "react-native";
+import { ActivityIndicator, Alert, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -21,7 +26,8 @@ import Eye from "lucide-react-native/icons/eye";
 
 import { qk } from "@/lib/queryKeys";
 import { RoleGate } from "@/components/RoleGate";
-import { AppText, Button, colors, Sheet } from "@/components/ui";
+import { AppText, Button, Card, Chip, colors, ListCard, ListRow, Sheet } from "@/components/ui";
+import { longDate } from "@/components/home/format";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { useRosterClients } from "@/lib/useRoster";
@@ -67,7 +73,7 @@ function EditScheduleScreenBody() {
   const { session } = useAuth();
   const router = useRouter();
   const queryClient = useQueryClient();
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
 
   const trainerId = session!.user.id;
 
@@ -227,37 +233,78 @@ function EditScheduleScreenBody() {
 
   if (workout.isLoading || roster.isLoading || templates.isLoading) {
     return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator />
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.chalk }}>
+        <ActivityIndicator color={colors.ink} />
       </View>
     );
   }
 
   if (workout.error || !workout.data) {
     return (
-      <View className="flex-1 items-center justify-center bg-white px-6">
-        <Text className="text-center text-sm text-red-600">
+      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.chalk }}>
+        <AppText size={14} tone="ember" center>
           {workout.error ? (workout.error as Error).message : t("schedule.detail.workoutNotFound")}
-        </Text>
+        </AppText>
       </View>
     );
   }
 
-  const mutationError = updateMutation.error ?? deleteMutation.error;
+  const rawError = (updateMutation.error ?? deleteMutation.error) as Error | null;
+  const mutationError = rawError?.message.includes("completed_workout_locked")
+    ? t("schedule.detail.completedLocked")
+    : rawError?.message;
   // V17 (Step 7): the trainer logs an offline client's workout themselves,
-  // and can open any completed one. An app client's open workout is logged
-  // from the client's own phone, so it gets no button.
+  // and can open any completed one (the read-only view below). An app
+  // client's open workout is logged from the client's own phone, so it gets
+  // no button.
   const completed = workout.data.row.status === "completed";
-  const openWorkout = completed || workout.data.initial.client?.kind === "managed";
+  const openWorkout = workout.data.initial.client?.kind === "managed";
+
+  if (completed) {
+    const { row, initial } = workout.data;
+    const client = (roster.data ?? []).find((c) => c.kind === initial.client?.kind && c.refId === initial.client?.refId);
+    const template = row.template_id ? (templates.data ?? []).find((tpl) => tpl.id === row.template_id) : null;
+    return (
+      <ScrollView style={{ flex: 1, backgroundColor: colors.chalk }} contentContainerStyle={{ padding: 20, gap: 16 }}>
+        <Button
+          label={t("schedule.detail.viewWorkout")}
+          icon={Eye}
+          variant="secondary"
+          block
+          onPress={() => router.push(`/workout/${id}`)}
+        />
+        <ListCard>
+          <ListRow
+            title={client?.name ?? t("schedule.home.client")}
+            subtitle={t("sessionForm.client")}
+            trailing={<Chip kind="done" label={t("trainerHome.done")} />}
+          />
+          <ListRow title={template?.name ?? t("sessionForm.free")} subtitle={t("sessionForm.workout")} />
+          <ListRow
+            title={[longDate(row.scheduled_date, i18n.language), row.scheduled_time ? row.scheduled_time.slice(0, 5) : null]
+              .filter(Boolean)
+              .join(" · ")}
+            subtitle={row.with_trainer ? t("trainerHome.withTrainer") : t("trainerHome.solo")}
+          />
+          {row.notes ? <ListRow title={row.notes} subtitle={t("sessionForm.note")} /> : null}
+        </ListCard>
+        <Card style={{ padding: 14 }}>
+          <AppText size={14} tone="graphite">
+            {t("schedule.detail.completedLocked")}
+          </AppText>
+        </Card>
+      </ScrollView>
+    );
+  }
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.chalk }}>
       {openWorkout ? (
         <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
           <Button
-            label={completed ? t("schedule.detail.viewWorkout") : t("schedule.detail.logWorkout")}
-            icon={completed ? Eye : Dumbbell}
-            variant={completed ? "secondary" : "accent"}
+            label={t("schedule.detail.logWorkout")}
+            icon={Dumbbell}
+            variant="accent"
             block
             onPress={() => router.push(`/workout/${id}`)}
           />
@@ -272,16 +319,17 @@ function EditScheduleScreenBody() {
         initial={workout.data.initial}
         submitLabel={t("schedule.detail.saveChanges")}
         submitting={updateMutation.isPending || checking}
-        errorMessage={mutationError ? (mutationError as Error).message : null}
+        errorMessage={mutationError ?? null}
         onSubmit={submit}
         footer={
-          <Pressable
-            className="items-center rounded-xl border border-red-300 px-4 py-3 active:opacity-70"
+          <Button
+            label={t("schedule.detail.deleteWorkout")}
+            variant="danger"
+            size={52}
+            block
             disabled={deleteMutation.isPending || checking}
             onPress={confirmDelete}
-          >
-            <Text className="text-base font-semibold text-red-600">{t("schedule.detail.deleteWorkout")}</Text>
-          </Pressable>
+          />
         }
       />
 
