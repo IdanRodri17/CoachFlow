@@ -60,6 +60,13 @@ submission.
   the test device's Expo Go dictates the SDK: when Expo Go updates, expect to
   upgrade again (`npx expo install expo@^N` → `npx expo install --fix` →
   `npx expo-doctor` → `tsc --noEmit` → `npx expo export --platform ios`).
+- **Preview updates (EAS Update):** every push to `main`, `cloud/**` or
+  `handoff/**` publishes an update named after the git branch
+  (`.eas/workflows/publish-preview-update.yml`, Expo Workflows, `preview`
+  environment variables on expo.dev). Open it from the update's page on
+  expo.dev → Preview → scan with the iPhone. `runtimeVersion` uses the
+  `sdkVersion` policy (`exposdk:58.0.0`) because Expo Go matches updates by
+  SDK; switch to `fingerprint` with the first development build.
 - **Every view declares `with (security_invoker = true)`** and explicitly
   grants only the roles that need it (`revoke all ... from anon, authenticated`
   when only edge functions read it). Supabase auto-grants new `public` objects
