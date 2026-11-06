@@ -42,7 +42,7 @@
     },
     "owner": "idanrodri",
     "runtimeVersion": {
-      "policy": "appVersion"
+      "policy": "sdkVersion"
     },
     "updates": {
       "url": "https://u.expo.dev/dad06d81-16b5-4bf1-ba4c-138a1f38ca82"
