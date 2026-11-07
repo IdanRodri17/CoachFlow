@@ -1013,5 +1013,44 @@
     "opensOnTheDay": "אפשר לסמן נוכחות ביום האימון.",
     "logged": "האימון נרשם",
     "notFound": "האימון הקבוצתי לא נמצא."
+  },
+  "volume": {
+    "title": "המשקל שהרמת",
+    "tonsUnit": "טון",
+    "liftedLike": "זה המשקל של {{what}}",
+    "firstGoal": "כל סט מקרב אותך לאופנוע הראשון.",
+    "toNext": "עוד {{left}} עד {{what}}",
+    "trainerMonth": "המתאמנים שלך הרימו החודש משקל של {{what}}",
+    "name": {
+      "motorbike": "אופנוע",
+      "car": "מכונית",
+      "elephant": "פיל",
+      "bus": "אוטובוס",
+      "whale": "לוויתן כחול"
+    },
+    "one": {
+      "motorbike": "אופנוע",
+      "car": "מכונית",
+      "elephant": "פיל",
+      "bus": "אוטובוס",
+      "whale": "לוויתן כחול"
+    },
+    "count": {
+      "motorbike_one": "אופנוע",
+      "motorbike_two": "שני אופנועים",
+      "motorbike_other": "{{count}} אופנועים",
+      "car_one": "מכונית",
+      "car_two": "שתי מכוניות",
+      "car_other": "{{count}} מכוניות",
+      "elephant_one": "פיל",
+      "elephant_two": "שני פילים",
+      "elephant_other": "{{count}} פילים",
+      "bus_one": "אוטובוס",
+      "bus_two": "שני אוטובוסים",
+      "bus_other": "{{count}} אוטובוסים",
+      "whale_one": "לוויתן כחול",
+      "whale_two": "שני לוויתנים כחולים",
+      "whale_other": "{{count}} לוויתנים כחולים"
+    }
   }
 }

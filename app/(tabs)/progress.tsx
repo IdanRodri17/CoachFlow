@@ -15,6 +15,11 @@
 // weight chart (last 10, newest at the start edge) with the change since the
 // first of them; "השיאים שלי" (the latest PR per exercise, top 3); badges,
 // moved here from Profile, the locked ones saying how far they are.
+//
+// V28: "המשקל שהרמת" — total lifted volume (client_volume, 0039) in tonnes,
+// the heaviest object on the ladder it equals (lib/volume.ts), the way to the
+// next one, and the ladder itself. The object icons are placeholders until
+// the design has illustrations.
 
 import { useState } from "react";
 import { Image, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
@@ -24,6 +29,11 @@ import { useTranslation } from "react-i18next";
 import * as ImagePicker from "expo-image-picker";
 import { decode } from "base64-arraybuffer";
 import Activity from "lucide-react-native/icons/activity";
+import Bike from "lucide-react-native/icons/bike";
+import Bus from "lucide-react-native/icons/bus";
+import Car from "lucide-react-native/icons/car";
+import Fish from "lucide-react-native/icons/fish";
+import PawPrint from "lucide-react-native/icons/paw-print";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
 import ArrowUp from "lucide-react-native/icons/arrow-up";
 import Calendar from "lucide-react-native/icons/calendar";
@@ -48,6 +58,7 @@ import { addDays, daysBetween, todayISO, toDateString, weekStartOf } from "@/lib
 import { ltr } from "@/lib/i18n";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import { formatWeight } from "@/lib/workoutSession";
+import { nextRung, tons, topRung, VOLUME_LADDER, type VolumeRung } from "@/lib/volume";
 import type { BadgeType } from "@/lib/badges";
 import { LineChart } from "@/components/LineChart";
 import { monthName } from "@/components/home/format";
@@ -62,6 +73,7 @@ import {
   fonts,
   Icon,
   IconButton,
+  Meter,
   Input,
   Num,
   parseTypedNumber,
@@ -224,6 +236,16 @@ function ProgressScreenBody() {
     },
   });
   const streak = useQuery(clientStreakQuery(clientId));
+  // V28: Σ reps × weight over every set the client logged (0039).
+  const volume = useQuery({
+    queryKey: qk.progress.volume(clientId),
+    queryFn: async () => {
+      const { data, error: e } = await supabase.from("client_volume").select("total_kg").eq("client_id", clientId);
+      if (e) throw e;
+      return data.reduce((sum, r) => sum + Number(r.total_kg), 0);
+    },
+  });
+
   const firstWorkout = useQuery({
     queryKey: qk.badges.firstWorkout(clientId),
     queryFn: async () => {
@@ -594,6 +616,9 @@ function ProgressScreenBody() {
         ) : null}
       </Card>
 
+      {/* V28: total lifted */}
+      {volume.data != null ? <VolumeCard totalKg={volume.data} /> : null}
+
       {/* Badges */}
       <Card style={{ padding: 14, gap: 16 }}>
         <AppText size={18} weight="semibold" lineHeight={23}>
@@ -701,5 +726,72 @@ function SquareButton({ icon, label, on, onPress }: { icon: IconComponent; label
       shape="square"
       onPress={onPress}
     />
+  );
+}
+
+/** Placeholder art for the ladder (V28) until the design draws the objects. */
+const RUNG_ICONS: Record<VolumeRung, IconComponent> = {
+  motorbike: Bike,
+  car: Car,
+  elephant: PawPrint,
+  bus: Bus,
+  whale: Fish,
+};
+
+function VolumeCard({ totalKg }: { totalKg: number }) {
+  const { t } = useTranslation();
+  const top = topRung(totalKg);
+  const next = nextRung(totalKg);
+  const left = next ? (next.leftKg < 1000 ? `${Math.ceil(next.leftKg)} ${t("progress.kg")}` : `${tons(next.leftKg)} ${t("volume.tonsUnit")}`) : null;
+  return (
+    <Card style={{ padding: 14, gap: 14 }}>
+      <AppText size={18} weight="semibold" lineHeight={23}>
+        {t("volume.title")}
+      </AppText>
+      <View style={{ flexDirection: "row", alignItems: "baseline", gap: 6 }}>
+        <Num size={44}>{tons(totalKg)}</Num>
+        <AppText size={15} weight="medium" tone="graphite">
+          {t("volume.tonsUnit")}
+        </AppText>
+      </View>
+      <AppText size={15}>
+        {top ? t("volume.liftedLike", { what: t(`volume.count.${top.key}`, { count: top.count }) }) : t("volume.firstGoal")}
+      </AppText>
+      {next && left ? (
+        <View style={{ gap: 6 }}>
+          <Meter value={Math.min(1, totalKg / next.kg)} />
+          <AppText size={13} tone="graphite">
+            {t("volume.toNext", { left: ltr(left), what: t(`volume.one.${next.key}`) })}
+          </AppText>
+        </View>
+      ) : null}
+      <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 6 }}>
+        {VOLUME_LADDER.map((r) => {
+          const reached = totalKg >= r.kg;
+          return (
+            <View key={r.key} style={{ flex: 1, alignItems: "center", gap: 6 }}>
+              <View
+                style={{
+                  width: 44,
+                  height: 44,
+                  borderRadius: 14,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  backgroundColor: reached ? colors.ink : "transparent",
+                  borderWidth: reached ? 0 : 1.5,
+                  borderStyle: "dashed",
+                  borderColor: "#A9A69C",
+                }}
+              >
+                <Icon icon={RUNG_ICONS[r.key]} size={22} color={reached ? colors.volt : colors.smoke} />
+              </View>
+              <AppText size={12} weight="semibold" center numberOfLines={2}>
+                {t(`volume.name.${r.key}`)}
+              </AppText>
+            </View>
+          );
+        })}
+      </View>
+    </Card>
   );
 }

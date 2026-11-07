@@ -1013,5 +1013,44 @@
     "opensOnTheDay": "Attendance can be marked on the day of the session.",
     "logged": "Workout logged",
     "notFound": "This group session wasn't found."
+  },
+  "volume": {
+    "title": "Total lifted",
+    "tonsUnit": "t",
+    "liftedLike": "That's the weight of {{what}}",
+    "firstGoal": "Every set counts toward your first motorbike.",
+    "toNext": "{{left}} more to {{what}}",
+    "trainerMonth": "Your clients lifted {{what}} this month",
+    "name": {
+      "motorbike": "Motorbike",
+      "car": "Car",
+      "elephant": "Elephant",
+      "bus": "Bus",
+      "whale": "Blue whale"
+    },
+    "one": {
+      "motorbike": "a motorbike",
+      "car": "a car",
+      "elephant": "an elephant",
+      "bus": "a bus",
+      "whale": "a blue whale"
+    },
+    "count": {
+      "motorbike_one": "a motorbike",
+      "motorbike_two": "2 motorbikes",
+      "motorbike_other": "{{count}} motorbikes",
+      "car_one": "a car",
+      "car_two": "2 cars",
+      "car_other": "{{count}} cars",
+      "elephant_one": "an elephant",
+      "elephant_two": "2 elephants",
+      "elephant_other": "{{count}} elephants",
+      "bus_one": "a bus",
+      "bus_two": "2 buses",
+      "bus_other": "{{count}} buses",
+      "whale_one": "a blue whale",
+      "whale_two": "2 blue whales",
+      "whale_other": "{{count}} blue whales"
+    }
   }
 }

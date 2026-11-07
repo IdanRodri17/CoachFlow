@@ -513,13 +513,29 @@ export type Database = {
         Row: {
           id: string;
           client_id: string;
-          type: "first_workout" | "streak_10" | "first_month";
+          type:
+            | "first_workout"
+            | "streak_10"
+            | "first_month"
+            | "volume_motorbike"
+            | "volume_car"
+            | "volume_elephant"
+            | "volume_bus"
+            | "volume_whale";
           earned_at: string;
         };
         Insert: {
           id?: string;
           client_id: string;
-          type: "first_workout" | "streak_10" | "first_month";
+          type:
+            | "first_workout"
+            | "streak_10"
+            | "first_month"
+            | "volume_motorbike"
+            | "volume_car"
+            | "volume_elephant"
+            | "volume_bus"
+            | "volume_whale";
           earned_at?: string;
         };
         Update: {
@@ -639,6 +655,17 @@ export type Database = {
     };
     Views: {
       // --- V8: 0008_dashboard_views.sql ---
+      // V28 (0039): Σ reps × weight per subject, all time and this month.
+      client_volume: {
+        Row: {
+          client_id: string | null;
+          managed_client_id: string | null;
+          subject_key: string;
+          total_kg: number;
+          month_kg: number;
+        };
+        Relationships: [];
+      };
       client_streaks: {
         Row: {
           trainer_id: string;

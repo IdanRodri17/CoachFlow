@@ -129,6 +129,8 @@ export const qk = {
     own: (clientId: Id) => ["progress", clientId] as const,
     /** "השיאים שלי": the client's latest PR per exercise (D28a). */
     prs: (clientId: Id) => ["progress", clientId, "prs"] as const,
+    /** V28: the client's lifted volume (client_volume, 0039). */
+    volume: (clientId: Id) => ["progress", clientId, "volume"] as const,
   },
 
   /** trainer_monthly_money (0014) — Home's card, the Money screen's history. */
