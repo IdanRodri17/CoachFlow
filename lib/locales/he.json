@@ -1,6 +1,6 @@
 {
   "common": {
-    "save": "שמור",
+    "save": "שמירה",
     "cancel": "ביטול",
     "continue": "המשך",
     "back": "חזרה"
@@ -17,10 +17,10 @@
   "signIn": {
     "appName": "CoachFlow",
     "phonePlaceholder": "050-1234567",
-    "invalidPhone": "הזן מספר נייד ישראלי, לדוגמה 050-1234567.",
-    "invalidCode": "הקוד שגוי או שפג תוקפו. נסה שוב או בקש קוד חדש.",
-    "sendFailed": "לא הצלחנו לשלוח את הקוד. נסה שוב בעוד רגע.",
-    "tooManyAttempts": "יותר מדי ניסיונות. המתן דקה ונסה שוב.",
+    "invalidPhone": "צריך להזין מספר נייד ישראלי, לדוגמה 050-1234567.",
+    "invalidCode": "הקוד שגוי או שפג תוקפו. אפשר לנסות שוב או לבקש קוד חדש.",
+    "sendFailed": "לא הצלחנו לשלוח את הקוד. אפשר לנסות שוב בעוד רגע.",
+    "tooManyAttempts": "יותר מדי ניסיונות. אפשר לנסות שוב בעוד דקה.",
     "taglineLine1": "פחות טלפון.",
     "taglineLine2": "יותר אימון.",
     "pitch": "אפליקציה אחת למאמן ולמתאמנים שלו — אימונים, יומן ותשלומים.",
@@ -137,7 +137,7 @@
       "newTitle": "תבנית חדשה",
       "editTitle": "עריכת תבנית",
       "emptyTitle": "עדיין אין תבניות",
-      "emptyHint": "בנה אימון לשימוש חוזר פעם אחת, והקצה אותו למספר מתאמנים בהמשך.",
+      "emptyHint": "בונים פעם אחת אימון לשימוש חוזר, ומקצים אותו לכמה מתאמנים בהמשך.",
       "search": "חיפוש תבנית",
       "edit": "עריכה",
       "duplicate": "שכפול",
@@ -150,21 +150,21 @@
       "clients_other": "{{count}} מתאמנים"
     },
     "form": {
-      "createTemplate": "צור תבנית",
+      "createTemplate": "יצירת תבנית",
       "nameRequired": "שם התבנית הוא שדה חובה.",
-      "addAtLeastOneExercise": "הוסף לפחות תרגיל אחד.",
+      "addAtLeastOneExercise": "צריך להוסיף לפחות תרגיל אחד.",
       "templateNamePlaceholder": "לדוגמה: גוף מלא A",
       "notesPlaceholder": "לדוגמה: התמקדו בטכניקה ולא במשקל.",
-      "noExercisesInLibrary": "אין עדיין תרגילים בספרייה שלך — הוסף כמה בטאב תרגילים קודם."
+      "noExercisesInLibrary": "אין עדיין תרגילים בספרייה — קודם מוסיפים כמה בטאב התרגילים."
     },
     "detail": {
       "exerciseFallback": "תרגיל",
       "deleteTitle": "מחיקת תבנית",
       "deleteMessage": "לא ניתן לבטל פעולה זו.",
-      "delete": "מחק",
+      "delete": "מחיקה",
       "notFound": "התבנית לא נמצאה.",
-      "saveChanges": "שמור שינויים",
-      "deleteTemplate": "מחק תבנית"
+      "saveChanges": "שמירת שינויים",
+      "deleteTemplate": "מחיקת תבנית"
     },
     "builder": {
       "name": "שם התבנית",
@@ -229,8 +229,8 @@
       "legendPlanned": "מתוכנן"
     },
     "form": {
-      "assignWorkout": "קבע אימון",
-      "pickClientError": "בחר לקוח, או הקלד שם חד-פעמי.",
+      "assignWorkout": "קביעת אימון",
+      "pickClientError": "צריך לבחור לקוח או להקליד שם חד-פעמי.",
       "weekday": {
         "sun": "א׳",
         "mon": "ב׳",
@@ -244,9 +244,9 @@
     "detail": {
       "deleteWorkout": "מחיקת אימון",
       "deleteWorkoutConfirm": "לא ניתן לבטל פעולה זו.",
-      "delete": "מחק",
+      "delete": "מחיקה",
       "workoutNotFound": "האימון לא נמצא.",
-      "saveChanges": "שמור שינויים",
+      "saveChanges": "שמירת שינויים",
       "logWorkout": "רישום האימון",
       "viewWorkout": "צפייה באימון",
       "completedLocked": "האימון בוצע, ולכן הוא נשמר בהיסטוריה כמו שהוא: אי אפשר לשנות את התאריך, המתאמן או האימון, ואי אפשר למחוק אותו."
