@@ -70,7 +70,7 @@ import {
 
 const LOCALE_LABELS: Record<SupportedLocale, string> = { he: "עברית", en: "English" };
 
-/** "972525885818" → "052-588-5818". */
+/** "972541234567" → "054-123-4567". */
 function localPhone(raw: string | undefined): string | null {
   if (!raw) return null;
   const digits = raw.replace(/\D/g, "");
