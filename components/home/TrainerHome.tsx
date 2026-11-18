@@ -12,7 +12,7 @@
 // number comes from the DB views; none is computed or faked here.
 
 import { useEffect, useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Linking, RefreshControl, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -46,6 +46,7 @@ import {
   ListCard,
   Meter,
   Num,
+  Pressable,
 } from "@/components/ui";
 
 import { clientContextQuery, todaySessionsQuery, type TodaySession } from "@/lib/queries";

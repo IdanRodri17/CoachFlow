@@ -17,7 +17,7 @@
 // moved here from Profile, the locked ones saying how far they are.
 
 import { useState } from "react";
-import { Image, Modal, Pressable, ScrollView, TextInput, View } from "react-native";
+import { Image, Modal, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -65,6 +65,7 @@ import {
   Input,
   Num,
   parseTypedNumber,
+  Pressable,
   Sheet,
   type IconComponent,
 } from "@/components/ui";

@@ -14,16 +14,26 @@
 //   - The actions sit at the END edge and the swipe mirrors: swipe left in
 //     English, right in Hebrew. The swipe is physical, so this file picks the
 //     side from isRTL() itself.
+//
+// gesture-handler 3 (SDK 58), two things this file now does itself:
+//   - It leaves the actions visible behind a closed row (2.x hid them), and our
+//     rows have no background of their own, so ActionStrip hides them until
+//     the row moves.
+//   - It lays the actions out assuming the layout direction is
+//     I18nManager.isRTL, but the app mirrors through the root `direction`
+//     style (lib/i18n.ts), and Expo Go keeps I18nManager LTR. So in Hebrew the
+//     actions sat at the start edge, under the row. The swipeable gets the
+//     direction gesture-handler assumes; the row inside gets the app's back.
 
 import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Alert, Pressable, View } from "react-native";
+import { Alert, I18nManager, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import * as Haptics from "expo-haptics";
 import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
-import Animated, { FadeInDown, FadeOutDown } from "react-native-reanimated";
+import Animated, { FadeInDown, FadeOutDown, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
-import { AppText, Button, colors, fonts, Icon, Sheet, useRTL, type IconComponent } from "./index";
+import { AppText, Button, colors, fonts, Icon, Pressable, Sheet, useRTL, type IconComponent } from "./index";
 
 export type RowActionTone = "edit" | "done" | "whatsapp" | "delete" | "neutral";
 
@@ -84,8 +94,8 @@ export function ActionRow({
   const content = typeof children === "function" ? children(() => setMenuOpen(true)) : children;
   if (disabled || shown.length === 0) return <>{content}</>;
 
-  const renderActions = () => (
-    <View style={{ flexDirection: "row" }}>
+  const renderActions = (progress: SharedValue<number>) => (
+    <ActionStrip progress={progress} rtl={rtl}>
       {shown.map((a) => {
         const tone = TONE[a.tone];
         return (
@@ -113,7 +123,7 @@ export function ActionRow({
           </Pressable>
         );
       })}
-    </View>
+    </ActionStrip>
   );
 
   return (
@@ -124,6 +134,9 @@ export function ActionRow({
         overshootFriction={8}
         rightThreshold={40}
         leftThreshold={40}
+        // See the header: the direction gesture-handler assumes, then the app's.
+        containerStyle={{ direction: I18nManager.isRTL ? "rtl" : "ltr" }}
+        childrenContainerStyle={{ direction: rtl ? "rtl" : "ltr" }}
         // Physical sides: the end edge is the right in English, the left in Hebrew.
         renderRightActions={rtl ? undefined : renderActions}
         renderLeftActions={rtl ? renderActions : undefined}
@@ -165,6 +178,15 @@ export function ActionRow({
         </View>
       </Sheet>
     </>
+  );
+}
+
+/** The swipe actions, hidden while the row is closed (`progress` is 0), and in
+ * the app's direction so the first one sits nearest the row. */
+function ActionStrip({ progress, rtl, children }: { progress: SharedValue<number>; rtl: boolean; children: ReactNode }) {
+  const visible = useAnimatedStyle(() => ({ opacity: progress.value === 0 ? 0 : 1 }));
+  return (
+    <Animated.View style={[{ flexDirection: "row", direction: rtl ? "rtl" : "ltr" }, visible]}>{children}</Animated.View>
   );
 }
 

@@ -14,7 +14,7 @@
 // only the change TO completed, so unchecking someone leaves their package
 // one session short.
 
-import { ActivityIndicator, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -33,7 +33,7 @@ import { groupStatus } from "@/lib/groups";
 import { useRosterClients } from "@/lib/useRoster";
 import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import { longDate } from "@/components/home/format";
-import { AppText, Button, Checkbox, Chip, colors, Display, IconButton, ListCard } from "@/components/ui";
+import { AppText, Button, Checkbox, Chip, colors, Display, IconButton, ListCard, Pressable } from "@/components/ui";
 
 export default function GroupAttendanceScreen() {
   return (

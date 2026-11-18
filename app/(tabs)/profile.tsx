@@ -20,7 +20,7 @@
 // never in the app); every owned row cascades away. Required by Apple/Google.
 
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery } from "@tanstack/react-query";
@@ -62,6 +62,7 @@ import {
   ListRow,
   Num,
   parseTypedNumber,
+  Pressable,
   Segmented,
   SegmentMeter,
   Sheet,

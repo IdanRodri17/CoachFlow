@@ -8,7 +8,7 @@
 // and the first suggestion start selected, so the common case is one tap.
 
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
 import Check from "lucide-react-native/icons/check";
@@ -27,6 +27,7 @@ import {
   Icon,
   IconButton,
   Input,
+  Pressable,
   Segmented,
   SelectChip,
   Sheet,

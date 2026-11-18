@@ -9,7 +9,7 @@
 // already picked). Swipe, long-press or "⋯" for edit / duplicate / delete.
 
 import { useMemo, useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -41,6 +41,7 @@ import {
   Icon,
   IconButton,
   Input,
+  Pressable,
   Segmented,
 } from "@/components/ui";
 

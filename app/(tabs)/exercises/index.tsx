@@ -8,7 +8,7 @@
 // filter chips and rows with a thumbnail (volt play mark when there's a video).
 
 import { useMemo, useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
@@ -34,6 +34,7 @@ import {
   IconButton,
   Input,
   ListCard,
+  Pressable,
   Segmented,
   SelectChip,
 } from "@/components/ui";

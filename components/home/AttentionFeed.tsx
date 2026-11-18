@@ -13,7 +13,7 @@
 // wording happen here. Copy avoids the client's gender ("דילוג על", not
 // "דילגה על") — the app doesn't know it.
 
-import { Linking, Pressable, View } from "react-native";
+import { Linking, View } from "react-native";
 import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -28,7 +28,7 @@ import { attentionQuery, type AttentionItem } from "@/lib/queries";
 import type { RosterClient } from "@/lib/useRoster";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { formatWeight } from "@/lib/workoutSession";
-import { AppText, Button, colors, Icon, ListCard, type IconComponent } from "@/components/ui";
+import { AppText, Button, colors, Icon, ListCard, type IconComponent, Pressable } from "@/components/ui";
 
 import { firstName } from "./format";
 

@@ -6,7 +6,7 @@
 // the same mark-done as Home. It stays a sheet component opened by the tab
 // bar (not the playbook's modal route): it already opens from every tab.
 
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { useRouter, type Href } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -24,7 +24,7 @@ import { addDays, todayISO } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
 import { useRosterClients } from "@/lib/useRoster";
 import { firstName } from "@/components/home/format";
-import { AppText, Avatar, Button, colors, Icon, Sheet, type IconComponent } from "@/components/ui";
+import { AppText, Avatar, Button, colors, Icon, Pressable, Sheet, type IconComponent } from "@/components/ui";
 
 export function QuickAddSheet({ visible, onClose }: { visible: boolean; onClose: () => void }) {
   const { t } = useTranslation();

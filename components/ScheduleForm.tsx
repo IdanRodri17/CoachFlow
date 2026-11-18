@@ -29,7 +29,7 @@
 // group, and no "עד סוף החבילה": each attendee has their own package.
 
 import { useState, type ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -58,6 +58,7 @@ import {
   Icon,
   Input,
   ListCard,
+  Pressable,
   Segmented,
   SelectChip,
 } from "@/components/ui";
