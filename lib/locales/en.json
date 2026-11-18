@@ -1013,5 +1013,11 @@
     "opensOnTheDay": "Attendance can be marked on the day of the session.",
     "logged": "Workout logged",
     "notFound": "This group session wasn't found."
+  },
+  "error": {
+    "title": "Something went wrong",
+    "body": "An error occurred. You can try again.",
+    "retry": "Try again",
+    "profileBody": "Can't reach CoachFlow right now. Check the connection and try again."
   }
 }

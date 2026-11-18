@@ -36,7 +36,7 @@ import {
 type Role = "trainer" | "client";
 
 export default function OnboardingScreen() {
-  const { session, profile, refreshProfile } = useAuth();
+  const { session, profile, profileError, refreshProfile } = useAuth();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [displayName, setDisplayName] = useState("");
@@ -48,7 +48,8 @@ export default function OnboardingScreen() {
 
   // No session? Back to sign-in. Already onboarded? Into the app. (After all hooks.)
   if (!session) return <Redirect href="/(auth)/sign-in" />;
-  if (profileComplete(profile)) return <Redirect href="/" />;
+  // A failed profile read mustn't reach Save (it would overwrite the real profile).
+  if (profileComplete(profile) || (profileError && !profile)) return <Redirect href="/" />;
 
   const canSubmit = displayName.trim().length > 0 && role !== null && acceptedTerms && acceptedHealth;
 

@@ -56,7 +56,7 @@ function localPhone(e164: string): string {
 }
 
 export default function SignInScreen() {
-  const { session, profile } = useAuth();
+  const { session, profile, profileError } = useAuth();
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
   const [phase, setPhase] = useState<"enter" | "code">("enter");
@@ -83,7 +83,8 @@ export default function SignInScreen() {
   // Already signed in? Don't show sign-in — let the guards route onward.
   // (After every hook.)
   if (session) {
-    return profileComplete(profile) ? <Redirect href="/" /> : <Redirect href="/(auth)/onboarding" />;
+    // A failed profile read goes to "/" too: the tabs guard shows the retry.
+    return profileComplete(profile) || (profileError && !profile) ? <Redirect href="/" /> : <Redirect href="/(auth)/onboarding" />;
   }
 
   function authError(err: { code?: string; message: string }, fallbackKey: string) {

@@ -63,6 +63,11 @@ import { useTranslation } from "react-i18next";
 import { layoutDirection, restoreSavedLocale } from "@/lib/i18n";
 import { AuthProvider } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
+import { RouteErrorBoundary } from "@/components/ui/ErrorScreen";
+
+// R6: renders in place of the whole root layout, so outside every provider —
+// the fallback uses only react-native primitives and useTranslation.
+export const ErrorBoundary = RouteErrorBoundary;
 
 // Keep the splash up until the fonts are in (hidden in RootLayout below).
 // Module scope, per the SDK 58 docs, so it runs before the first render.

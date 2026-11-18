@@ -15,11 +15,16 @@ import { Redirect, Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { profileComplete, useAuth } from "@/lib/auth";
+import { authRoute } from "@/lib/authRoute";
+import { ErrorScreen, RouteErrorBoundary } from "@/components/ui/ErrorScreen";
 import { TabBar } from "@/components/TabBar";
 import { useScheduleRealtime } from "@/lib/useScheduleRealtime";
 
+// R6: a crash inside one tab shows this instead of taking the whole app down.
+export const ErrorBoundary = RouteErrorBoundary;
+
 export default function TabsLayout() {
-  const { loading, session, profile } = useAuth();
+  const { loading, session, profile, profileError, retryProfile } = useAuth();
   const { t } = useTranslation();
   // Before the guards below (rules of hooks); it waits for a profile itself.
   useScheduleRealtime(session?.user.id, profileComplete(profile) ? profile?.role : null);
@@ -34,10 +39,16 @@ export default function TabsLayout() {
   }
 
   // Not signed in -> sign-in. Signed in but not onboarded -> onboarding.
-  if (!session) return <Redirect href="/(auth)/sign-in" />;
-  if (!profileComplete(profile)) return <Redirect href="/(auth)/onboarding" />;
+  // A FAILED profile read (cold start, no cached profile) is a retry screen,
+  // never onboarding: onboarding's Save would overwrite the real profile.
+  const route = authRoute(session, profile, profileError);
+  if (route === "signIn") return <Redirect href="/(auth)/sign-in" />;
+  if (route === "retry") {
+    return <ErrorScreen body={t("error.profileBody")} onRetry={() => void retryProfile()} />;
+  }
+  if (route === "onboarding") return <Redirect href="/(auth)/onboarding" />;
   // V12b: clients answer the intake questionnaire once before using the app.
-  if (profile?.role === "client" && profile.intake == null) return <Redirect href="/intake" />;
+  if (route === "intake") return <Redirect href="/intake" />;
 
   const isTrainer = profile?.role === "trainer";
 

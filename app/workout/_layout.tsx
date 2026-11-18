@@ -4,6 +4,11 @@
 import { Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
 
+import { RouteErrorBoundary } from "@/components/ui/ErrorScreen";
+
+// R6: a crash in a workout shows a retry instead of a white screen.
+export const ErrorBoundary = RouteErrorBoundary;
+
 export default function WorkoutLayout() {
   const { t } = useTranslation();
   return (

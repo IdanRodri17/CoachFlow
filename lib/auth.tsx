@@ -76,15 +76,8 @@ export async function verifyOtp(identifier: string, token: string) {
   return supabase.auth.verifyOtp({ phone: toE164IL(identifier) ?? identifier, token, type: "sms" });
 }
 
-/** True once the user has finished onboarding: role set + both consents stamped. */
-export function profileComplete(profile: Profile | null): boolean {
-  return (
-    !!profile &&
-    !!profile.role &&
-    !!profile.accepted_terms_at &&
-    !!profile.accepted_health_disclaimer_at
-  );
-}
+// profileComplete lives in lib/authRoute.ts (pure, unit-tested); re-exported here.
+export { profileComplete } from "@/lib/authRoute";
 
 // ---------------------------------------------------------------------------
 // 2) Auth context
@@ -94,6 +87,11 @@ type AuthContextValue = {
   loading: boolean;
   session: Session | null;
   profile: Profile | null;
+  /** True when the last profile read FAILED and there's no cached profile to
+   * fall back on. Guards must show a retry, never treat it as "not onboarded". */
+  profileError: boolean;
+  /** Re-run the profile read for the current user (the retry button). */
+  retryProfile: () => Promise<void>;
   /** Re-fetch the profile row (call after onboarding writes it). Re-enters the
    * global loading state — use patchProfile for in-place settings changes. */
   refreshProfile: () => Promise<void>;
@@ -111,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   // Two-stage loading: first we resolve the session, then (if any) the profile.
   const [authLoading, setAuthLoading] = useState(true);
   const [profileResolved, setProfileResolved] = useState(false);
+  const [profileError, setProfileError] = useState(false);
 
   // Fetch the current user's profile row (RLS returns only their own).
   //
@@ -128,6 +127,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .eq("id", userId)
       .maybeSingle();
     if (!error) setProfile(data ?? null);
+    // C3: remember a failed read, so a cold start (no cached profile) isn't
+    // mistaken for "no profile row" and sent to onboarding.
+    setProfileError(!!error);
     setProfileResolved(true);
   }, []);
 
@@ -142,10 +144,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   // On mount: read any persisted session, then listen for login/logout changes.
   useEffect(() => {
-    supabase.auth.getSession().then(({ data }) => {
-      setSession(data.session);
-      setAuthLoading(false);
-    });
+    // C4: a rejected read (e.g. encrypted storage fails) means "no session",
+    // and loading must end either way or the app spins forever.
+    supabase.auth
+      .getSession()
+      .then(({ data }) => setSession(data.session))
+      .catch(() => setSession(null))
+      .finally(() => setAuthLoading(false));
     const {
       data: { subscription },
     } = supabase.auth.onAuthStateChange((_event, nextSession) => {
@@ -160,6 +165,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       loadProfile(session.user.id);
     } else {
       setProfile(null);
+      setProfileError(false);
       setProfileResolved(true);
     }
   }, [session, loadProfile]);
@@ -184,6 +190,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     loading: authLoading || (!!session && !profileResolved),
     session,
     profile,
+    profileError,
+    retryProfile: async () => {
+      if (session?.user) await loadProfile(session.user.id);
+    },
     refreshProfile: async () => {
       if (session?.user) await loadProfile(session.user.id);
     },
