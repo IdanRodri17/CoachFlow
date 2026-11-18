@@ -257,11 +257,8 @@ function ProgressScreenBody() {
 
   async function pickPhoto() {
     setError(null);
-    const perm = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (!perm.granted) {
-      setError(t("progress.photoPermission"));
-      return;
-    }
+    // The system photo picker needs no library permission (iOS 14+, Android),
+    // so we never ask for one: the app only ever sees the photo that was picked.
     const res = await ImagePicker.launchImageLibraryAsync({ mediaTypes: ["images"], quality: 0.5, base64: true });
     if (!res.canceled && res.assets[0]?.base64) setPhoto({ uri: res.assets[0].uri, base64: res.assets[0].base64 });
   }
