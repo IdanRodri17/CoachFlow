@@ -10,7 +10,7 @@
 // and the two consent checkboxes. The role is still locked once saved (0013).
 
 import { useState } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, Text, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, Text, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Redirect } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -31,6 +31,7 @@ import {
   Icon,
   Input,
   type IconComponent,
+  Pressable,
 } from "@/components/ui";
 
 type Role = "trainer" | "client";

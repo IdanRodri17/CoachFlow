@@ -13,7 +13,7 @@
 // client, the trainer can correct this week's check-in after saving it.
 
 import { useState } from "react";
-import { Image, Pressable, TextInput, View } from "react-native";
+import { Image, TextInput, View } from "react-native";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import * as ImagePicker from "expo-image-picker";
@@ -42,6 +42,7 @@ import {
   Input,
   Num,
   parseTypedNumber,
+  Pressable,
   Sheet,
   type IconComponent,
 } from "@/components/ui";

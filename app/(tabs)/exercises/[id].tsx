@@ -11,7 +11,7 @@
 // marked. History is read for the signed-in client explicitly.
 
 import { useState } from "react";
-import { Alert, Pressable, ScrollView, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -31,7 +31,7 @@ import { formatWeight } from "@/lib/workoutSession";
 import { ExerciseForm, type ExerciseInput } from "@/components/ExerciseForm";
 import { ExerciseVideo } from "@/components/ExerciseVideo";
 import { shortDate } from "@/components/home/format";
-import { AppText, Button, Card, Chip, colors, Display, Divider, Icon, Num } from "@/components/ui";
+import { AppText, Button, Card, Chip, colors, Display, Divider, Icon, Num, Pressable } from "@/components/ui";
 
 export default function ExerciseDetailScreen() {
   const { t } = useTranslation();

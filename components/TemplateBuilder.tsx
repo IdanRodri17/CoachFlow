@@ -16,7 +16,7 @@
 // The description field isn't on the design: an existing one is kept as is.
 
 import { useMemo, useState, type ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, Pressable, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { Stack } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -46,6 +46,7 @@ import {
   Input,
   ListCard,
   Num,
+  Pressable,
   Sheet,
   Stepper,
 } from "@/components/ui";

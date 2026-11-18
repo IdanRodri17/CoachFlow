@@ -8,10 +8,10 @@
 // out as "תפוס" and can't be picked. A current value that isn't on the hour
 // (e.g. 09:30 when editing) gets its own chip so it stays visible.
 
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import { useTranslation } from "react-i18next";
 
-import { AppText, colors, Num, SelectChip } from "@/components/ui";
+import { AppText, colors, Num, Pressable, SelectChip } from "@/components/ui";
 
 const SLOTS: string[] = [];
 for (let h = 6; h <= 21; h += 1) SLOTS.push(`${String(h).padStart(2, "0")}:00`);

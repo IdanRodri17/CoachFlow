@@ -28,7 +28,7 @@
 //   offline client → managed_clients + its package, then its card.
 
 import { useMemo, useState } from "react";
-import { Linking, Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { Linking, RefreshControl, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -69,6 +69,7 @@ import {
   Input,
   ListCard,
   parseTypedNumber,
+  Pressable,
   Segmented,
   SelectChip,
   Sheet,

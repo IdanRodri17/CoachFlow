@@ -4,7 +4,7 @@
 // unfinished one jumps to it (machine busy → do another and come back; its
 // logged sets stay); "סיום האימון עכשיו" goes to the finish step.
 
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import Check from "lucide-react-native/icons/check";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
@@ -14,7 +14,7 @@ import X from "lucide-react-native/icons/x";
 import { ltr } from "@/lib/i18n";
 import type { WorkoutSession } from "@/lib/useWorkoutSession";
 import { formatElapsed, formatWeight, overview, type OverviewRow } from "@/lib/workoutSession";
-import { AppText, Button, colors, Icon, IconButton, Num, Sheet } from "@/components/ui";
+import { AppText, Button, colors, Icon, IconButton, Num, Pressable, Sheet } from "@/components/ui";
 
 export function OverviewSheet({
   visible,

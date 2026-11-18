@@ -6,7 +6,7 @@
 // saveWorkout); this view only collects effort + note.
 
 import { useState } from "react";
-import { Pressable, ScrollView, View } from "react-native";
+import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import Check from "lucide-react-native/icons/check";
@@ -18,7 +18,7 @@ import Trophy from "lucide-react-native/icons/trophy";
 
 import { ltr } from "@/lib/i18n";
 import { formatElapsed, formatWeight } from "@/lib/workoutSession";
-import { AppText, Button, colors, Display, Icon, Input, Num, SelectChip, type IconComponent } from "@/components/ui";
+import { AppText, Button, colors, Display, Icon, Input, Num, Pressable, SelectChip, type IconComponent } from "@/components/ui";
 
 const NOTE_CHIPS = ["great", "knee", "tired", "rushed"] as const;
 type NoteChip = (typeof NOTE_CHIPS)[number];

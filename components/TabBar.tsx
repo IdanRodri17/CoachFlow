@@ -13,7 +13,7 @@
 // Clients reach the exercise library from Profile (D28b), as designed.
 
 import { useState } from "react";
-import { Pressable, View } from "react-native";
+import { View } from "react-native";
 import type { BottomTabBarProps } from "expo-router/tabs";
 import { useTranslation } from "react-i18next";
 import Apple from "lucide-react-native/icons/apple";
@@ -25,7 +25,7 @@ import Plus from "lucide-react-native/icons/plus";
 import User from "lucide-react-native/icons/user";
 import Users from "lucide-react-native/icons/users";
 
-import { AppText, colors, Icon, type IconComponent } from "@/components/ui";
+import { AppText, colors, Icon, type IconComponent, Pressable } from "@/components/ui";
 import { QuickAddSheet } from "@/components/QuickAddSheet";
 
 type Item =

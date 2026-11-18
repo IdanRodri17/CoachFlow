@@ -12,7 +12,7 @@
 // no field in the design, so an existing value is passed through untouched.
 
 import { useState, type ReactNode } from "react";
-import { KeyboardAvoidingView, Linking, Platform, Pressable, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Linking, Platform, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { LucideProps } from "lucide-react-native";
 import Play from "lucide-react-native/icons/play";
@@ -28,6 +28,7 @@ import {
   fonts,
   Icon,
   Input,
+  Pressable,
   SelectChip,
   Stepper,
 } from "@/components/ui";

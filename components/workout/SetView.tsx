@@ -7,7 +7,7 @@
 // the screen that hosts this decides which sheet opens.
 
 import { useState, type ComponentProps } from "react";
-import { InputAccessoryView, Keyboard, Platform, Pressable, ScrollView, TextInput, View } from "react-native";
+import { InputAccessoryView, Keyboard, Platform, ScrollView, TextInput, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import ArrowLeftRight from "lucide-react-native/icons/arrow-left-right";
@@ -41,6 +41,7 @@ import {
   Icon,
   IconButton,
   Num,
+  Pressable,
   TextButton,
   type IconComponent,
 } from "@/components/ui";

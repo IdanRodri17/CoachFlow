@@ -34,7 +34,7 @@ import {
   KeyboardAvoidingView,
   Modal,
   Platform,
-  Pressable,
+  Pressable as RNPressable,
   StyleSheet,
   Text,
   TextInput,
@@ -317,8 +317,23 @@ export function SmartphoneOff({ size = 24, color = colors.ink, strokeWidth = 2, 
 }
 
 // ---------------------------------------------------------------------------
+// Pressable — React Native's, minus NativeWind. On iOS and Android
+// NativeWind's wrapper (react-native-css-interop 0.2.x) turns a function
+// `style` — `style={({ pressed }) => …}` — into `{}`, so rows lost their
+// flexDirection, swipe actions their width and colour, the tab bar's "+" its
+// circle (seen after the SDK 58 upgrade). This one hands `style` to React
+// Native untouched. No className here; import Pressable from the kit, never
+// from react-native (eslint.config.js enforces it).
+// ---------------------------------------------------------------------------
+export function Pressable(props: PressableProps) {
+  return <RNPressable cssInterop={false} {...props} />;
+}
+
+// ---------------------------------------------------------------------------
 // Press feedback: scale .97. The outer Pressable takes layout (style /
-// className — margins, flex); the inner Animated.View carries the look.
+// className — margins, flex); the inner Animated.View carries the look. It
+// keeps NativeWind's Pressable for that className; its style is never a
+// function.
 // ---------------------------------------------------------------------------
 function PressScale({
   style,
@@ -336,7 +351,7 @@ function PressScale({
   const scale = useSharedValue(1);
   const scaled = useAnimatedStyle(() => ({ transform: [{ scale: scale.value }] }));
   return (
-    <Pressable
+    <RNPressable
       {...rest}
       style={style}
       // .set() rather than `.value =`: the React Compiler lint treats hook
@@ -351,7 +366,7 @@ function PressScale({
       }}
     >
       <Animated.View style={[contentStyle, scaled]}>{children}</Animated.View>
-    </Pressable>
+    </RNPressable>
   );
 }
 
@@ -483,7 +498,6 @@ export function TextButton({
   underline,
   disabled,
   style,
-  className,
 }: {
   label: string;
   onPress?: () => void;
@@ -492,14 +506,12 @@ export function TextButton({
   underline?: boolean;
   disabled?: boolean;
   style?: StyleProp<ViewStyle>;
-  className?: string;
 }) {
   return (
     <Pressable
       onPress={onPress}
       disabled={disabled}
       accessibilityRole="button"
-      className={className}
       style={({ pressed }) => [
         { height: 44, paddingHorizontal: 8, justifyContent: "center", opacity: disabled ? 0.38 : pressed ? 0.6 : 1 },
         style,

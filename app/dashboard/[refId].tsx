@@ -24,7 +24,7 @@
 // own screen (D26a, app/dashboard/nutrition/[refId].tsx).
 
 import { useRef, useState, type ReactNode, type RefObject } from "react";
-import { ActivityIndicator, Linking, Pressable, RefreshControl, ScrollView, View, type TextInputInstance } from "react-native";
+import { ActivityIndicator, Linking, RefreshControl, ScrollView, View, type TextInputInstance } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -82,6 +82,7 @@ import {
   Meter,
   Num,
   parseTypedNumber,
+  Pressable,
   SectionHeader,
   Segmented,
   SegmentMeter,

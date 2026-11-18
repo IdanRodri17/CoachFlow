@@ -45,4 +45,29 @@ module.exports = defineConfig([
       "import/namespace": "off",
     },
   },
+  {
+    // On the phone, NativeWind turns a function style on React Native's
+    // Pressable — style={({ pressed }) => …} — into {}. The kit's Pressable
+    // (components/ui/index.tsx) passes it through, so import that one.
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          paths: [
+            {
+              name: "react-native",
+              importNames: ["Pressable"],
+              message:
+                "Import Pressable from @/components/ui: on the phone NativeWind turns a function style on React Native's into {}.",
+            },
+          ],
+        },
+      ],
+    },
+  },
+  {
+    // The kit wraps React Native's Pressable, so it alone imports it.
+    files: ["components/ui/index.tsx"],
+    rules: { "no-restricted-imports": "off" },
+  },
 ]);

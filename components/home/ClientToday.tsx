@@ -19,7 +19,7 @@
 // "חזרה לאימון" card sits at the top and reopens it where it was left.
 
 import { useCallback } from "react";
-import { Pressable, RefreshControl, ScrollView, View } from "react-native";
+import { RefreshControl, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
@@ -60,6 +60,7 @@ import {
   ListCard,
   Num,
   type IconComponent,
+  Pressable,
 } from "@/components/ui";
 
 import { firstName, greetingKey, longDate, shortDate, weekdayLetter } from "./format";
