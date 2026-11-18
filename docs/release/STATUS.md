@@ -43,6 +43,12 @@ Ship type: **JS** = reaches testers by OTA update · **native** = needs a new st
 | B9–B13, B16–B20 | Write-check gaps on 4 policies, client-editable reminder stamps, anon table grants, bucket size/MIME limits, invite-code throttle, SMS number check + timeout, realtime delete ids, CORS/logging, Anthropic key in the app's .env, perf advisors | security/perf | P2 | — | — | later (one hardening migration) |
 | C17–C25, D16, D20 | Lint warnings, `ltr()` on times, global error handler, JSON.parse loop, localized display name, `eas project:info` | misc | P2 | — | — | later |
 
+## Resume here (2026-11-19, session stopped at the usage limit)
+1. **Audit A (store compliance) was stopped before it reported.** Re-run it (`auditor`, Opus) with Phase 1 A's brief. R8 (AI disclosure + report) and R1 (privacy/terms links) wait on it.
+2. **origin/cloud/dev has a new fix, 79c3231** "fix(ui): rows, swipe actions and the '+' lost their layout" (2026-11-18, on top of v28). Check whether it depends on v28; if not, cherry-pick it onto this branch. Ask Idan for the cloud chat's remaining bug list too.
+3. A candidate icon set (volt italic "CF" on ink, Barlow Condensed) was generated outside the repo; regenerate it on approval with a script of that kind and wire it into app.json (icon, adaptive foreground + backgroundColor #131416, monochrome, splash).
+4. Then: the checkpoint message to Idan (decisions + smoke test), R9 (ai_usage migration 0039 + function), live deploys after his OK.
+
 ## Decisions (Idan)
 *(Asked at Checkpoint 0+1. Answers go here.)*
 
