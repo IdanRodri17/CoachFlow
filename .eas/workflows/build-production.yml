@@ -1,0 +1,13 @@
+# Manual only: there is no `on:` trigger, so pushes never start a store build.
+# Run from the repo folder:  npx eas-cli workflow:run .eas/workflows/build-production.yml
+# It uploads the local project directory (minus .easignore) and builds with the
+# `production` profile in eas.json, using the `production` environment on expo.dev.
+name: Build production (Android)
+
+jobs:
+  build_android:
+    name: Android AAB
+    type: build
+    params:
+      platform: android
+      profile: production

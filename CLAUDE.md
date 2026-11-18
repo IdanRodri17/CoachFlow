@@ -66,7 +66,20 @@ submission.
   environment variables on expo.dev). Open it from the update's page on
   expo.dev → Preview → scan with the iPhone. `runtimeVersion` uses the
   `sdkVersion` policy (`exposdk:58.0.0`) because Expo Go matches updates by
-  SDK; switch to `fingerprint` with the first development build.
+  SDK. Store builds get their own runtime: `app.config.ts` switches to the
+  `appVersion` policy when `APP_VARIANT=production` (set by `eas.json`'s
+  `production` profile), so a preview update never reaches a store binary.
+  Never create a git branch named `production` (it would publish to the store
+  channel).
+- **Versioning (store builds):**
+  1. `version` in app.json (1.0.0) is the number users see, and also the
+     store builds' OTA runtime.
+  2. `ios.buildNumber` / `android.versionCode` come from EAS (remote
+     `autoIncrement`). Never add them to app.json.
+  3. Bump `version` (and make a new store build) whenever native code changes:
+     a native package, a config plugin, or the SDK. A JS-only fix keeps
+     `version` and ships as an OTA update:
+     `APP_VARIANT=production eas update --channel production --environment production`.
 - **Every view declares `with (security_invoker = true)`** and explicitly
   grants only the roles that need it (`revoke all ... from anon, authenticated`
   when only edge functions read it). Supabase auto-grants new `public` objects

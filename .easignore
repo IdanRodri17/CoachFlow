@@ -1,0 +1,42 @@
+# EAS uses this file INSTEAD of .gitignore when it uploads the project for a
+# build or workflow run, so it repeats .gitignore and then adds what the
+# app binary never needs. Keep the two in sync.
+
+# --- from .gitignore ---
+node_modules/
+.expo/
+dist/
+web-build/
+expo-env.d.ts
+.kotlin/
+*.orig.*
+*.jks
+*.p8
+*.p12
+*.key
+*.mobileprovision
+.metro-health-check*
+npm-debug.*
+yarn-debug.*
+yarn-error.*
+.DS_Store
+*.pem
+.env
+.env*.local
+supabase/.branches
+supabase/.temp
+supabase/seed_dev_workout.sql
+supabase/seed_dev_sms_reminder.sql
+*.tsbuildinfo
+/ios
+/android
+supabase.exe
+supabase-go.exe
+supabase.tar.gz
+
+# --- EAS only: not part of the app ---
+# docs/ includes Idan's private roadmap, playbook and design files (untracked).
+/docs/
+/.claude/
+/supabase/
+/.github/
