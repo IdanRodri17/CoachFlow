@@ -20,7 +20,7 @@ Read this file first, then `CLAUDE.md`, `docs/release/BACKLOG.md`, and `docs/rel
 **This replaces "one Vn step per session" and "1–2 files per step".** Work in batches. A batch is a set of related items, and it ends at a checkpoint (§4). When a small decision comes up inside a batch, take the conservative option, log it in STATUS.md under "Decisions I made", and keep going. Save real questions for the next checkpoint instead of stopping.
 
 **Still in force from CLAUDE.md:**
-- SQL migrations are surgical and add nullable or defaulted columns. Each one is a new file; never edit a migration that has been applied. 0039 is v28's `volume_milestones` (live since 2026-11-18; 1.0 doesn't read it), 0040 is `ai_usage` (R9), 0041 is the `trainer_clients` delete policy (R15). The next free number is **0042**.
+- SQL migrations are surgical and add nullable or defaulted columns. Each one is a new file; never edit a migration that has been applied. 0039 is v28's `volume_milestones` (live since 2026-11-18; 1.0 doesn't read it), 0040 is `ai_usage` (R9), 0041 is the `trainer_clients` delete policy (R15), 0042 is reserved for `ai_reports` (R8). The next free number is **0043**.
 - Every view uses `with (security_invoker = true)` and has explicit grants.
 - Dates go through `lib/dates.ts` only (Asia/Jerusalem).
 - RTL-first. Text uses `text-left` for the start edge; TextInput uses `directionalTextClassName()`.
