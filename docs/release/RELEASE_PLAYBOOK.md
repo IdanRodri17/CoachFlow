@@ -20,7 +20,7 @@ Read this file first, then `CLAUDE.md`, `docs/release/BACKLOG.md`, and `docs/rel
 **This replaces "one Vn step per session" and "1–2 files per step".** Work in batches. A batch is a set of related items, and it ends at a checkpoint (§4). When a small decision comes up inside a batch, take the conservative option, log it in STATUS.md under "Decisions I made", and keep going. Save real questions for the next checkpoint instead of stopping.
 
 **Still in force from CLAUDE.md:**
-- SQL migrations are surgical and add nullable or defaulted columns. Each one is a new file; never edit a migration that has been applied. The next free number is **0039** on this branch (cloud/dev's 0039 is out of scope and unapplied; if v28 ever lands, renumber it).
+- SQL migrations are surgical and add nullable or defaulted columns. Each one is a new file; never edit a migration that has been applied. 0039 is v28's `volume_milestones` (live since 2026-11-18; 1.0 doesn't read it), 0040 is `ai_usage` (R9), 0041 is the `trainer_clients` delete policy (R15). The next free number is **0042**.
 - Every view uses `with (security_invoker = true)` and has explicit grants.
 - Dates go through `lib/dates.ts` only (Asia/Jerusalem).
 - RTL-first. Text uses `text-left` for the start edge; TextInput uses `directionalTextClassName()`.
@@ -62,7 +62,7 @@ The lead does the thinking, and subagents do the reading and writing.
 
 **Stack:** Expo SDK 58 (RN 0.88.1, React 19.3), Expo Router, NativeWind 4 + Tailwind 3, TanStack Query, i18next (he/en), Supabase (project ref `cybvavqwbvfctbfevzha`).
 - Edge functions: `send-sms-hook`, `send-reminders`, `send-sms-reminders`, `send-trainer-digest`, `delete-account`, `nutrition-suggest`.
-- Migrations 0001–0038 are on `main` **and applied to the live DB**. `0039_volume_milestones.sql` (feature v28) exists only on `cloud/dev` and is **not applied**, so v28 is out of 1.0.
+- Migrations 0001–0038 are on `main` **and applied to the live DB**. `0039_volume_milestones.sql` (feature v28) was applied on 2026-11-18. It's additive (a view and a wider badge-type check), and this branch carries the same file. v28's app code stays on `cloud/dev`, out of 1.0.
 
 **Login:** phone OTP only (`AUTH_MODE = "sms"` in `lib/auth.tsx`; `lib/devAuth.ts` is gone).
 - Only Israeli `05X` numbers are accepted (`toE164IL`).
@@ -221,7 +221,7 @@ Then stop and wait for his reply.
 
 ## 5. Decisions only Idan makes (record the answers in STATUS.md)
 1. Is the bundle id / package `com.idan.coachflow` final? It becomes permanent with the first upload.
-2. ~~Does `cloud/dev` (v28 and migration 0039) go into 1.0?~~ Answered by the facts: 0039 isn't applied, so v28 is post-launch.
+2. ~~Does `cloud/dev` (v28 and migration 0039) go into 1.0?~~ Answered: v28's app code is post-launch. Its migration 0039 went live on 2026-11-18 (additive; 1.0 doesn't read it).
 3. Is 1.0 free (a pilot) or paid? Charging trainers inside the app brings in Apple's in-app purchase rules, so the simplest 1.0 is free.
 4. Where are the privacy policy, terms and web deletion page hosted (GitHub Pages, his VPS, or another site), and what's the support email?
 5. SMS: buy the "CoachFlow" sender before launch (decided 2026-09-30), or stay on the free tier?

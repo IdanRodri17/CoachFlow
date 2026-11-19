@@ -33,7 +33,7 @@ Format: `- [ ] id · title · type · files · done when`. Audit findings get th
 *(Not visible from the local session. Idan pastes the cloud chat's list here; each line gets a B-id.)*
 
 ## Out of 1.0 (post-launch), from the cloud brief
-- V28 volume milestones (cloud/dev caf978c, migration 0039 unapplied)
+- V28 volume milestones app code (cloud/dev caf978c; its migration 0039 went live 2026-11-18)
 - V24 revenue per client, CSV export for the accountant, Hebrew receipt over WhatsApp
 - DB cleanup migration: 37 RLS policies to `(select auth.uid())`, indexes on unindexed FKs
 - Share card "שמירה בגלריה" (expo-media-library; adds a photo-write permission)

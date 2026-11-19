@@ -1,7 +1,7 @@
-# Release 1.0 — status (updated 2026-11-19 by Opus 5.5)
-Phase: 2 (audits B, C, D merged; A pending) · Next checkpoint: 0+1 combined · Branch: `cloud/release-1.0`
+# Release 1.0 — status (updated 2026-11-19 evening by Opus 5.5)
+Phase: 1 done (audits A, B, C, D merged) · **Checkpoint 0+1 sent 2026-11-19, waiting for Idan's answers** · Branch: `cloud/release-1.0`
 Baseline at a6d570e: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 138/138 (9 files)
-Now: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 145/145 (10 files)
+Now: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 147/147 (10 files) · `expo export --platform ios` ✓
 
 P0 = blocks store submission or leaks data · P1 = before the public launch · P2 = after launch.
 Audit ids: A = store compliance, B = Supabase security, C = app robustness, D = build config.
@@ -11,24 +11,30 @@ Ship type: **JS** = reaches testers by OTA update · **native** = needs a new st
 |----|------|------|---|-------|-----------|-------|
 | R7 | eas.json, store runtime split, build workflow, .easignore, versioning rule (D1–D3, D9, D10, D19) | release | P0 | lead | previews resolve sdkVersion, production appVersion; workflow validates | ✅ 4d7a346 |
 | R6 | Error boundaries: root, tabs, workout (C1, C2) | release · JS | P0 | implementer | a render crash shows a translated retry screen | ✅ af3e6c4 |
-| R4 | Store-safe permissions: photo purpose string, camera/mic/READ_MEDIA_*/overlay blocked, no Face ID string, no Photos prompt, `usesNonExemptEncryption: false` (D6, D7, D12) | release · native | P0 | lead | introspected Info.plist + manifest clean | ✅ 3d2c607 |
+| R4 | Store-safe permissions: photo purpose string, camera/mic/READ_MEDIA_*/overlay blocked, no Face ID string, no Photos prompt, `usesNonExemptEncryption: false` (D6, D7, D12) | release · native | P0 | lead | introspected Info.plist + manifest clean | ✅ 3d2c607 (re-verified by audit A) |
 | R2 | Account deletion removes progress photos (own + managed clients' folders) before the user (B2) | release · live | P0 | lead | code ✅; deployed; a throwaway account leaves no objects | ✅ 9c5eed1 code · **deploy needs OK** |
 | R2b | One-off sweep of photo folders whose owner no longer exists (B2) | data · live | P0 | lead with OK | no orphan folders | needs OK |
 | S1 | Test OTP on Idan's real number = his real trainer account behind one static code; the number was in a public code comment (B1) | security · live | P0 | Idan | number removed from Auth → Phone → test numbers | comment fixed e7e35d1 · **Idan** |
 | S2 | Shared dev password for trainer@/client@coachflow.dev is in public git history (B8) | security · live | P0 | Idan | Email provider confirmed OFF; both passwords rotated | **Idan** |
-| R7b | `production` environment on expo.dev: Supabase URL + anon key + `APP_VARIANT=production` (D4) | release · live | P0 | Idan (or lead with OK) | `eas env:list production` shows all three | todo (RUNBOOK 1.1) |
-| R12 | Real app icon, adaptive icon, splash, notification icon (D5, D8, D14) | release · native | P0 | decision → lead | no Expo template art in assets/ | blocked: decision |
-| R1 | Privacy policy + terms linked in the app (onboarding + Profile) | release · JS | P0 | implementer + Idan (hosting) | both links open the hosted he/en pages | blocked: decision |
-| R3 | Web account-deletion page | release | P0 | store-writer + Idan (hosting) | public URL live | blocked: decision |
-| R8 | AI disclosure + in-app "report this plan" | release · JS | P0 | implementer | every plan labeled; report works | waiting for audit A |
-| R5 | App Review sign-in: test numbers, demo data, review notes | release · live | P0 | Idan + store-writer | a reviewer signs in on both sides | todo (RUNBOOK 1.2–1.3) |
-| I1 | Confirm `com.idan.coachflow` (D11) | decision | P0 | Idan | answered | ask |
+| R7b | `production` environment on expo.dev: Supabase URL + anon key + `APP_VARIANT=production` (D4) | release · live | P0 | Idan (or lead with OK) | `eas env:list --environment production` shows all three | todo (RUNBOOK 1.1) · asked at checkpoint |
+| R12 | Real app icon, adaptive icon, splash, notification icon (D5, D8, D14, A5) | release · native | P0 | decision → lead | no Expo template art in assets/ | candidate in `docs/release/icons/` (preview.png + make_icons.py) · **awaiting approval** |
+| R1 | Privacy policy + terms + support linked in the app: onboarding consent text with two tappable links that don't toggle the checkbox (A1); a "Legal & support" card in Profile for both roles with policy, terms, support email, web deletion page (A2); sign-in footer (A16, P2) | release · JS | P0 | implementer + Idan (hosting) | both links open the hosted he/en pages; URLs live in one `lib/legal.ts` | blocked: decision (hosting + support email) |
+| R3 | Web account-deletion page, incl. an email route for offline (managed) clients who have no account (A4, A12) | release | P0 | store-writer + Idan (hosting) | public URL live | blocked: decision |
+| A3 | **Third-party AI consent (Apple 5.1.2(i)).** Before a trainer's first "יצירת תפריט", a one-time sheet names Anthropic and says what is sent (targets, diet chips, free-text preferences; no names or phone numbers); hint under the preferences field not to type names or medical details; covered in the privacy policy | release · JS | P0 | implementer | first plan request shows the sheet; declining sends nothing; accepted once per user per device | todo (batch R8+A3+A9) · design asked at checkpoint |
+| R8 | AI disclosure + in-app report: an "AI-generated" label on the trainer's plan (A7: `[refId].tsx` chip ~368, `nutritionAi.disclaimer`) and the client's plan (A6: `nutrition.tsx` ~85, `nutrition.disclaimer`); "Report this plan" on both (A8) inserting into `ai_reports` (planned migration 0042: plan id, reporter, reason; RLS insert-own, no select for app roles) | release · JS+live | P0 | implementer | every plan labeled; a report lands in `ai_reports` | todo (batch R8+A3+A9) |
+| R5 | App Review sign-in: test numbers, demo data, review notes. Plus A10: an idempotent seed SQL that recreates both demo accounts onboarded, linked and with data (reviewers often test "delete account"), and a third test number for deletion testing; say sign-up is Israel-only | release · live | P0 | Idan + store-writer + lead (seed SQL) | a reviewer signs in on both sides | todo (RUNBOOK 1.2–1.3) |
+| I1 | Confirm `com.idan.coachflow` (D11) | decision | P0 | Idan | answered | asked at checkpoint |
 | S3 | Live `send-trainer-digest` and `send-reminders` accept any app JWT (deployed versions predate the cron gate); unused since email was dropped (B3, B6) | security · live | P1 | Idan | both deleted in Supabase → Edge Functions | **Idan** |
 | S4 | SMS abuse: random Israeli numbers cost an SMS each; one IP can exhaust the hourly SMS quota and block logins (B4) | security · live | P1 | Idan | Auth rate limits sized; SMS4Free balance alert; CAPTCHA later | todo |
-| R9 | nutrition-suggest daily cap per trainer: `ai_usage` table + definer function, 429 over the cap; Anthropic spend limit (B5) | release · live+JS | P1 | implementer | 21st call in a day gets 429 | todo (migration 0039) |
-| R15 | A client can leave a trainer (withdraw consent): delete policy on `trainer_clients` + "Leave trainer" action (B7) | privacy · live+JS | P1 | implementer | client unlinks; trainer loses read access | todo |
+| R9 | nutrition-suggest daily cap per trainer: `ai_usage` + `consume_ai_call` (service role only), 20/day/Israel day, 429 `daily_limit`, fail closed; translated message; Anthropic spend limit (B5) | release · live+JS | P1 | implementer | 21st call in a day gets 429 | ✅ code (this push) · dry run ✓ · **apply 0040, then deploy the function: needs OK** |
+| R15 | A client can leave a trainer (withdraw consent): delete policy on `trainer_clients` + "Leave trainer" action (B7) | privacy · live+JS | P1 | implementer | client unlinks; trainer loses read access | todo (migration 0041) |
+| A9 | Delete-account confirm mentions "messages" (none exist) and doesn't tell a trainer it also wipes app clients' workout history with them and all offline clients' records and photos (B14) | release · JS | P1 | implementer | role-specific `deleteAccountMessage` (he/en) | todo (batch R8+A3+A9) |
+| A11 | Minimum age stated nowhere (Play target audience, Apple age rating; clients upload body photos) | decision | P1 | Idan | age in terms consent + Terms; Play target audience | asked at checkpoint (18+ recommended) |
+| A12 | Trainers enter non-users' data (offline clients: name, phone, metrics, photos, nutrition) | release · docs | P1 | store-writer | Terms make the trainer responsible for consent; policy + R3 page give non-users an email route; declared in both forms | with R13 |
+| A15 | No `ios.privacyManifests` while several pods ship no PrivacyInfo | release · native | P1 | lead | no ITMS-91053 email after the first TestFlight upload | after the first iOS build |
 | C3 | Failed cold-start profile read sent users to onboarding (Save overwrote the profile) | bug · JS | P1 | implementer | retry screen; `lib/authRoute.ts` + 7 tests | ✅ af3e6c4 |
 | C4 | `getSession()` without catch → endless spinner | bug · JS | P1 | implementer | loading always ends | ✅ af3e6c4 |
+| CF1 | cloud/dev 79c3231: Pressables lost their function style under NativeWind (rows stacked, swipe actions blank, "+" lost its circle); gesture-handler 3 swipe direction in RTL | bug · JS | P1 | lead | rows, swipe actions and "+" look right on the phone | ✅ 0e0fc60 + c95b3c4 · smoke test |
 | R11 | Gender-neutral Hebrew (16 strings) | release · JS | P1 | lead | values neutral, keys untouched | ✅ 2329434 |
 | R10 | nutrition-suggest model id `claude-sonnet-5` | bug | — | — | valid, supported to ≥ 2027-06-30 (B15) | ✅ no change |
 | C5, C6 | `.single()` on detail screens shows raw errors on a deleted/bad id; `data!` in handlers | bug · JS | P1 | implementer | `maybeSingle` + notFound; guarded handlers | todo (batch 2) |
@@ -38,22 +44,45 @@ Ship type: **JS** = reaches testers by OTA update · **native** = needs a new st
 | C12 | Not-found screens have no back button (iOS user stuck) | bug · JS | P1 | implementer | back + retry | todo (batch 2) |
 | C13, C14 | Blank loading on two detail screens; undefined photo URL | bug · JS | P1 | implementer | spinner; placeholder | todo (batch 2) |
 | D17 | 16 KB page-size check on the first AAB | release | P1 | Idan + lead | no Play Console warning | after the first build |
-| R13 | Store package (listings, policy drafts, form answers, review notes, screenshots plan) | release | P1 | store-writer | Phase 5 files complete | after decisions |
+| R13 | Store package (listings, policy drafts, form answers, review notes, screenshots plan). Audit A's data inventory (below) is the source for App Privacy / Data safety; A13 Health apps declaration is RUNBOOK 3.3 | release | P1 | store-writer | Phase 5 files complete | after decisions |
 | R14 | RUNBOOK | release | P1 | lead | current at every checkpoint | ✅ parts 0–5 drafted |
+| A14 | `LICENSE` is Expo's MIT "© 650 Industries" in a public repo (= I5) | decision | P1 | Idan | replaced, or repo private | asked at checkpoint |
+| A16–A20 | Sign-in footer links (with R1); Hebrew photo purpose string via `locales`; block READ/WRITE_EXTERNAL_STORAGE (maxSdk 32) after testing Android 10–12; policy mentions the trainer's phone shown to clients and YouTube/Vimeo embeds; review note "payments are manual records, nothing is sold in the app" | release | P2 | — | — | later (A17/A18 are native: ride the next build) |
 | B9–B13, B16–B20 | Write-check gaps on 4 policies, client-editable reminder stamps, anon table grants, bucket size/MIME limits, invite-code throttle, SMS number check + timeout, realtime delete ids, CORS/logging, Anthropic key in the app's .env, perf advisors | security/perf | P2 | — | — | later (one hardening migration) |
 | C17–C25, D16, D20 | Lint warnings, `ltr()` on times, global error handler, JSON.parse loop, localized display name, `eas project:info` | misc | P2 | — | — | later |
 
-## Resume here (2026-11-19, session stopped at the usage limit)
-1. **Audit A (store compliance) was stopped before it reported.** Re-run it (`auditor`, Opus) with Phase 1 A's brief. R8 (AI disclosure + report) and R1 (privacy/terms links) wait on it.
-2. **origin/cloud/dev has a new fix, 79c3231** "fix(ui): rows, swipe actions and the '+' lost their layout" (2026-11-18, on top of v28). Check whether it depends on v28; if not, cherry-pick it onto this branch. Ask Idan for the cloud chat's remaining bug list too.
-3. A candidate icon set (volt italic "CF" on ink, Barlow Condensed) was generated outside the repo; regenerate it on approval with a script of that kind and wire it into app.json (icon, adaptive foreground + backgroundColor #131416, monochrome, splash).
-4. Then: the checkpoint message to Idan (decisions + smoke test), R9 (ai_usage migration 0039 + function), live deploys after his OK.
+## Resume here (2026-11-19 evening)
+Checkpoint 0+1 went to Idan in chat (12 numbered decisions + a 10-step smoke test). **Wait for his answers; record them under "Decisions (Idan)".** Then, in this order:
+1. Live changes he OKs (list below). Order matters: **apply 0040 before deploying nutrition-suggest**, or every plan request returns 500 (the function fails closed).
+2. One implementer batch, same files, run sequentially: **R8 + A3 + A9** (nutrition screens, profile delete copy, locales, migration 0042 `ai_reports`). Dry-run 0042 like 0040.
+3. R12 on icon approval: run `docs/release/icons/make_icons.py` (usage in its header) into `assets/`, set app.json `icon`, `android.adaptiveIcon` (foreground, monochrome, `backgroundColor` `#131416`), the `expo-splash-screen` plugin (image + `backgroundColor` `#131416`), and an `expo-notifications` plugin entry with `icon` + `color`. Read the v58 docs for both plugins first.
+4. R1 + R3 once hosting and the support email are answered (store-writer drafts the pages; implementer adds `lib/legal.ts` and the links).
+5. R15 (0041), A10 seed SQL, then batch 2 (C5–C14).
+- Ask Idan for the cloud chat's remaining bug list (still open).
+- A second local session ("Migration renumbering and UI fix cherry-pick") worked in this same folder on 2026-11-19; it renumbered R9 to 0040 and handed the tree back. Before editing, check `git status` for files you didn't touch.
 
 ## Decisions (Idan)
-*(Asked at Checkpoint 0+1. Answers go here.)*
+*(Asked at Checkpoint 0+1 on 2026-11-19. Answers go here.)*
+1. Bundle id / package `com.idan.coachflow` final? — rec. yes
+2. Icon: approve the volt italic "CF" on ink (`docs/release/icons/preview.png`)? — rec. yes
+3. 1.0 free (pilot)? — rec. free
+4. Hosting for privacy/terms/deletion pages + support email? — rec. GitHub Pages repo `coachflow-site` now (VPS later) + a new CoachFlow Gmail
+5. Buy the SMS4Free "CoachFlow" sender before launch? — rec. yes (also unblocks S1)
+6. Supabase Pro before the closed test? — rec. yes (backups, no pausing)
+7. LICENSE / public repo? — rec. make the repo private and replace LICENSE with "All rights reserved"
+8. Israel only for 1.0? — rec. yes
+9. Sentry before the first store build? — rec. yes (native; cheapest now)
+10. Minimum age (A11)? — rec. 18+
+11. AI consent design (A3): one-time sheet naming Anthropic, stored per user on the device? — rec. yes
+12. OK the live changes below? — rec. yes
 
 ## Decisions I made (conservative defaults)
-- v28 / migration 0039 stay out of 1.0 (0039 isn't applied). This branch's next free migration number is **0039**; renumber v28 if it ever lands.
+- Migration 0039 is v28's `volume_milestones` (the `client_volume` view + 5 `volume_*` badge types). It went live on 2026-11-18 from the cloud session. It's additive, and 1.0 code doesn't read it. This branch carries the same file, byte for byte from cloud/dev, so its migrations match the live DB. v28's app code stays post-launch. R9's `ai_usage` became **0040**, R15's `trainer_clients` policy **0041**, R8's `ai_reports` is planned as **0042**; the next free number after that is **0043**.
+- Cherry-picked cloud/dev 79c3231 (the Pressable/swipe fix): it doesn't depend on v28 (the only shared file, progress.tsx, differs by one import line). Its new lint rule flagged `ErrorScreen.tsx`; exempted it (c95b3c4) rather than importing the kit, because the root boundary renders outside every provider and uses a plain object style.
+- R9: cap 20 calls per trainer per Asia/Jerusalem day; counted after the request validates and before the Anthropic call, so a failed Anthropic call still counts; the function fails closed (500) if the check errors. `consume_ai_call` is plpgsql: the dry run showed Postgres rejects a data-modifying WITH nested inside `exists()`.
+- R8's report goes to an `ai_reports` table rather than a mailto, so it works before the support email exists and needs nothing from the reporter's mail app (pending the batch).
+- A3 consent is stored on the device (SecureStore, per user id), so the app doesn't depend on a migration being applied first; the privacy policy carries the durable disclosure.
+- The icon candidate's script and preview live in `docs/release/icons/` so they survive a cleared scratchpad.
 - eas.json has only a `production` profile (no `expo-dev-client`, and nothing uses a preview build).
 - Store builds use the `appVersion` runtime rather than `fingerprint`.
 - `.easignore` excludes docs/, .claude/, supabase/ and .github/ from build uploads.
@@ -64,25 +93,54 @@ Ship type: **JS** = reaches testers by OTA update · **native** = needs a new st
 - RUNBOOK recommends GitHub Pages in a separate public repo for the legal pages.
 
 ## Migrations to apply, in order
-None yet. Planned: 0039 `ai_usage` (R9), 0040 `trainer_clients` client delete policy (R15).
+Live through 0039 (`0039_volume_milestones`, applied 2026-11-18).
+1. **0040 `ai_usage`** (R9) — file committed; dry run ✓ 2026-11-19 in a rolled-back block: FK rejects unknown ids; calls 1–2 of cap 2 → true, 3–4 → false with the counter staying at 2; a second trainer counted separately; `authenticated` and `anon` denied execute, select and insert; nothing persisted.
+2. 0041 `trainer_clients` client delete policy (R15) — planned.
+3. 0042 `ai_reports` (R8) — planned.
 
 ## Live changes waiting for Idan's OK
-1. Deploy `delete-account` (9c5eed1) through the Supabase connector, then verify with a throwaway test account.
-2. One-off sweep of orphaned photo folders (lists folder names only, removes those with no owner).
+1. Apply 0040, then deploy `nutrition-suggest` (in that order), then one call from the app to confirm plans still generate.
+2. Deploy `delete-account` (9c5eed1) through the Supabase connector, then verify with a throwaway test account.
+3. One-off sweep of orphaned photo folders (lists folder names only, removes those with no owner).
+4. R7b: add the production environment variables on expo.dev with `eas env:create` from this computer (Supabase URL, anon key, `APP_VARIANT=production`).
 
 ## Idan's manual tasks
 - **Today, security:** remove his own number from Auth → Phone → test numbers (S1); confirm the Email provider is off and rotate the two dev passwords (S2); delete `send-trainer-digest` and `send-reminders` in Edge Functions (S3).
+- Set a monthly spend limit in the Anthropic console (R9's second half).
 - RUNBOOK Part 0: Play account type/date, 15–20 Android testers, Apple Developer enrollment, support email.
 - RUNBOOK 1.1–1.3 before the first store build.
+
+## Store data inventory (audit A, 2026-11-19; source for R13's App Privacy and Data safety answers)
+Not used for tracking or ads. Supabase, SMS4Free, Anthropic and Expo are service providers. Encrypted in transit; deletion in the app (web path = R3). No analytics, crash or ads SDK; no push tokens (local notifications only); no location or contacts.
+| data (store category) | purpose | processor | linked | optional |
+|---|---|---|---|---|
+| Phone number (Contact info) | OTP sign-in, SMS reminders, trainer WhatsApp | Supabase Auth, SMS4Free | yes | required |
+| Name, business name (Name) | app functionality, share card | Supabase | yes | name required |
+| User ID | auth | Supabase | yes | required |
+| Workouts: sets, reps, weights, effort, duration, notes, skip/swap reasons (Fitness) | core | Supabase | yes | required for use |
+| Weight, waist/chest (Health) | progress | Supabase | yes | optional |
+| Intake: goals, injuries, equipment, experience (Health) | plan building | Supabase | yes | optional |
+| Weekly check-in: sleep, energy, soreness, adherence (Health) | progress | Supabase | yes | optional |
+| Progress photos (Photos) | progress | Supabase Storage (private, signed URLs) | yes | optional |
+| Nutrition targets, diet preferences, possibly allergies (Health) | AI plan | Supabase (linked); Anthropic (no name or id sent) | yes / no | optional |
+| AI plan text (Other content) | shown to trainer + client | Supabase; generated by Anthropic | yes | optional |
+| Packages, price, paid flags (Financial → other) | trainer bookkeeping | Supabase | yes | optional |
+| Offline clients' data entered by trainers; client contact phones | client management, reminders | Supabase; SMS4Free | yes | optional |
+| Trainer notes about clients (Other user content) | coaching | Supabase | yes | optional |
+| Consent timestamps, locale, reminder opt-out (App activity) | compliance, settings | Supabase | yes | required |
+| Install id (EAS-Client-ID), platform/runtime headers; IP in auth logs (Device ids / Diagnostics) | OTA delivery, auth security | Expo, Supabase | no | required |
+Also: YouTube/Vimeo embeds (trainer demo videos) load third-party players that see IP and device; say so in the policy.
 
 ## Facts gathered (2026-11-19)
 - Supabase org plan: **free** (no backups; can pause when idle). Region **eu-central-1** (Frankfurt).
 - All 18 public tables have RLS; all 8 views are `security_invoker`; the `progress-photos` bucket is private with correct folder policies (B).
 - No FK is RESTRICT, so deleting any user succeeds. A trainer's deletion also removes the history app clients logged with that trainer; a client's deletion removes the trainer's packages, payments and notes for that client. `client_invites` keeps the trainer-typed label and price (B14). The privacy policy and terms must say so.
 - EAS CLI 27.4 is installed and logged in as `idanrodri` on Idan's computer.
+- Live `trainer_clients` policies: client_read, trainer_delete, trainer_read, trainer_update (no client delete yet → R15).
+- Audit A could not verify (needs a real build): the Gradle-merged manifest and targetSdk 36 (`bundletool dump manifest` on the first AAB), and the real Info.plist's `NSAllowsArbitraryLoads` (introspection shows the fallback template's `true`).
 
 ## Post-launch (moved out of scope)
-- V28 volume milestones (cloud/dev caf978c)
+- V28 volume milestones app code (cloud/dev caf978c; its migration 0039 is already live)
 - V24 revenue per client, CSV export, Hebrew receipt over WhatsApp
 - DB performance migration: `(select auth.uid())` in 37 policies, FK indexes (B20)
 - Share card "שמירה בגלריה"; "רישום האימון" on Home's next-up card; share card opt-in deltas + bigger trainer icon
