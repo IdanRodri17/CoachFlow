@@ -66,8 +66,11 @@ module.exports = defineConfig([
     },
   },
   {
-    // The kit wraps React Native's Pressable, so it alone imports it.
-    files: ["components/ui/index.tsx"],
+    // The kit wraps React Native's Pressable, so it imports it. ErrorScreen
+    // does too: the root error boundary renders outside every provider, so it
+    // avoids the kit, and its Pressable takes a plain object style, which
+    // NativeWind passes through.
+    files: ["components/ui/index.tsx", "components/ui/ErrorScreen.tsx"],
     rules: { "no-restricted-imports": "off" },
   },
 ]);
