@@ -17,6 +17,9 @@
 // session itself and requires profiles.role = 'trainer' — same pattern as
 // supabase/functions/delete-account/index.ts.
 //
+// DAILY CAP: each trainer gets DAILY_CAP calls per Asia/Jerusalem day
+// (consume_ai_call, migration 0040); the next one gets HTTP 429 "daily_limit".
+//
 // SECRETS (set once: `supabase secrets set NAME=value`):
 //   ANTHROPIC_API_KEY — from https://console.anthropic.com/settings/keys.
 //                        Server-side only — never put this in the app bundle.
@@ -30,6 +33,9 @@ import { createClient } from "npm:@supabase/supabase-js@2";
 // it is capped — an unbounded string is both a cost and a prompt-injection
 // surface. Long enough for any real dietary note.
 const MAX_PREFERENCES_LENGTH = 300;
+
+// Per trainer per Israel day; keeps Anthropic spend bounded.
+const DAILY_CAP = 20;
 
 const DISCLAIMER: Record<"he" | "en", string> = {
   he: "כלליות בלבד — לא ייעוץ רפואי או דיאטני",
@@ -107,6 +113,16 @@ Deno.serve(async (req) => {
   ) {
     return json({ error: "calories, protein_g, carbs_g and fat_g must all be numbers." }, 400);
   }
+
+  // Counted only after the request validated, so a bad request costs no
+  // quota. Fail closed: if the check itself fails, no Anthropic call.
+  const { data: allowed, error: usageErr } = await admin.rpc("consume_ai_call", {
+    p_trainer: userData.user.id,
+    p_cap: DAILY_CAP,
+  });
+  if (usageErr) return json({ error: "Usage check failed." }, 500);
+  if (!allowed) return json({ error: "daily_limit" }, 429);
+
   const preferences = body.preferences?.slice(0, MAX_PREFERENCES_LENGTH);
 
   const languageName = locale === "he" ? "Hebrew" : "English";

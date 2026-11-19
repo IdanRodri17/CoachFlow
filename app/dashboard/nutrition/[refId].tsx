@@ -31,7 +31,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toDateString } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
-import { parsePlan } from "@/lib/nutritionPlan";
+import { isDailyLimitError, parsePlan } from "@/lib/nutritionPlan";
 import { useRosterClients } from "@/lib/useRoster";
 import { firstName, formatMoney } from "@/components/home/format";
 import {
@@ -53,6 +53,8 @@ import {
 
 const DIETS = ["vegetarian", "vegan", "kosher", "glutenFree", "lactoseFree", "nutFree"] as const;
 type Diet = (typeof DIETS)[number];
+// Marker error thrown for HTTP 429, rendered as nutritionAi.dailyLimit.
+const DAILY_LIMIT = "daily_limit";
 const MEAL_COUNTS = ["3", "4", "5"] as const;
 type MealCount = (typeof MEAL_COUNTS)[number];
 
@@ -222,7 +224,7 @@ function PlanForm({
       const { data, error } = await supabase.functions.invoke("nutrition-suggest", {
         body: { calories: kcal, protein_g: p, carbs_g: c, fat_g: f, preferences: preferencesText(), locale: i18n.language },
       });
-      if (error) throw error;
+      if (error) throw isDailyLimitError(error) ? new Error(DAILY_LIMIT) : error;
       if (data?.error) throw new Error(data.error);
       return data.plan_markdown as string;
     },
@@ -354,7 +356,9 @@ function PlanForm({
       ) : null}
       {suggest.error ? (
         <AppText size={14} tone="ember">
-          {(suggest.error as Error).message}
+          {(suggest.error as Error).message === DAILY_LIMIT
+            ? t("nutritionAi.dailyLimit")
+            : (suggest.error as Error).message}
         </AppText>
       ) : null}
 

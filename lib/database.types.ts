@@ -733,8 +733,32 @@ export type Database = {
         };
         Relationships: [];
       };
+      // R9 (0040): per-trainer daily AI call counter; service role only.
+      ai_usage: {
+        Row: {
+          trainer_id: string;
+          day: string;
+          calls: number;
+        };
+        Insert: {
+          trainer_id: string;
+          day: string;
+          calls?: number;
+        };
+        Update: {
+          trainer_id?: string;
+          day?: string;
+          calls?: number;
+        };
+        Relationships: [];
+      };
     };
     Functions: {
+      // R9 (0040): counts one AI call for the trainer today; false = cap reached. Service role only.
+      consume_ai_call: {
+        Args: { p_trainer: string; p_cap: number };
+        Returns: boolean;
+      };
       // V4: add a client to the caller-trainer's roster by email.
       // V18b (0020): revoked from every app role — kept only for history.
       add_client_by_email: {

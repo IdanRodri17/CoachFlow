@@ -143,3 +143,10 @@ export function parsePlan(text: string): ParsedPlan {
   });
   return { meals: real, notes };
 }
+
+// supabase-js functions.invoke throws a FunctionsHttpError whose `context` is
+// the Response; nutrition-suggest answers 429 once a trainer's daily cap is hit.
+export function isDailyLimitError(error: unknown): boolean {
+  const status = (error as { context?: { status?: unknown } } | null)?.context?.status;
+  return status === 429;
+}

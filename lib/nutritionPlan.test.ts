@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { parsePlan, shortMealTitle } from "./nutritionPlan";
+import { isDailyLimitError, parsePlan, shortMealTitle } from "./nutritionPlan";
 
 // The shape real saved plans have: blank lines between the name, the food
 // lines and the macro line.
@@ -72,5 +72,16 @@ describe("shortMealTitle", () => {
     expect(shortMealTitle("ארוחת צהריים:")).toBe("צהריים");
     expect(shortMealTitle("**SNACK 2**")).toBe("Snack 2");
     expect(shortMealTitle("Mid-morning")).toBe("Mid-morning");
+  });
+});
+
+describe("isDailyLimitError", () => {
+  it("is true for a 429 response", () => {
+    expect(isDailyLimitError({ context: { status: 429 } })).toBe(true);
+  });
+  it("is false for other statuses, plain errors and null", () => {
+    expect(isDailyLimitError({ context: { status: 500 } })).toBe(false);
+    expect(isDailyLimitError(new Error("x"))).toBe(false);
+    expect(isDailyLimitError(null)).toBe(false);
   });
 });

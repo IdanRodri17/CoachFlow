@@ -868,6 +868,7 @@
   },
   "nutritionAi": {
     "title": "Nutrition plan",
+    "dailyLimit": "You've reached today's limit of AI meal plans. Try again tomorrow.",
     "targetsTitle": "Daily targets",
     "calories": "Calories",
     "macroHintClose": "The macros come to {{kcal}} kcal — close to the target.",
