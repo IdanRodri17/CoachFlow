@@ -14,7 +14,7 @@ Merged from the cloud session's final report (it checked each item against cloud
 | # | id | problem | where | type | state |
 |---|----|---------|-------|------|-------|
 | 1 | CF1 | Phone check of the layout fix: the "+" circle, rows side by side, swipe actions (incl. the Hebrew swipe direction, never checked on a phone) | tab bar, מתאמנים, תרגילים, תבניות, לוח זמנים | JS | **Idan:** smoke steps 1–7 and 9 below |
-| 2 | CF2 | Unticking someone in a group session leaves their package one session too many used; re-ticking counts it twice | group attendance | live | 0043 committed (3c3ac7d), **not applied**; dry-run then apply with Idan's OK |
+| 2 | CF2 | Unticking someone in a group session leaves their package one session too many used; re-ticking counts it twice | group attendance | live | ✅ **0043 live 2026-11-20** (3c3ac7d); in-app check: untick someone on a group sheet, the package gets the session back |
 | 3 | U1 | Packages already miscounted by past unticks aren't corrected | client card → package | live data | after 0043: count mismatched packages (aggregates only), show Idan, fix only with his OK |
 | 4 | R2 | Deleting an account leaves progress photos on the server | Profile → delete account | live | code ✅ 9c5eed1; deploy delete-account (OK'd 2026-11-20, not done) |
 | 5 | C5, C6 | A deleted or wrong item opens a raw error | detail screens | JS | todo (batch 2) |
@@ -59,7 +59,7 @@ Merged from the cloud session's final report (it checked each item against cloud
 | S3 | Live `send-trainer-digest` and `send-reminders` accept any app JWT (deployed versions predate the cron gate); unused since email was dropped (B3, B6) | security · live | P1 | Idan | both deleted in Supabase → Edge Functions | **Idan** |
 | S4 | SMS abuse: random Israeli numbers cost an SMS each; one IP can exhaust the hourly SMS quota and block logins (B4) | security · live | P1 | Idan | Auth rate limits sized; SMS4Free balance alert; CAPTCHA later | todo |
 | R9 | nutrition-suggest daily cap per trainer: `ai_usage` + `consume_ai_call` (service role only), 20/day/Israel day, 429 `daily_limit`, fail closed; translated message; Anthropic spend limit (B5) | release · live+JS | P1 | implementer | 21st call in a day gets 429 | ✅ 2a7d0ae · **live 2026-11-20**: 0040 applied, nutrition-suggest v6 (verify_jwt true) · ✅ verified end to end (one plan from the app; `count(*)` on ai_usage = 1) · header comment line 5 still says "never touches the database" (fix with the next function change) |
-| CF2 | cloud/dev 18139dd: unticking a group session gives it back to the package (trigger 0043 + a comment in `app/group/[groupId].tsx`) | bug · live+JS | P1 | other local session | used_sessions goes back down on untick | ✅ 3c3ac7d (patch identical to 18139dd) · **0043 not applied** (Idan OKs it in the cloud chat). Live check: `trg_increment_used_sessions` is AFTER UPDATE FOR EACH ROW with no WHEN, and its body matches 0043's "+1" branch, so 0043 only adds the give-back |
+| CF2 | cloud/dev 18139dd: unticking a group session gives it back to the package (trigger 0043 + a comment in `app/group/[groupId].tsx`) | bug · live+JS | P1 | other local session | used_sessions goes back down on untick | ✅ 3c3ac7d (patch identical to 18139dd) · **0043 applied 2026-11-20** (Idan's OK in the united session). Live check: `trg_increment_used_sessions` is AFTER UPDATE FOR EACH ROW with no WHEN, and its body matches 0043's "+1" branch, so 0043 only adds the give-back |
 | R15 | A client can leave a trainer (withdraw consent): delete policy on `trainer_clients` + "Leave trainer" action (B7) | privacy · live+JS | P1 | implementer | client unlinks; trainer loses read access | todo (migration 0041) |
 | A9 | Delete-account confirm mentions "messages" (none exist) and doesn't tell a trainer it also wipes app clients' workout history with them and all offline clients' records and photos (B14) | release · JS | P1 | implementer | role-specific `deleteAccountMessage` (he/en) | todo (batch R8+A3+A9) |
 | A11 | Minimum age stated nowhere (Play target audience, Apple age rating; clients upload body photos) | decision | P1 | Idan | age in terms consent + Terms; Play target audience | **decided 2026-11-20: 13+** · lead's note: say in the Terms that 13–17 need a parent's or guardian's consent (health data + body photos); Play target audience 13–15, 16–17, 18+ (no under-13, so no Families policy) |
@@ -97,7 +97,7 @@ When release work resumes, in this order:
 4. R1 + R3: store-writer drafts the he/en privacy, terms and deletion pages for GitHub Pages (`coachflow-site`); implementer adds `lib/legal.ts` and the links once Idan has the repo URL and the CoachFlow Gmail.
 5. R15 (0041), A10 seed SQL, then batch 2 (C5–C14).
 - ~~Ask Idan for the cloud chat's remaining bug list~~ Merged 2026-11-20 into "Now: bugs and UI/UX" at the top.
-- 0043 (CF2, the group untick fix) is committed but not applied; Idan OKs it in this session now (the cloud session is retired). Dry-run first.
+- ~~0043 (CF2, the group untick fix)~~ Applied 2026-11-20 after a rolled-back dry run (see "Migrations").
 - Two local sessions shared this folder on 2026-11-19/20 and handed changes back and forth cleanly. Before editing, check `git status` for files you didn't touch.
 - Idan's deployment lessons (written 2026-11-19, private artifact): https://claude.ai/artifact/EQso9No98gJD2jLQziwbA4
 
@@ -145,11 +145,11 @@ Result so far: step 8 passed on 2026-11-20 (with the cap live; `ai_usage` count 
 - RUNBOOK recommends GitHub Pages in a separate public repo for the legal pages.
 
 ## Migrations to apply, in order
-Live through 0040.
+Live: 0001–0040 and 0043. Planned and not applied: 0041, 0042.
 - ✅ **0040 `ai_usage`** (R9), applied 2026-11-20 as `0040_ai_usage`. Dry runs ✓ 2026-11-19 and 2026-11-20 (rolled back): FK rejects unknown ids; calls 1–2 of cap 2 → true, 3–4 → false with the counter staying at 2; a second trainer counted separately; `authenticated` and `anon` denied execute, select and insert; nothing persisted. After the apply: RLS on, service_role can execute, app roles have no privileges, 0 rows. Advisors: one new INFO `rls_enabled_no_policy` on ai_usage (intended); no new WARN.
 1. 0041 `trainer_clients` client delete policy (R15) — planned.
 2. 0042 `ai_reports` (R8) — planned.
-3. 0043 `uncomplete_returns_session` (CF2, cherry-picked as 3c3ac7d) — file committed; Idan OKs applying it in this session. Dry-run it like 0040 first.
+- ✅ **0043 `uncomplete_returns_session`** (CF2, cherry-picked as 3c3ac7d), applied 2026-11-20 as `0043_uncomplete_returns_session` (version 20261120144744). Dry run (rolled back; throwaway trainer, app client and offline client inserted with FK checks off, then updates through RLS and the guard triggers as `authenticated` with each one's JWT sub): tick → 1; paid and notes changes → still 1; untick → 0; re-tick → 1 (not 2); untick after a package reset → stays 0; offline client tick/untick → 1/0; a client completing their own workout → counted; a client unticking → still refused by `prevent_client_reschedule`; app roles can't execute the function. Nothing persisted. After the apply, the live body equals the file; advisors unchanged (no new findings). 0041 and 0042 are still unapplied, so the live DB now skips those two numbers until they land.
 
 ## Live changes (OK'd by Idan 2026-11-20, decision 12)
 1. ✅ Apply 0040, then deploy `nutrition-suggest`: done 2026-11-20 and verified (one plan from the app; `ai_usage` count = 1).
