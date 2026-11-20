@@ -17,7 +17,7 @@
 // day, client and workout can't change.
 
 import { useState } from "react";
-import { ActivityIndicator, Alert, ScrollView, View } from "react-native";
+import { Alert, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -25,6 +25,8 @@ import Dumbbell from "lucide-react-native/icons/dumbbell";
 import Eye from "lucide-react-native/icons/eye";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError, screenError } from "@/lib/friendlyError";
+import { ScreenLoading, ScreenMessage } from "@/components/ui/ScreenState";
 import { RoleGate } from "@/components/RoleGate";
 import { AppText, Button, Card, Chip, colors, ListCard, ListRow, Sheet } from "@/components/ui";
 import { longDate } from "@/components/home/format";
@@ -128,6 +130,7 @@ function EditScheduleScreenBody() {
   });
 
   const updateMutation = useMutation({
+    meta: { inlineError: true },
     mutationFn: async ({ payload, seriesPatch }: { payload: SchedulePayload; seriesPatch: SeriesPatch | null }) => {
       let client_id: string | null = null;
       let managed_client_id: string | null = null;
@@ -169,6 +172,7 @@ function EditScheduleScreenBody() {
   });
 
   const deleteMutation = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (scope: "one" | "future") => {
       if (scope === "future" && workout.data) {
         await deleteFromSeries(supabase, workout.data.row);
@@ -199,7 +203,10 @@ function EditScheduleScreenBody() {
   }
 
   async function submit(payload: SchedulePayload) {
-    const row = workout.data!.row;
+    // C6: the form only renders with data, but a refetch can drop it (the row
+    // was deleted elsewhere) while a press is in flight.
+    const row = workout.data?.row;
+    if (!row) return;
     const patch = changedSeriesFields(row, {
       scheduled_time: payload.time,
       template_id: payload.templateId,
@@ -212,7 +219,9 @@ function EditScheduleScreenBody() {
   }
 
   async function confirmDelete() {
-    const siblings = await siblingCount(workout.data!.row);
+    const row = workout.data?.row;
+    if (!row) return;
+    const siblings = await siblingCount(row);
     if (siblings > 0) {
       setAsk({ action: "delete", count: siblings + 1 });
       return;
@@ -231,28 +240,25 @@ function EditScheduleScreenBody() {
     else updateMutation.mutate({ payload: current.payload, seriesPatch: scope === "future" ? current.patch : null });
   }
 
-  if (workout.isLoading || roster.isLoading || templates.isLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.chalk }}>
-        <ActivityIndicator color={colors.ink} />
-      </View>
-    );
-  }
+  if (workout.isLoading || roster.isLoading || templates.isLoading) return <ScreenLoading />;
 
   if (workout.error || !workout.data) {
+    const s = screenError(workout.error, t, t("schedule.detail.workoutNotFound"));
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.chalk }}>
-        <AppText size={14} tone="ember" center>
-          {workout.error ? (workout.error as Error).message : t("schedule.detail.workoutNotFound")}
-        </AppText>
-      </View>
+      <ScreenMessage
+        message={s.message}
+        onRetry={s.canRetry ? () => void workout.refetch() : undefined}
+        fallbackHref="/schedule"
+      />
     );
   }
 
   const rawError = (updateMutation.error ?? deleteMutation.error) as Error | null;
-  const mutationError = rawError?.message.includes("completed_workout_locked")
-    ? t("schedule.detail.completedLocked")
-    : rawError?.message;
+  const mutationError = rawError
+    ? rawError.message.includes("completed_workout_locked")
+      ? t("schedule.detail.completedLocked")
+      : friendlyError(rawError, t)
+    : undefined;
   // V17 (Step 7): the trainer logs an offline client's workout themselves,
   // and can open any completed one (the read-only view below). An app
   // client's open workout is logged from the client's own phone, so it gets

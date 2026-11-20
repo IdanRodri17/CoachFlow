@@ -27,6 +27,7 @@ import Plus from "lucide-react-native/icons/plus";
 import Zap from "lucide-react-native/icons/zap";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/lib/supabase";
 import { todayISO, weekStartOf } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
@@ -120,6 +121,7 @@ function WeighInForm({
   }
 
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       let photoPath: string | null = null;
       if (photo) {
@@ -248,7 +250,7 @@ function WeighInForm({
 
       {error || save.error ? (
         <AppText size={14} tone="ember">
-          {error ?? (save.error as Error).message}
+          {error ?? friendlyError(save.error, t)}
         </AppText>
       ) : null}
       <Button label={t("progress.save")} size={52} block loading={save.isPending} onPress={submit} />
@@ -324,6 +326,7 @@ function CheckinForm({
   const [note, setNote] = useState(current?.note ?? "");
 
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       const row = { ...values, note: note.trim() === "" ? null : note.trim() };
       // One per week (check_ins_managed_week_key): this week's row is edited.
@@ -394,7 +397,7 @@ function CheckinForm({
       />
       {save.error ? (
         <AppText size={14} tone="ember">
-          {(save.error as Error).message}
+          {friendlyError(save.error, t)}
         </AppText>
       ) : null}
       <Button label={t("progress.save")} size={52} block loading={save.isPending} onPress={() => save.mutate()} />

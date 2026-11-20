@@ -61,7 +61,8 @@
   "profile": {
     "nutritionPlanNoneYet": "Your trainer hasn't shared a nutrition plan yet.",
     "deleteAccountTitle": "Delete account",
-    "deleteAccountMessage": "This permanently deletes your account and all of its data — workouts, progress, messages, everything. This can't be undone."
+    "deleteAccountMessageTrainer": "This permanently deletes your account and everything in it: your client list, your clients without the app with all their records and photos, schedules, templates, packages and payments. Clients with the app keep their accounts, but the workouts they logged with you are deleted too. This can't be undone.",
+    "deleteAccountMessageClient": "This permanently deletes your account and everything in it: workouts, progress, photos and weekly check-ins. Your trainer's package, payments and notes for you are deleted too. This can't be undone."
   },
   "exercises": {
     "list": {
@@ -1019,6 +1020,9 @@
     "title": "Something went wrong",
     "body": "An error occurred. You can try again.",
     "retry": "Try again",
-    "profileBody": "Can't reach CoachFlow right now. Check the connection and try again."
+    "profileBody": "Can't reach CoachFlow right now. Check the connection and try again.",
+    "offline": "No internet connection. Check the connection and try again.",
+    "notFound": "This item no longer exists.",
+    "notAllowed": "You don't have permission to do this."
   }
 }

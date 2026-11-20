@@ -43,6 +43,8 @@ import UserPlus from "lucide-react-native/icons/user-plus";
 import X from "lucide-react-native/icons/x";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
+import { InlineError } from "@/components/ui/ScreenState";
 import { attentionQuery, owedQuery } from "@/lib/queries";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
@@ -281,11 +283,7 @@ function ClientsScreenBody() {
           ))}
         </ScrollView>
 
-        {roster.error ? (
-          <AppText size={14} tone="ember">
-            {(roster.error as Error).message}
-          </AppText>
-        ) : null}
+        {roster.error ? <InlineError message={friendlyError(roster.error, t)} onRetry={() => void roster.refetch()} /> : null}
 
         {shown.length > 0 ? (
           <ListCard>
@@ -587,7 +585,7 @@ function AddClientForm({ onDone }: { onDone: () => void }) {
       );
       onDone();
     },
-    onError: (e) => setError((e as Error).message),
+    onError: (e) => setError(friendlyError(e, t)),
   });
 
   const addOffline = useMutation({
@@ -616,7 +614,7 @@ function AddClientForm({ onDone }: { onDone: () => void }) {
       onDone();
       router.push(`/dashboard/${id}?kind=managed`);
     },
-    onError: (e) => setError((e as Error).message),
+    onError: (e) => setError(friendlyError(e, t)),
   });
 
   const busy = invite.isPending || addOffline.isPending;

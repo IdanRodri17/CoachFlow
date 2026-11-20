@@ -17,6 +17,7 @@ import { useTranslation } from "react-i18next";
 import { randomUUID } from "expo-crypto";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -65,6 +66,7 @@ function NewScheduleScreenBody() {
   });
 
   const mutation = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (payload: SchedulePayload) => {
       // Resolve the client once (creating an offline client if a name was typed).
       let client_id: string | null = null;
@@ -130,7 +132,7 @@ function NewScheduleScreenBody() {
       loadingTemplates={templates.isLoading}
       submitLabel={t("schedule.form.assignWorkout")}
       submitting={mutation.isPending}
-      errorMessage={mutation.error ? (mutation.error as Error).message : null}
+      errorMessage={mutation.error ? friendlyError(mutation.error, t) : null}
       onSubmit={(payload) => mutation.mutate(payload)}
       initial={
         templateId || date || client ? { templateId: templateId ?? null, date, time: time ?? null, client } : undefined

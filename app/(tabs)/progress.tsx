@@ -40,6 +40,7 @@ import Trophy from "lucide-react-native/icons/trophy";
 import Zap from "lucide-react-native/icons/zap";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { clientStreakQuery } from "@/lib/queries";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
@@ -147,6 +148,7 @@ function ProgressScreenBody() {
   });
 
   const submitCheckin = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       const { error: e } = await supabase.from("check_ins").insert({
         client_id: clientId,
@@ -265,6 +267,7 @@ function ProgressScreenBody() {
   }
 
   const addEntry = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       let photoPath: string | null = null;
       if (photo) {
@@ -407,7 +410,7 @@ function ProgressScreenBody() {
             />
             {submitCheckin.error ? (
               <AppText size={14} tone="ember">
-                {(submitCheckin.error as Error).message}
+                {friendlyError(submitCheckin.error, t)}
               </AppText>
             ) : null}
             <Button label={t("checkin.send")} size={52} block loading={submitCheckin.isPending} onPress={() => submitCheckin.mutate()} />
@@ -494,7 +497,7 @@ function ProgressScreenBody() {
         {photo ? <Image source={{ uri: photo.uri }} style={{ width: 56, height: 56, borderRadius: 12 }} /> : null}
         {error || addEntry.error ? (
           <AppText size={14} tone="ember">
-            {error ?? (addEntry.error as Error).message}
+            {error ?? friendlyError(addEntry.error, t)}
           </AppText>
         ) : null}
       </Card>
@@ -541,7 +544,9 @@ function ProgressScreenBody() {
             </AppText>
             <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 8 }}>
               {photos.map((e) => {
-                const url = progress.data!.signed.get(e.photo_url!)!;
+                // C14: photos is already filtered to signed ones; never render an empty uri.
+                const url = e.photo_url ? progress.data?.signed.get(e.photo_url) : undefined;
+                if (!url) return null;
                 return (
                   <Pressable key={e.id} accessibilityRole="imagebutton" onPress={() => setViewing(url)}>
                     <Image source={{ uri: url }} style={{ width: 64, height: 64, borderRadius: 12 }} />

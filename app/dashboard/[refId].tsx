@@ -51,6 +51,8 @@ import Trash from "lucide-react-native/icons/trash";
 import Zap from "lucide-react-native/icons/zap";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError, screenError } from "@/lib/friendlyError";
+import { ScreenLoading, ScreenMessage } from "@/components/ui/ScreenState";
 import { clientContextQuery, owedQuery, type ClientContext } from "@/lib/queries";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
@@ -428,6 +430,7 @@ function ClientCardBody() {
 
   // Offline clients: the trainer marks today's (or the overdue) session done.
   const markComplete = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (scheduledWorkoutId: string) => {
       const { error } = await supabase.from("scheduled_workouts").update({ status: "completed" }).eq("id", scheduledWorkoutId);
       if (error) throw error;
@@ -472,6 +475,7 @@ function ClientCardBody() {
 
   const [newNote, setNewNote] = useState("");
   const addNote = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (body: string) => {
       const { error } = await supabase.from("client_notes").insert({ trainer_id: trainerId, client_id: refId, body });
       if (error) throw error;
@@ -482,20 +486,15 @@ function ClientCardBody() {
     },
   });
 
-  if (detail.isLoading) {
-    return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.chalk }}>
-        <ActivityIndicator color={colors.ink} />
-      </View>
-    );
-  }
+  if (detail.isLoading) return <ScreenLoading />;
   if (detail.error || !detail.data) {
+    const s = screenError(detail.error, t, t("clientCard.notFound"));
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", backgroundColor: colors.chalk, padding: 24 }}>
-        <AppText size={14} tone="ember" center>
-          {detail.error ? (detail.error as Error).message : t("clientCard.notFound")}
-        </AppText>
-      </View>
+      <ScreenMessage
+        message={s.message}
+        onRetry={s.canRetry ? () => void detail.refetch() : undefined}
+        fallbackHref="/clients"
+      />
     );
   }
 
@@ -643,7 +642,7 @@ function ClientCardBody() {
           ) : null}
           {markComplete.error ? (
             <AppText size={14} tone="ember">
-              {(markComplete.error as Error).message}
+              {friendlyError(markComplete.error, t)}
             </AppText>
           ) : null}
 
@@ -703,7 +702,7 @@ function ClientCardBody() {
               value={newNote}
               onChange={setNewNote}
               adding={addNote.isPending}
-              error={addNote.error ? (addNote.error as Error).message : null}
+              error={addNote.error ? friendlyError(addNote.error, t) : null}
               onAdd={() => addNote.mutate(newNote.trim())}
               onAll={() => setTab("notes")}
             />
@@ -734,7 +733,7 @@ function ClientCardBody() {
           />
           {addNote.error ? (
             <AppText size={14} tone="ember">
-              {(addNote.error as Error).message}
+              {friendlyError(addNote.error, t)}
             </AppText>
           ) : null}
           <NotesLog refId={refId} notes={notes.data ?? []} loading={notes.isLoading} />
@@ -969,6 +968,7 @@ function PackageForm({
   const priceN = parseTypedNumber(price);
 
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       const patch: { total_sessions?: number; price_per_session?: number } = {};
       if (sizeN != null) patch.total_sessions = Math.round(sizeN);
@@ -1033,7 +1033,7 @@ function PackageForm({
       ) : null}
       {save.error ? (
         <AppText size={14} tone="ember">
-          {(save.error as Error).message}
+          {friendlyError(save.error, t)}
         </AppText>
       ) : null}
       <Button
@@ -1383,6 +1383,7 @@ function NotesLog({ refId, notes, loading }: { refId: string; notes: ClientNote[
   const [body, setBody] = useState("");
 
   const update = useMutation({
+    meta: { inlineError: true },
     mutationFn: async ({ id, text }: { id: string; text: string }) => {
       const { error } = await supabase.from("client_notes").update({ body: text }).eq("id", id);
       if (error) throw error;
@@ -1438,7 +1439,7 @@ function NotesLog({ refId, notes, loading }: { refId: string; notes: ClientNote[
               </View>
               {update.error ? (
                 <AppText size={14} tone="ember">
-                  {(update.error as Error).message}
+                  {friendlyError(update.error, t)}
                 </AppText>
               ) : null}
             </View>

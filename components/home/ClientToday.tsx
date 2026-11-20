@@ -40,6 +40,7 @@ import Users from "lucide-react-native/icons/users";
 import UserPlus from "lucide-react-native/icons/user-plus";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { addDays, todayISO, weekStartOf } from "@/lib/dates";
@@ -62,6 +63,7 @@ import {
   type IconComponent,
   Pressable,
 } from "@/components/ui";
+import { InlineError } from "@/components/ui/ScreenState";
 
 import { firstName, greetingKey, longDate, shortDate, weekdayLetter } from "./format";
 
@@ -213,6 +215,7 @@ export function ClientToday() {
     qk.templates.all,
     qk.workout.open(clientId),
   ]);
+  const loadError = upcoming.error ?? week.error ?? trainerLinks.error ?? pkg.error ?? streak.error;
 
   return (
     <ScrollView
@@ -231,6 +234,9 @@ export function ClientToday() {
           </AppText>
         ) : null}
       </View>
+
+      {/* C10: without this a failed load looked like a day with nothing on it. */}
+      {loadError ? <InlineError message={friendlyError(loadError, t)} onRetry={() => void refresh.onRefresh()} /> : null}
 
       {openWorkout ? (
         <ResumeCard item={openWorkout} onPress={() => router.push(`/workout/${openWorkout.scheduledId}`)} />

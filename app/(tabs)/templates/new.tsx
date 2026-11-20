@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -29,6 +30,7 @@ function NewTemplateScreenBody() {
 
 
   const mutation = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (input: TemplateInput) => {
       // 1) Create the template and get its id.
       const { data: template, error: tErr } = await supabase
@@ -66,7 +68,7 @@ function NewTemplateScreenBody() {
     <TemplateBuilder
       submitLabel={t("templates.form.createTemplate")}
       submitting={mutation.isPending}
-      errorMessage={mutation.error ? (mutation.error as Error).message : null}
+      errorMessage={mutation.error ? friendlyError(mutation.error, t) : null}
       onSubmit={(input) => mutation.mutate(input)}
     />
   );

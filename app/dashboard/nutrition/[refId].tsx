@@ -26,6 +26,8 @@ import Share from "lucide-react-native/icons/share";
 import Sparkles from "lucide-react-native/icons/sparkles";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
+import { InlineError } from "@/components/ui/ScreenState";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -132,11 +134,7 @@ function TrainerNutritionBody() {
         <View style={{ width: 44 }} />
       </View>
 
-      {latest.error ? (
-        <AppText size={14} tone="ember">
-          {(latest.error as Error).message}
-        </AppText>
-      ) : null}
+      {latest.error ? <InlineError message={friendlyError(latest.error, t)} onRetry={() => void latest.refetch()} /> : null}
 
       {/* Rendered once the last plan is known, so its targets pre-fill the form. */}
       {latest.isSuccess ? (
@@ -220,6 +218,7 @@ function PlanForm({
       .join(". ");
 
   const suggest = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       const { data, error } = await supabase.functions.invoke("nutrition-suggest", {
         body: { calories: kcal, protein_g: p, carbs_g: c, fat_g: f, preferences: preferencesText(), locale: i18n.language },
@@ -232,6 +231,7 @@ function PlanForm({
   });
 
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       if (!suggestion) return;
       const targets = {
@@ -358,7 +358,7 @@ function PlanForm({
         <AppText size={14} tone="ember">
           {(suggest.error as Error).message === DAILY_LIMIT
             ? t("nutritionAi.dailyLimit")
-            : (suggest.error as Error).message}
+            : friendlyError(suggest.error, t)}
         </AppText>
       ) : null}
 
@@ -405,7 +405,7 @@ function PlanForm({
               />
               {save.error ? (
                 <AppText size={14} tone="ember">
-                  {(save.error as Error).message}
+                  {friendlyError(save.error, t)}
                 </AppText>
               ) : null}
             </View>

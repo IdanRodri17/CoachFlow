@@ -8,6 +8,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -30,6 +31,7 @@ function NewExerciseScreenBody() {
   // Only trainers create exercises; clients shouldn't reach here.
 
   const mutation = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (input: ExerciseInput) => {
       const { error } = await supabase
         .from("exercises")
@@ -46,7 +48,7 @@ function NewExerciseScreenBody() {
     <ExerciseForm
       submitLabel={t("exercises.form.createExercise")}
       submitting={mutation.isPending}
-      errorMessage={mutation.error ? (mutation.error as Error).message : null}
+      errorMessage={mutation.error ? friendlyError(mutation.error, t) : null}
       onSubmit={(input) => mutation.mutate(input)}
     />
   );

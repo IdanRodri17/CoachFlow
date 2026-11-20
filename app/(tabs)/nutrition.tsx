@@ -21,6 +21,8 @@ import Info from "lucide-react-native/icons/info";
 import MessageCircle from "lucide-react-native/icons/message-circle";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
+import { InlineError } from "@/components/ui/ScreenState";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -90,11 +92,7 @@ function NutritionScreenBody() {
         ) : null}
       </View>
 
-      {nutritionPlan.error ? (
-        <AppText size={14} tone="ember">
-          {(nutritionPlan.error as Error).message}
-        </AppText>
-      ) : null}
+      {nutritionPlan.error ? <InlineError message={friendlyError(nutritionPlan.error, t)} onRetry={() => void nutritionPlan.refetch()} /> : null}
 
       {plan ? (
         <>

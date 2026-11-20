@@ -20,6 +20,7 @@ import { useMutation } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/friendlyError";
 import { useAuth } from "@/lib/auth";
 import {
   AppText,
@@ -53,6 +54,7 @@ export default function IntakeScreen() {
   const [experience, setExperience] = useState<Experience | null>(null);
 
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (skip: boolean) => {
       const intake: Record<string, string> = {};
       if (!skip) {
@@ -190,7 +192,7 @@ export default function IntakeScreen() {
 
           {save.error ? (
             <AppText size={14} tone="ember">
-              {(save.error as Error).message}
+              {friendlyError(save.error, t)}
             </AppText>
           ) : null}
 

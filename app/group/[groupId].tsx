@@ -23,6 +23,8 @@ import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import User from "lucide-react-native/icons/user";
 
 import { qk } from "@/lib/queryKeys";
+import { errorKind, friendlyError } from "@/lib/friendlyError";
+import { InlineError } from "@/components/ui/ScreenState";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -93,6 +95,7 @@ function GroupAttendanceBody() {
     queryClient.invalidateQueries({ queryKey: qk.clientContext.all });
   };
   const setPresent = useMutation({
+    meta: { inlineError: true },
     mutationFn: async ({ id, present }: { id: string; present: boolean }) => {
       const { error } = await supabase
         .from("scheduled_workouts")
@@ -103,6 +106,7 @@ function GroupAttendanceBody() {
     onSuccess: afterChange,
   });
   const markAll = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       const { error } = await supabase
         .from("scheduled_workouts")
@@ -115,6 +119,7 @@ function GroupAttendanceBody() {
     onSuccess: afterChange,
   });
   const togglePaid = useMutation({
+    meta: { inlineError: true },
     mutationFn: async ({ id, paid }: { id: string; paid: boolean }) => {
       const { error } = await supabase.from("scheduled_workouts").update({ paid }).eq("id", id);
       if (error) throw error;
@@ -159,9 +164,13 @@ function GroupAttendanceBody() {
       </View>
 
       {group.error || !lead ? (
-        <AppText size={14} tone="ember">
-          {group.error ? (group.error as Error).message : t("group.notFound")}
-        </AppText>
+        group.error && errorKind(group.error) !== "notFound" ? (
+          <InlineError message={friendlyError(group.error, t)} onRetry={() => void group.refetch()} />
+        ) : (
+          <AppText size={14} tone="graphite">
+            {t("group.notFound")}
+          </AppText>
+        )
       ) : (
         <>
           <View style={{ gap: 8 }}>
@@ -207,7 +216,7 @@ function GroupAttendanceBody() {
 
           {mutationError ? (
             <AppText size={14} tone="ember">
-              {(mutationError as Error).message}
+              {friendlyError(mutationError, t)}
             </AppText>
           ) : null}
 

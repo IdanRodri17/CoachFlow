@@ -21,6 +21,8 @@ import Plus from "lucide-react-native/icons/plus";
 import Search from "lucide-react-native/icons/search";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
+import { InlineError } from "@/components/ui/ScreenState";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { ltr } from "@/lib/i18n";
@@ -48,7 +50,7 @@ export default function ExercisesListScreen() {
   const [search, setSearch] = useState("");
   const [muscle, setMuscle] = useState<string | null>(null);
 
-  const { data, error, isSuccess } = useQuery({
+  const { data, error, isSuccess, refetch } = useQuery({
     queryKey: qk.exercises.list,
     queryFn: async () => {
       const { data, error } = await supabase.from("exercises").select("*").order("name");
@@ -128,11 +130,7 @@ export default function ExercisesListScreen() {
       </ScrollView>
 
       <View style={{ paddingHorizontal: 20 }}>
-        {error ? (
-          <AppText size={14} tone="ember">
-            {(error as Error).message}
-          </AppText>
-        ) : null}
+        {error ? <InlineError message={friendlyError(error, t)} onRetry={() => void refetch()} /> : null}
 
         {shown.length > 0 ? (
           <ListCard>

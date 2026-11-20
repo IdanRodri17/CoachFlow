@@ -26,6 +26,7 @@ import Ticket from "lucide-react-native/icons/ticket";
 import User from "lucide-react-native/icons/user";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
@@ -48,6 +49,7 @@ import {
   Num,
   Pressable,
 } from "@/components/ui";
+import { InlineError } from "@/components/ui/ScreenState";
 
 import { clientContextQuery, todaySessionsQuery, type TodaySession } from "@/lib/queries";
 
@@ -140,6 +142,7 @@ export function TrainerHome() {
     qk.clientContext.all,
     qk.templates.all,
   ]);
+  const loadError = todays.error ?? roster.error ?? money.error;
 
   return (
     <ScrollView
@@ -164,6 +167,9 @@ export function TrainerHome() {
           <Avatar id={trainerId} name={profile?.display_name ?? "?"} size={48} />
         </Pressable>
       </View>
+
+      {/* C9: without this a failed load looked like an empty day. */}
+      {loadError ? <InlineError message={friendlyError(loadError, t)} onRetry={() => void refresh.onRefresh()} /> : null}
 
       {next ? (
         <NextUpCard

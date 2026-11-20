@@ -6,12 +6,14 @@
 // added/removed rows. Also supports deleting the whole template.
 // D29a: the loading / error states and the delete button use the kit.
 
-import { Alert, View } from "react-native";
+import { Alert } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError, screenError } from "@/lib/friendlyError";
+import { ScreenLoading, ScreenMessage } from "@/components/ui/ScreenState";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import {
@@ -19,7 +21,7 @@ import {
   type TemplateBuilderInitial,
   type TemplateInput,
 } from "@/components/TemplateBuilder";
-import { AppText, Button, colors } from "@/components/ui";
+import { Button } from "@/components/ui";
 
 export default function EditTemplateScreen() {
   return (
@@ -39,7 +41,7 @@ function EditTemplateScreenBody() {
   const exerciseFallback = t("templates.detail.exerciseFallback");
 
   // Load the template, its exercises (ordered), and the exercise names.
-  const { data, isLoading, error } = useQuery({
+  const { data, isLoading, error, refetch } = useQuery({
     queryKey: qk.templates.one(id),
     queryFn: async (): Promise<TemplateBuilderInitial> => {
       const { data: tpl, error: tErr } = await supabase
@@ -85,6 +87,7 @@ function EditTemplateScreenBody() {
   });
 
   const updateMutation = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (input: TemplateInput) => {
       const { error: tErr } = await supabase
         .from("workout_templates")
@@ -136,16 +139,11 @@ function EditTemplateScreenBody() {
     ]);
   }
 
-  if (isLoading) return <View style={{ flex: 1, backgroundColor: colors.chalk }} />;
+  if (isLoading) return <ScreenLoading />;
 
   if (error || !data) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.chalk, alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <AppText size={14} tone="ember" center>
-          {error ? (error as Error).message : t("templates.detail.notFound")}
-        </AppText>
-      </View>
-    );
+    const s = screenError(error, t, t("templates.detail.notFound"));
+    return <ScreenMessage message={s.message} onRetry={s.canRetry ? () => void refetch() : undefined} />;
   }
 
   return (
@@ -153,7 +151,7 @@ function EditTemplateScreenBody() {
       initial={data}
       submitLabel={t("templates.detail.saveChanges")}
       submitting={updateMutation.isPending}
-      errorMessage={updateMutation.error ? (updateMutation.error as Error).message : null}
+      errorMessage={updateMutation.error ? friendlyError(updateMutation.error, t) : null}
       onSubmit={(input) => updateMutation.mutate(input)}
       footer={
         <Button

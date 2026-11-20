@@ -19,6 +19,7 @@ import ClipboardList from "lucide-react-native/icons/clipboard-list";
 import Dumbbell from "lucide-react-native/icons/dumbbell";
 
 import { supabase } from "@/lib/supabase";
+import { friendlyError } from "@/lib/friendlyError";
 import { profileComplete, useAuth } from "@/lib/auth";
 import {
   AppText,
@@ -70,7 +71,7 @@ export default function OnboardingScreen() {
     });
     if (error) {
       setBusy(false);
-      setError(error.message);
+      setError(friendlyError(error, t));
       return;
     }
     // Refresh the cached profile so profileComplete() flips true -> guards route on.

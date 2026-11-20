@@ -38,12 +38,22 @@
 // V19: the same for the network. TanStack's onlineManager follows NetInfo, so
 // queries that failed or went stale while the phone was offline (the gym's
 // basement) refetch as soon as the connection is back.
+//
+// C7/C8 (release audit): a failed save or delete used to vanish. Offline,
+// TanStack paused the mutation (networkMode "online"), so the button just
+// waited; online, a mutation without onError failed silently. Now mutations
+// run whatever the network says ("always") and fail fast with "no
+// connection", and the MutationCache shows a translated alert for any failure
+// the mutation doesn't handle itself: no onError of its own, and no
+// meta.inlineError (the screen already prints mutation.error, through
+// friendlyError). Queries keep "online": they wait and refetch on reconnect.
 
 import "../global.css";
-import "@/lib/i18n";
+// lib/i18n first, for its side effect; the named imports ride along.
+import i18next, { layoutDirection, restoreSavedLocale } from "@/lib/i18n";
 
 import { useEffect } from "react";
-import { AppState, Platform, View } from "react-native";
+import { Alert, AppState, Platform, View } from "react-native";
 import { LocaleProvider, Stack } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
@@ -56,11 +66,11 @@ import { IBMPlexSansHebrew_600SemiBold } from "@expo-google-fonts/ibm-plex-sans-
 import { IBMPlexSansHebrew_700Bold } from "@expo-google-fonts/ibm-plex-sans-hebrew/700Bold";
 import { GestureHandlerRootView } from "react-native-gesture-handler";
 import { SafeAreaProvider } from "react-native-safe-area-context";
-import { focusManager, onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
+import { focusManager, MutationCache, onlineManager, QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import NetInfo from "@react-native-community/netinfo";
 import { useTranslation } from "react-i18next";
 
-import { layoutDirection, restoreSavedLocale } from "@/lib/i18n";
+import { friendlyError } from "@/lib/friendlyError";
 import { AuthProvider } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { RouteErrorBoundary } from "@/components/ui/ErrorScreen";
@@ -73,10 +83,26 @@ export const ErrorBoundary = RouteErrorBoundary;
 // Module scope, per the SDK 58 docs, so it runs before the first render.
 SplashScreen.preventAutoHideAsync();
 
+declare module "@tanstack/react-query" {
+  interface Register {
+    mutationMeta: {
+      /** The screen prints this mutation's error itself; don't also alert. */
+      inlineError?: boolean;
+    };
+  }
+}
+
 const queryClient = new QueryClient({
   defaultOptions: {
     queries: { staleTime: 30_000, retry: 1 },
+    mutations: { networkMode: "always" },
   },
+  mutationCache: new MutationCache({
+    onError: (error, _variables, _onMutateResult, mutation) => {
+      if (mutation.options.onError || mutation.meta?.inlineError) return;
+      Alert.alert(i18next.t("error.title"), friendlyError(error, i18next.t));
+    },
+  }),
 });
 
 // Back online → refetch (TanStack Query's React Native guide).

@@ -23,6 +23,8 @@ import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import MessageCircle from "lucide-react-native/icons/message-circle";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
+import { InlineError } from "@/components/ui/ScreenState";
 import { owedQuery } from "@/lib/queries";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
@@ -143,11 +145,7 @@ function MoneyScreenBody() {
         <View style={{ width: 44 }} />
       </View>
 
-      {history.error ? (
-        <AppText size={14} tone="ember">
-          {(history.error as Error).message}
-        </AppText>
-      ) : null}
+      {history.error ? <InlineError message={friendlyError(history.error, t)} onRetry={() => void history.refetch()} /> : null}
 
       {/* This month so far */}
       <Card style={{ padding: 12, gap: 16 }}>

@@ -32,6 +32,8 @@ import { useTranslation } from "react-i18next";
 import Check from "lucide-react-native/icons/check";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError, screenError } from "@/lib/friendlyError";
+import { ScreenMessage } from "@/components/ui/ScreenState";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { formatDisplayDate, toDateString, todayISO } from "@/lib/dates";
@@ -64,7 +66,7 @@ import { FinishView, type FinishInput } from "@/components/workout/FinishView";
 import { OverviewSheet } from "@/components/workout/OverviewSheet";
 import { RestView } from "@/components/workout/RestView";
 import { SetView } from "@/components/workout/SetView";
-import { AppText, colors, Icon, Sheet } from "@/components/ui";
+import { colors, Icon, Sheet } from "@/components/ui";
 
 // The name shown in trainer mode's header ("דנה · רגליים").
 async function subjectName(subject: WorkoutSubject): Promise<string | null> {
@@ -121,27 +123,29 @@ export default function WorkoutScreen() {
     );
   }
   if (query.error || !query.data) {
+    const s = screenError(query.error, t, t("workout.notFound"));
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.iron }}>
+      <>
         <StatusBar style="light" />
-        <AppText size={14} tone="ash" center>
-          {query.error ? (query.error as Error).message : t("workout.notFound")}
-        </AppText>
-      </View>
+        <ScreenMessage dark message={s.message} onRetry={s.canRetry ? () => void query.refetch() : undefined} />
+      </>
     );
   }
 
   const { access, data, restored, name } = query.data;
   if (access.kind === "denied" || !data) {
     return (
-      <View style={{ flex: 1, alignItems: "center", justifyContent: "center", padding: 24, backgroundColor: colors.iron }}>
+      <>
         <StatusBar style="light" />
-        <AppText size={14} tone="ash" center>
-          {access.kind === "denied" && access.reason === "appClientLogsOwn"
-            ? t("workout.trainerMode.appClientLogsOwn")
-            : t("workout.notFound")}
-        </AppText>
-      </View>
+        <ScreenMessage
+          dark
+          message={
+            access.kind === "denied" && access.reason === "appClientLogsOwn"
+              ? t("workout.trainerMode.appClientLogsOwn")
+              : t("workout.notFound")
+          }
+        />
+      </>
     );
   }
 
@@ -416,6 +420,7 @@ function WorkoutMode({
   }
 
   const save = useMutation({
+    meta: { inlineError: true },
     mutationFn: (input: FinishInput) =>
       saveWorkout(session, {
         // A free workout (no exercises) had no timed session.
@@ -521,7 +526,7 @@ function WorkoutMode({
           streak={finishStreak}
           prs={sessionPrs(s)}
           saving={save.isPending}
-          errorMessage={save.error ? (save.error as Error).message : null}
+          errorMessage={save.error ? friendlyError(save.error, t) : null}
           trainerMode={trainerMode}
           onSave={(input) => finish(input, "home")}
           // The share card is the client's own (an offline client has no app).

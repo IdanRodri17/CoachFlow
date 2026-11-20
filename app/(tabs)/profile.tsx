@@ -40,6 +40,7 @@ import Trash from "lucide-react-native/icons/trash";
 import Vibrate from "lucide-react-native/icons/vibrate";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { ltr, setLocale, type SupportedLocale } from "@/lib/i18n";
@@ -107,6 +108,7 @@ export default function ProfileScreen() {
 
   type ProfilePatch = { display_name?: string; business_name?: string | null; default_price_per_session?: number | null };
   const saveField = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (patch: ProfilePatch) => {
       const { error } = await supabase.from("profiles").update(patch).eq("id", userId);
       if (error) throw error;
@@ -155,10 +157,14 @@ export default function ProfileScreen() {
       if (error) throw error;
     },
     onMutate: (on) => patchProfile({ sms_reminders_enabled: on }),
-    onError: (_e, on) => patchProfile({ sms_reminders_enabled: !on }),
+    onError: (e, on) => {
+      patchProfile({ sms_reminders_enabled: !on });
+      Alert.alert(t("error.title"), friendlyError(e, t));
+    },
   });
 
   const deleteAccount = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       const { error } = await supabase.functions.invoke("delete-account");
       if (error) throw error;
@@ -167,7 +173,9 @@ export default function ProfileScreen() {
   });
 
   function confirmDeleteAccount() {
-    Alert.alert(t("profile.deleteAccountTitle"), t("profile.deleteAccountMessage"), [
+    // A9: say what each role actually loses (B14's cascade facts).
+    const message = isClient ? t("profile.deleteAccountMessageClient") : t("profile.deleteAccountMessageTrainer");
+    Alert.alert(t("profile.deleteAccountTitle"), message, [
       { text: t("common.cancel"), style: "cancel" },
       { text: t("settings.deleteAccount"), style: "destructive", onPress: () => deleteAccount.mutate() },
     ]);
@@ -428,7 +436,7 @@ export default function ProfileScreen() {
 
         {deleteAccount.error ? (
           <AppText size={14} tone="ember">
-            {(deleteAccount.error as Error).message}
+            {friendlyError(deleteAccount.error, t)}
           </AppText>
         ) : null}
       </ScrollView>
@@ -478,7 +486,7 @@ export default function ProfileScreen() {
         ) : null}
         {saveField.error ? (
           <AppText size={14} tone="ember">
-            {(saveField.error as Error).message}
+            {friendlyError(saveField.error, t)}
           </AppText>
         ) : null}
         <Button label={t("settings.save")} size={56} block loading={saveField.isPending} disabled={!canSave} onPress={save} />

@@ -43,6 +43,8 @@ import Plus from "lucide-react-native/icons/plus";
 import User from "lucide-react-native/icons/user";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
+import { InlineError } from "@/components/ui/ScreenState";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -343,11 +345,7 @@ function ScheduleHomeScreenBody() {
           ) : null}
         </View>
 
-        {workouts.error ? (
-          <AppText size={14} tone="ember">
-            {(workouts.error as Error).message}
-          </AppText>
-        ) : null}
+        {workouts.error ? <InlineError message={friendlyError(workouts.error, t)} onRetry={() => void workouts.refetch()} /> : null}
 
         {dayItems.length > 0 || slots.length > 0 ? (
           <ListCard>

@@ -24,6 +24,8 @@ import Trash from "lucide-react-native/icons/trash";
 import Users from "lucide-react-native/icons/users";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
+import { InlineError } from "@/components/ui/ScreenState";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
@@ -70,7 +72,7 @@ function TemplatesListScreenBody() {
   const queryClient = useQueryClient();
   const [search, setSearch] = useState("");
 
-  const { data, error, isSuccess } = useQuery({
+  const { data, error, isSuccess, refetch } = useQuery({
     queryKey: qk.templates.cards,
     queryFn: async (): Promise<TemplateCard[]> => {
       const { data: tpls, error: tErr } = await supabase
@@ -158,7 +160,7 @@ function TemplatesListScreenBody() {
       }
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.templates.all }),
-    onError: (e) => Alert.alert((e as Error).message),
+    onError: (e) => Alert.alert(t("error.title"), friendlyError(e, t)),
   });
 
   const remove = useMutation({
@@ -168,7 +170,7 @@ function TemplatesListScreenBody() {
       if (error) throw error;
     },
     onSuccess: () => queryClient.invalidateQueries({ queryKey: qk.templates.all }),
-    onError: (e) => Alert.alert((e as Error).message),
+    onError: (e) => Alert.alert(t("error.title"), friendlyError(e, t)),
   });
 
   return (
@@ -211,11 +213,7 @@ function TemplatesListScreenBody() {
         returnKeyType="search"
       />
 
-      {error ? (
-        <AppText size={14} tone="ember">
-          {(error as Error).message}
-        </AppText>
-      ) : null}
+      {error ? <InlineError message={friendlyError(error, t)} onRetry={() => void refetch()} /> : null}
 
       {isSuccess && (data ?? []).length === 0 ? (
         <Card style={{ gap: 4 }}>

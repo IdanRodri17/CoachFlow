@@ -21,6 +21,8 @@ import Repeat from "lucide-react-native/icons/repeat";
 import Trophy from "lucide-react-native/icons/trophy";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError, screenError } from "@/lib/friendlyError";
+import { ScreenLoading, ScreenMessage } from "@/components/ui/ScreenState";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { toDateString } from "@/lib/dates";
@@ -41,7 +43,7 @@ export default function ExerciseDetailScreen() {
   const router = useRouter();
   const queryClient = useQueryClient();
 
-  const { data: exercise, isLoading, error } = useQuery({
+  const { data: exercise, isLoading, error, refetch } = useQuery({
     queryKey: qk.exercises.one(id),
     queryFn: async () => {
       const { data, error } = await supabase.from("exercises").select("*").eq("id", id).single();
@@ -51,6 +53,7 @@ export default function ExerciseDetailScreen() {
   });
 
   const updateMutation = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (input: ExerciseInput) => {
       const { error } = await supabase.from("exercises").update(input).eq("id", id);
       if (error) throw error;
@@ -62,6 +65,7 @@ export default function ExerciseDetailScreen() {
   });
 
   const deleteMutation = useMutation({
+    meta: { inlineError: true },
     mutationFn: async () => {
       const { error } = await supabase.from("exercises").delete().eq("id", id);
       if (error) throw error;
@@ -85,21 +89,16 @@ export default function ExerciseDetailScreen() {
   const formError = deleteError
     ? deleteError.message.includes("exercise_in_use")
       ? t("exercises.detail.inUse")
-      : deleteError.message
+      : friendlyError(deleteError, t)
     : updateMutation.error
-      ? (updateMutation.error as Error).message
+      ? friendlyError(updateMutation.error, t)
       : null;
 
-  if (isLoading) return <View style={{ flex: 1, backgroundColor: colors.chalk }} />;
+  if (isLoading) return <ScreenLoading />;
 
   if (error || !exercise) {
-    return (
-      <View style={{ flex: 1, backgroundColor: colors.chalk, alignItems: "center", justifyContent: "center", padding: 24 }}>
-        <AppText size={14} tone="ember" center>
-          {error ? (error as Error).message : t("exercises.detail.notFound")}
-        </AppText>
-      </View>
-    );
+    const s = screenError(error, t, t("exercises.detail.notFound"));
+    return <ScreenMessage message={s.message} onRetry={s.canRetry ? () => void refetch() : undefined} />;
   }
 
   if (isTrainer) {

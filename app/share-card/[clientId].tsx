@@ -26,6 +26,7 @@ import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import Share from "lucide-react-native/icons/share";
 
 import { qk } from "@/lib/queryKeys";
+import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
@@ -100,7 +101,7 @@ function ShareCardBody() {
       }
       await Sharing.shareAsync(uri, { mimeType: "image/png" });
     } catch (e) {
-      setError((e as Error).message);
+      setError(friendlyError(e, t));
     } finally {
       setSharing(false);
     }
@@ -135,7 +136,7 @@ function ShareCardBody() {
 
       {card.error ? (
         <AppText size={14} tone="ember" center>
-          {(card.error as Error).message}
+          {friendlyError(card.error, t)}
         </AppText>
       ) : null}
 

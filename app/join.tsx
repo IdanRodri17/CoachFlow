@@ -34,6 +34,7 @@ export default function JoinScreen() {
   const [code, setCode] = useState("");
 
   const join = useMutation({
+    meta: { inlineError: true },
     mutationFn: async (value: string) => {
       const { error } = await supabase.rpc("accept_invite", { p_code: value });
       if (error) throw error;
