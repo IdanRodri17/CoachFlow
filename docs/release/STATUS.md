@@ -15,7 +15,7 @@ Merged from the cloud session's final report (it checked each item against cloud
 |---|----|---------|-------|------|-------|
 | 1 | CF1 | Phone check of the layout fix: the "+" circle, rows side by side, swipe actions (incl. the Hebrew swipe direction, never checked on a phone) | tab bar, מתאמנים, תרגילים, תבניות, לוח זמנים | JS | **Idan:** smoke steps 1–7 and 9 below |
 | 2 | CF2 | Unticking someone in a group session leaves their package one session too many used; re-ticking counts it twice | group attendance | live | ✅ **0043 live 2026-11-20** (3c3ac7d); in-app check: untick someone on a group sheet, the package gets the session back |
-| 3 | U1 | Packages already miscounted by past unticks aren't corrected | client card → package | live data | after 0043: count mismatched packages (aggregates only), show Idan, fix only with his OK |
+| 3 | U1 | Packages already miscounted by past unticks aren't corrected | client card → package | live data | ✅ checked 2026-11-20, nothing to fix: the live DB has 1 package, in no group session. Its used_sessions = 4 = exactly the completed workouts whose log `completed_at` is after the package's `created_at` (13 more were done before it existed and correctly don't count). The app only ever completes a workout by UPDATE, so the AFTER UPDATE trigger sees every completion. Re-check if group sessions get real use before 0043 matters |
 | 4 | R2 | Deleting an account leaves progress photos on the server | Profile → delete account | live | code ✅ 9c5eed1; deploy delete-account (OK'd 2026-11-20, not done) |
 | 5 | C5, C6 | A deleted or wrong item opens a raw error | detail screens | JS | todo (batch 2) |
 | 6 | C7, C8 | Saves and deletes fail with no message when offline | most editing screens | JS | todo (batch 2) |
