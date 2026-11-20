@@ -26,7 +26,8 @@ Ship type: **JS** = reaches testers by OTA update · **native** = needs a new st
 | I1 | Confirm `com.idan.coachflow` (D11) | decision | P0 | Idan | answered | asked at checkpoint |
 | S3 | Live `send-trainer-digest` and `send-reminders` accept any app JWT (deployed versions predate the cron gate); unused since email was dropped (B3, B6) | security · live | P1 | Idan | both deleted in Supabase → Edge Functions | **Idan** |
 | S4 | SMS abuse: random Israeli numbers cost an SMS each; one IP can exhaust the hourly SMS quota and block logins (B4) | security · live | P1 | Idan | Auth rate limits sized; SMS4Free balance alert; CAPTCHA later | todo |
-| R9 | nutrition-suggest daily cap per trainer: `ai_usage` + `consume_ai_call` (service role only), 20/day/Israel day, 429 `daily_limit`, fail closed; translated message; Anthropic spend limit (B5) | release · live+JS | P1 | implementer | 21st call in a day gets 429 | ✅ code (this push) · dry run ✓ · **apply 0040, then deploy the function: needs OK** |
+| R9 | nutrition-suggest daily cap per trainer: `ai_usage` + `consume_ai_call` (service role only), 20/day/Israel day, 429 `daily_limit`, fail closed; translated message; Anthropic spend limit (B5) | release · live+JS | P1 | implementer | 21st call in a day gets 429 | ✅ 2a7d0ae · **live 2026-11-20**: 0040 applied, nutrition-suggest v6 (verify_jwt true) · in-app check of one plan + `count(*)` on ai_usage pending · header comment line 5 still says "never touches the database" (fix with the next function change) |
+| CF2 | cloud/dev 18139dd: unticking a group session gives it back to the package (trigger 0043 + a comment in `app/group/[groupId].tsx`) | bug · live+JS | P1 | other local session | used_sessions goes back down on untick | ✅ 3c3ac7d (patch identical to 18139dd) · **0043 not applied** (Idan OKs it in the cloud chat). Live check: `trg_increment_used_sessions` is AFTER UPDATE FOR EACH ROW with no WHEN, and its body matches 0043's "+1" branch, so 0043 only adds the give-back |
 | R15 | A client can leave a trainer (withdraw consent): delete policy on `trainer_clients` + "Leave trainer" action (B7) | privacy · live+JS | P1 | implementer | client unlinks; trainer loses read access | todo (migration 0041) |
 | A9 | Delete-account confirm mentions "messages" (none exist) and doesn't tell a trainer it also wipes app clients' workout history with them and all offline clients' records and photos (B14) | release · JS | P1 | implementer | role-specific `deleteAccountMessage` (he/en) | todo (batch R8+A3+A9) |
 | A11 | Minimum age stated nowhere (Play target audience, Apple age rating; clients upload body photos) | decision | P1 | Idan | age in terms consent + Terms; Play target audience | asked at checkpoint (18+ recommended) |
@@ -53,7 +54,7 @@ Ship type: **JS** = reaches testers by OTA update · **native** = needs a new st
 
 ## Resume here (2026-11-19 evening)
 Checkpoint 0+1 went to Idan in chat (12 numbered decisions + a 10-step smoke test). **Wait for his answers; record them under "Decisions (Idan)".** Then, in this order:
-1. Live changes he OKs (list below). Order matters: **apply 0040 before deploying nutrition-suggest**, or every plan request returns 500 (the function fails closed).
+1. Live changes he OKs (list below). R9 is already live (2026-11-20, applied and deployed by the other local session at Idan's request).
 2. One implementer batch, same files, run sequentially: **R8 + A3 + A9** (nutrition screens, profile delete copy, locales, migration 0042 `ai_reports`). Dry-run 0042 like 0040.
 3. R12 on icon approval: run `docs/release/icons/make_icons.py` (usage in its header) into `assets/`, set app.json `icon`, `android.adaptiveIcon` (foreground, monochrome, `backgroundColor` `#131416`), the `expo-splash-screen` plugin (image + `backgroundColor` `#131416`), and an `expo-notifications` plugin entry with `icon` + `color`. Read the v58 docs for both plugins first.
 4. R1 + R3 once hosting and the support email are answered (store-writer drafts the pages; implementer adds `lib/legal.ts` and the links).
@@ -77,7 +78,7 @@ Checkpoint 0+1 went to Idan in chat (12 numbered decisions + a 10-step smoke tes
 12. OK the live changes below? — rec. yes
 
 ## Decisions I made (conservative defaults)
-- Migration 0039 is v28's `volume_milestones` (the `client_volume` view + 5 `volume_*` badge types). It went live on 2026-11-18 from the cloud session. It's additive, and 1.0 code doesn't read it. This branch carries the same file, byte for byte from cloud/dev, so its migrations match the live DB. v28's app code stays post-launch. R9's `ai_usage` became **0040**, R15's `trainer_clients` policy **0041**, R8's `ai_reports` is planned as **0042**; the next free number after that is **0043**.
+- Migration 0039 is v28's `volume_milestones` (the `client_volume` view + 5 `volume_*` badge types). It went live on 2026-11-18 from the cloud session. It's additive, and 1.0 code doesn't read it. This branch carries the same file, byte for byte from cloud/dev, so its migrations match the live DB. v28's app code stays post-launch. R9's `ai_usage` became **0040**, R15's `trainer_clients` policy **0041**, R8's `ai_reports` is planned as **0042**. **0043** is cloud/dev's `uncomplete_returns_session` (18139dd, numbered after the release branch on purpose). The next free number is **0044**.
 - Cherry-picked cloud/dev 79c3231 (the Pressable/swipe fix): it doesn't depend on v28 (the only shared file, progress.tsx, differs by one import line). Its new lint rule flagged `ErrorScreen.tsx`; exempted it (c95b3c4) rather than importing the kit, because the root boundary renders outside every provider and uses a plain object style.
 - R9: cap 20 calls per trainer per Asia/Jerusalem day; counted after the request validates and before the Anthropic call, so a failed Anthropic call still counts; the function fails closed (500) if the check errors. `consume_ai_call` is plpgsql: the dry run showed Postgres rejects a data-modifying WITH nested inside `exists()`.
 - R8's report goes to an `ai_reports` table rather than a mailto, so it works before the support email exists and needs nothing from the reporter's mail app (pending the batch).
@@ -93,13 +94,14 @@ Checkpoint 0+1 went to Idan in chat (12 numbered decisions + a 10-step smoke tes
 - RUNBOOK recommends GitHub Pages in a separate public repo for the legal pages.
 
 ## Migrations to apply, in order
-Live through 0039 (`0039_volume_milestones`, applied 2026-11-18).
-1. **0040 `ai_usage`** (R9) — file committed; dry run ✓ 2026-11-19 in a rolled-back block: FK rejects unknown ids; calls 1–2 of cap 2 → true, 3–4 → false with the counter staying at 2; a second trainer counted separately; `authenticated` and `anon` denied execute, select and insert; nothing persisted.
-2. 0041 `trainer_clients` client delete policy (R15) — planned.
-3. 0042 `ai_reports` (R8) — planned.
+Live through 0040.
+- ✅ **0040 `ai_usage`** (R9), applied 2026-11-20 as `0040_ai_usage`. Dry runs ✓ 2026-11-19 and 2026-11-20 (rolled back): FK rejects unknown ids; calls 1–2 of cap 2 → true, 3–4 → false with the counter staying at 2; a second trainer counted separately; `authenticated` and `anon` denied execute, select and insert; nothing persisted. After the apply: RLS on, service_role can execute, app roles have no privileges, 0 rows. Advisors: one new INFO `rls_enabled_no_policy` on ai_usage (intended); no new WARN.
+1. 0041 `trainer_clients` client delete policy (R15) — planned.
+2. 0042 `ai_reports` (R8) — planned.
+3. 0043 `uncomplete_returns_session` (CF2, cherry-picked as 3c3ac7d) — file committed; Idan OKs applying it in the cloud chat. Dry-run it like 0040 first.
 
 ## Live changes waiting for Idan's OK
-1. Apply 0040, then deploy `nutrition-suggest` (in that order), then one call from the app to confirm plans still generate.
+1. ~~Apply 0040, then deploy `nutrition-suggest`~~ Done 2026-11-20. Still open: one plan from the app (מתאמנים ← client ← תפריט תזונה ← יצירת תפריט), then `select count(*) from ai_usage` shows 1+.
 2. Deploy `delete-account` (9c5eed1) through the Supabase connector, then verify with a throwaway test account.
 3. One-off sweep of orphaned photo folders (lists folder names only, removes those with no owner).
 4. R7b: add the production environment variables on expo.dev with `eas env:create` from this computer (Supabase URL, anon key, `APP_VARIANT=production`).
@@ -137,6 +139,7 @@ Also: YouTube/Vimeo embeds (trainer demo videos) load third-party players that s
 - No FK is RESTRICT, so deleting any user succeeds. A trainer's deletion also removes the history app clients logged with that trainer; a client's deletion removes the trainer's packages, payments and notes for that client. `client_invites` keeps the trainer-typed label and price (B14). The privacy policy and terms must say so.
 - EAS CLI 27.4 is installed and logged in as `idanrodri` on Idan's computer.
 - Live `trainer_clients` policies: client_read, trainer_delete, trainer_read, trainer_update (no client delete yet → R15).
+- Security advisors (2026-11-20): WARN authenticated can execute SECURITY DEFINER `accept_invite`, `create_invite`, `my_trainer` (intended: app RPCs; review in the P2 hardening migration); WARN leaked-password protection off (email/password sign-in is off, so it matters little).
 - Audit A could not verify (needs a real build): the Gradle-merged manifest and targetSdk 36 (`bundletool dump manifest` on the first AAB), and the real Info.plist's `NSAllowsArbitraryLoads` (introspection shows the fallback template's `true`).
 
 ## Post-launch (moved out of scope)
