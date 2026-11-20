@@ -77,7 +77,7 @@ The lead does the thinking, and subagents do the reading and writing.
 
 **app.json:**
 - Name CoachFlow, version 1.0.0, `userInterfaceStyle: light`, scheme `coachflow`.
-- `ios.bundleIdentifier` and `android.package` are `com.idan.coachflow`. They become permanent with the first store upload, so confirm them first.
+- `ios.bundleIdentifier` and `android.package` are `com.idan.coachflow` today; Idan decided on 2026-11-20 to use **`com.coachflow.app`** (change app.json before the first build). They become permanent with the first store upload.
 - `supportsTablet: false`, `runtimeVersion.policy: "sdkVersion"`.
 - The plugins list has no config for `expo-image-picker` or `expo-notifications` (both are dependencies).
 - `.gitignore` already ignores `/android` and `/ios`.
@@ -220,7 +220,7 @@ Idan often reads on his phone. At each checkpoint, write to him briefly, in the 
 Then stop and wait for his reply.
 
 ## 5. Decisions only Idan makes (record the answers in STATUS.md)
-1. Is the bundle id / package `com.idan.coachflow` final? It becomes permanent with the first upload.
+1. ~~Is the bundle id / package `com.idan.coachflow` final?~~ Answered 2026-11-20: `com.coachflow.app`.
 2. ~~Does `cloud/dev` (v28 and migration 0039) go into 1.0?~~ Answered: v28's app code is post-launch. Its migration 0039 went live on 2026-11-18 (additive; 1.0 doesn't read it).
 3. Is 1.0 free (a pilot) or paid? Charging trainers inside the app brings in Apple's in-app purchase rules, so the simplest 1.0 is free.
 4. Where are the privacy policy, terms and web deletion page hosted (GitHub Pages, his VPS, or another site), and what's the support email?

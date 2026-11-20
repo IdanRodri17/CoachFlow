@@ -1,5 +1,6 @@
 # Release 1.0 — status (updated 2026-11-19 evening by Opus 5.5)
-Phase: 1 done (audits A, B, C, D merged) · **Checkpoint 0+1 sent 2026-11-19, waiting for Idan's answers** · Branch: `cloud/release-1.0`
+Phase: 1 done (audits A, B, C, D merged) · **Checkpoint 0+1 answered 2026-11-20** (see "Decisions (Idan)") · Branch: `cloud/release-1.0`
+**Priority (Idan, 2026-11-20, relayed by the other local session): one united session; bugs and UI/UX first, deployment after.** The release lead session (this file's author until now) stopped here and handed over; nothing below is in flight.
 Baseline at a6d570e: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 138/138 (9 files)
 Now: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 147/147 (10 files) · `expo export --platform ios` ✓
 
@@ -17,20 +18,20 @@ Ship type: **JS** = reaches testers by OTA update · **native** = needs a new st
 | S1 | Test OTP on Idan's real number = his real trainer account behind one static code; the number was in a public code comment (B1) | security · live | P0 | Idan | number removed from Auth → Phone → test numbers | comment fixed e7e35d1 · **Idan** |
 | S2 | Shared dev password for trainer@/client@coachflow.dev is in public git history (B8) | security · live | P0 | Idan | Email provider confirmed OFF; both passwords rotated | **Idan** |
 | R7b | `production` environment on expo.dev: Supabase URL + anon key + `APP_VARIANT=production` (D4) | release · live | P0 | Idan (or lead with OK) | `eas env:list --environment production` shows all three | todo (RUNBOOK 1.1) · asked at checkpoint |
-| R12 | Real app icon, adaptive icon, splash, notification icon (D5, D8, D14, A5) | release · native | P0 | decision → lead | no Expo template art in assets/ | candidate in `docs/release/icons/` (preview.png + make_icons.py) · **awaiting approval** |
+| R12 | Real app icon, adaptive icon, splash, notification icon (D5, D8, D14, A5) | release · native | P0 | lead | no Expo template art in assets/ | **approved 2026-11-20** (`docs/release/icons/preview.png`) · todo: run make_icons.py into assets/ + wire app.json (Resume step 3) |
 | R1 | Privacy policy + terms + support linked in the app: onboarding consent text with two tappable links that don't toggle the checkbox (A1); a "Legal & support" card in Profile for both roles with policy, terms, support email, web deletion page (A2); sign-in footer (A16, P2) | release · JS | P0 | implementer + Idan (hosting) | both links open the hosted he/en pages; URLs live in one `lib/legal.ts` | blocked: decision (hosting + support email) |
 | R3 | Web account-deletion page, incl. an email route for offline (managed) clients who have no account (A4, A12) | release | P0 | store-writer + Idan (hosting) | public URL live | blocked: decision |
-| A3 | **Third-party AI consent (Apple 5.1.2(i)).** Before a trainer's first "יצירת תפריט", a one-time sheet names Anthropic and says what is sent (targets, diet chips, free-text preferences; no names or phone numbers); hint under the preferences field not to type names or medical details; covered in the privacy policy | release · JS | P0 | implementer | first plan request shows the sheet; declining sends nothing; accepted once per user per device | todo (batch R8+A3+A9) · design asked at checkpoint |
+| A3 | **Third-party AI consent (Apple 5.1.2(i)).** Before a trainer's first "יצירת תפריט", a one-time sheet names Anthropic and says what is sent (targets, diet chips, free-text preferences; no names or phone numbers); hint under the preferences field not to type names or medical details; covered in the privacy policy | release · JS | P0 | implementer | first plan request shows the sheet; declining sends nothing; accepted once per user per device | todo (batch R8+A3+A9) · **decided 2026-11-20: the sheet names Anthropic (Claude); no Hebrew brand name for the feature** |
 | R8 | AI disclosure + in-app report: an "AI-generated" label on the trainer's plan (A7: `[refId].tsx` chip ~368, `nutritionAi.disclaimer`) and the client's plan (A6: `nutrition.tsx` ~85, `nutrition.disclaimer`); "Report this plan" on both (A8) inserting into `ai_reports` (planned migration 0042: plan id, reporter, reason; RLS insert-own, no select for app roles) | release · JS+live | P0 | implementer | every plan labeled; a report lands in `ai_reports` | todo (batch R8+A3+A9) |
 | R5 | App Review sign-in: test numbers, demo data, review notes. Plus A10: an idempotent seed SQL that recreates both demo accounts onboarded, linked and with data (reviewers often test "delete account"), and a third test number for deletion testing; say sign-up is Israel-only | release · live | P0 | Idan + store-writer + lead (seed SQL) | a reviewer signs in on both sides | todo (RUNBOOK 1.2–1.3) |
-| I1 | Confirm `com.idan.coachflow` (D11) | decision | P0 | Idan | answered | asked at checkpoint |
+| I1 | Bundle id / package (D11) | release · native | P0 | lead | app.json `ios.bundleIdentifier` + `android.package` = `com.coachflow.app` before the first build | **decided 2026-11-20: `com.coachflow.app`** (not `com.idan.coachflow`) · todo: change app.json; check the id is free when creating the Play/App Store Connect app |
 | S3 | Live `send-trainer-digest` and `send-reminders` accept any app JWT (deployed versions predate the cron gate); unused since email was dropped (B3, B6) | security · live | P1 | Idan | both deleted in Supabase → Edge Functions | **Idan** |
 | S4 | SMS abuse: random Israeli numbers cost an SMS each; one IP can exhaust the hourly SMS quota and block logins (B4) | security · live | P1 | Idan | Auth rate limits sized; SMS4Free balance alert; CAPTCHA later | todo |
-| R9 | nutrition-suggest daily cap per trainer: `ai_usage` + `consume_ai_call` (service role only), 20/day/Israel day, 429 `daily_limit`, fail closed; translated message; Anthropic spend limit (B5) | release · live+JS | P1 | implementer | 21st call in a day gets 429 | ✅ 2a7d0ae · **live 2026-11-20**: 0040 applied, nutrition-suggest v6 (verify_jwt true) · in-app check of one plan + `count(*)` on ai_usage pending · header comment line 5 still says "never touches the database" (fix with the next function change) |
+| R9 | nutrition-suggest daily cap per trainer: `ai_usage` + `consume_ai_call` (service role only), 20/day/Israel day, 429 `daily_limit`, fail closed; translated message; Anthropic spend limit (B5) | release · live+JS | P1 | implementer | 21st call in a day gets 429 | ✅ 2a7d0ae · **live 2026-11-20**: 0040 applied, nutrition-suggest v6 (verify_jwt true) · ✅ verified end to end (one plan from the app; `count(*)` on ai_usage = 1) · header comment line 5 still says "never touches the database" (fix with the next function change) |
 | CF2 | cloud/dev 18139dd: unticking a group session gives it back to the package (trigger 0043 + a comment in `app/group/[groupId].tsx`) | bug · live+JS | P1 | other local session | used_sessions goes back down on untick | ✅ 3c3ac7d (patch identical to 18139dd) · **0043 not applied** (Idan OKs it in the cloud chat). Live check: `trg_increment_used_sessions` is AFTER UPDATE FOR EACH ROW with no WHEN, and its body matches 0043's "+1" branch, so 0043 only adds the give-back |
 | R15 | A client can leave a trainer (withdraw consent): delete policy on `trainer_clients` + "Leave trainer" action (B7) | privacy · live+JS | P1 | implementer | client unlinks; trainer loses read access | todo (migration 0041) |
 | A9 | Delete-account confirm mentions "messages" (none exist) and doesn't tell a trainer it also wipes app clients' workout history with them and all offline clients' records and photos (B14) | release · JS | P1 | implementer | role-specific `deleteAccountMessage` (he/en) | todo (batch R8+A3+A9) |
-| A11 | Minimum age stated nowhere (Play target audience, Apple age rating; clients upload body photos) | decision | P1 | Idan | age in terms consent + Terms; Play target audience | asked at checkpoint (18+ recommended) |
+| A11 | Minimum age stated nowhere (Play target audience, Apple age rating; clients upload body photos) | decision | P1 | Idan | age in terms consent + Terms; Play target audience | **decided 2026-11-20: 13+** · lead's note: say in the Terms that 13–17 need a parent's or guardian's consent (health data + body photos); Play target audience 13–15, 16–17, 18+ (no under-13, so no Families policy) |
 | A12 | Trainers enter non-users' data (offline clients: name, phone, metrics, photos, nutrition) | release · docs | P1 | store-writer | Terms make the trainer responsible for consent; policy + R3 page give non-users an email route; declared in both forms | with R13 |
 | A15 | No `ios.privacyManifests` while several pods ship no PrivacyInfo | release · native | P1 | lead | no ITMS-91053 email after the first TestFlight upload | after the first iOS build |
 | C3 | Failed cold-start profile read sent users to onboarding (Save overwrote the profile) | bug · JS | P1 | implementer | retry screen; `lib/authRoute.ts` + 7 tests | ✅ af3e6c4 |
@@ -47,35 +48,54 @@ Ship type: **JS** = reaches testers by OTA update · **native** = needs a new st
 | D17 | 16 KB page-size check on the first AAB | release | P1 | Idan + lead | no Play Console warning | after the first build |
 | R13 | Store package (listings, policy drafts, form answers, review notes, screenshots plan). Audit A's data inventory (below) is the source for App Privacy / Data safety; A13 Health apps declaration is RUNBOOK 3.3 | release | P1 | store-writer | Phase 5 files complete | after decisions |
 | R14 | RUNBOOK | release | P1 | lead | current at every checkpoint | ✅ parts 0–5 drafted |
-| A14 | `LICENSE` is Expo's MIT "© 650 Industries" in a public repo (= I5) | decision | P1 | Idan | replaced, or repo private | asked at checkpoint |
+| A14 | `LICENSE` is Expo's MIT "© 650 Industries" in a public repo (= I5) | release | P1 | Idan + lead | repo private; LICENSE says "All rights reserved" | **decided 2026-11-20: both** · Idan: GitHub → Settings → Change visibility → Private · lead: replace LICENSE |
 | A16–A20 | Sign-in footer links (with R1); Hebrew photo purpose string via `locales`; block READ/WRITE_EXTERNAL_STORAGE (maxSdk 32) after testing Android 10–12; policy mentions the trainer's phone shown to clients and YouTube/Vimeo embeds; review note "payments are manual records, nothing is sold in the app" | release | P2 | — | — | later (A17/A18 are native: ride the next build) |
 | B9–B13, B16–B20 | Write-check gaps on 4 policies, client-editable reminder stamps, anon table grants, bucket size/MIME limits, invite-code throttle, SMS number check + timeout, realtime delete ids, CORS/logging, Anthropic key in the app's .env, perf advisors | security/perf | P2 | — | — | later (one hardening migration) |
 | C17–C25, D16, D20 | Lint warnings, `ltr()` on times, global error handler, JSON.parse loop, localized display name, `eas project:info` | misc | P2 | — | — | later |
 
-## Resume here (2026-11-19 evening)
-Checkpoint 0+1 went to Idan in chat (12 numbered decisions + a 10-step smoke test). **Wait for his answers; record them under "Decisions (Idan)".** Then, in this order:
-1. Live changes he OKs (list below). R9 is already live (2026-11-20, applied and deployed by the other local session at Idan's request).
-2. One implementer batch, same files, run sequentially: **R8 + A3 + A9** (nutrition screens, profile delete copy, locales, migration 0042 `ai_reports`). Dry-run 0042 like 0040.
-3. R12 on icon approval: run `docs/release/icons/make_icons.py` (usage in its header) into `assets/`, set app.json `icon`, `android.adaptiveIcon` (foreground, monochrome, `backgroundColor` `#131416`), the `expo-splash-screen` plugin (image + `backgroundColor` `#131416`), and an `expo-notifications` plugin entry with `icon` + `color`. Read the v58 docs for both plugins first.
-4. R1 + R3 once hosting and the support email are answered (store-writer drafts the pages; implementer adds `lib/legal.ts` and the links).
+## Resume here (2026-11-20, handover to the united session)
+Idan's priority (2026-11-20): **bugs and UI/UX first, deployment after.** So the release work below waits until he reopens it; when he does, start here. Nothing is half-done: the tree was clean at the handover, and every release commit is pushed.
+When release work resumes, in this order:
+1. Code-only items decided at the checkpoint (no live system touched):
+   - I1: app.json `ios.bundleIdentifier` + `android.package` → `com.coachflow.app` (before any build).
+   - R12: run `docs/release/icons/make_icons.py` (usage in its header) into `assets/`, set app.json `icon`, `android.adaptiveIcon` (foreground, monochrome, `backgroundColor` `#131416`), the `expo-splash-screen` plugin (image + `backgroundColor` `#131416`), and an `expo-notifications` plugin entry with `icon` + `color`. Read the v58 docs for both plugins first. Expo Go doesn't show the app icon; verify with `npx expo config --type introspect`.
+   - A14: LICENSE → "Copyright (c) 2026 IdanRodri17. All rights reserved." (ask Idan if he wants his full name there).
+   - Sentry (decision 9): Idan creates a sentry.io account (EU data region) + a React Native project and hands over the DSN; then `npx expo install @sentry/react-native`, its config plugin, init in app/_layout.tsx with `sendDefaultPii: false`, no session replay (screens show health data), user id only, low traces. Check the v58 docs and Expo Go behaviour first.
+2. One implementer batch, same files, run sequentially: **R8 + A3 + A9** (nutrition screens, profile delete copy, locales, migration 0042 `ai_reports`). A3's sheet names Anthropic (Claude); the plans are labeled "AI-generated" / "נוצר בעזרת AI", no brand name. Dry-run 0042 like 0040.
+3. Live changes Idan OK'd on 2026-11-20 that are **not done yet** (list under "Live changes"): deploy delete-account + verify; the orphan photo sweep (list first; confirm the count with Idan before deleting, it can't be undone); production variables on expo.dev.
+4. R1 + R3: store-writer drafts the he/en privacy, terms and deletion pages for GitHub Pages (`coachflow-site`); implementer adds `lib/legal.ts` and the links once Idan has the repo URL and the CoachFlow Gmail.
 5. R15 (0041), A10 seed SQL, then batch 2 (C5–C14).
 - Ask Idan for the cloud chat's remaining bug list (still open).
-- A second local session ("Migration renumbering and UI fix cherry-pick") worked in this same folder on 2026-11-19; it renumbered R9 to 0040 and handed the tree back. Before editing, check `git status` for files you didn't touch.
+- 0043 (CF2, the group untick fix) is committed but not applied; Idan OKs it in the cloud chat. Dry-run first.
+- Two local sessions shared this folder on 2026-11-19/20 and handed changes back and forth cleanly. Before editing, check `git status` for files you didn't touch.
+- Idan's deployment lessons (written 2026-11-19, private artifact): https://claude.ai/artifact/EQso9No98gJD2jLQziwbA4
 
 ## Decisions (Idan)
-*(Asked at Checkpoint 0+1 on 2026-11-19. Answers go here.)*
-1. Bundle id / package `com.idan.coachflow` final? — rec. yes
-2. Icon: approve the volt italic "CF" on ink (`docs/release/icons/preview.png`)? — rec. yes
-3. 1.0 free (pilot)? — rec. free
-4. Hosting for privacy/terms/deletion pages + support email? — rec. GitHub Pages repo `coachflow-site` now (VPS later) + a new CoachFlow Gmail
-5. Buy the SMS4Free "CoachFlow" sender before launch? — rec. yes (also unblocks S1)
-6. Supabase Pro before the closed test? — rec. yes (backups, no pausing)
-7. LICENSE / public repo? — rec. make the repo private and replace LICENSE with "All rights reserved"
-8. Israel only for 1.0? — rec. yes
-9. Sentry before the first store build? — rec. yes (native; cheapest now)
-10. Minimum age (A11)? — rec. 18+
-11. AI consent design (A3): one-time sheet naming Anthropic, stored per user on the device? — rec. yes
-12. OK the live changes below? — rec. yes
+Asked at Checkpoint 0+1 on 2026-11-19; answered 2026-11-20.
+1. Bundle id / package → **`com.coachflow.app`** (not `com.idan.coachflow`). Permanent after the first upload.
+2. Icon: the volt italic "CF" on ink (`docs/release/icons/preview.png`) → **yes**
+3. 1.0 free (pilot) → **yes**
+4. Legal pages + support email → **GitHub Pages repo `coachflow-site` now, VPS later; a new CoachFlow Gmail**
+5. Buy the SMS4Free "CoachFlow" sender before launch → **yes** (also unblocks S1)
+6. Supabase Pro before the closed test → **no, stay on free for now.** Known risks: no automatic backups, and the project pauses after a week with no activity. Revisit before real customers depend on it; until then, a manual `supabase db dump` before risky migrations.
+7. Repo private + replace Expo's LICENSE → **yes**
+8. Israel only for 1.0 → **yes**
+9. Sentry before the first store build → **yes**
+10. Minimum age → **13+** (recommendation was 18+; see A11 for the guardian-consent note)
+11. AI consent (A3) → **name Anthropic in the sheet** ("anthropic is okay"); no Hebrew brand name for the feature
+12. Live changes → **yes** (0040 + nutrition-suggest done and verified; the rest under "Live changes")
+
+### Checkpoint 0+1 smoke test (as sent, 2026-11-19; open the `cloud/release-1.0` update in Expo Go)
+1. The "+" in the tab bar has its volt circle.
+2. מתאמנים: each row shows the name and details side by side.
+3. מתאמנים: swipe a row. The actions open from the side you swiped and have colour, and closed rows show nothing behind them.
+4. תרגילים and תבניות: rows look right and open.
+5. לוח זמנים: swipe a workout row; the actions work.
+6. התקדמות: add a weight; the sheet saves.
+7. בית: tap an item in the attention feed.
+8. מתאמנים ← a client ← תפריט תזונה ← יצירת תפריט: a plan generates as before (the cap isn't live yet).
+9. Start a workout and finish it; the buttons on the finish screen respond.
+Result so far: step 8 passed on 2026-11-20 (with the cap live; `ai_usage` count = 1). Steps 1–7 and 9 not reported yet.
 
 ## Decisions I made (conservative defaults)
 - Migration 0039 is v28's `volume_milestones` (the `client_volume` view + 5 `volume_*` badge types). It went live on 2026-11-18 from the cloud session. It's additive, and 1.0 code doesn't read it. This branch carries the same file, byte for byte from cloud/dev, so its migrations match the live DB. v28's app code stays post-launch. R9's `ai_usage` became **0040**, R15's `trainer_clients` policy **0041**, R8's `ai_reports` is planned as **0042**. **0043** is cloud/dev's `uncomplete_returns_session` (18139dd, numbered after the release branch on purpose). The next free number is **0044**.
@@ -100,15 +120,17 @@ Live through 0040.
 2. 0042 `ai_reports` (R8) — planned.
 3. 0043 `uncomplete_returns_session` (CF2, cherry-picked as 3c3ac7d) — file committed; Idan OKs applying it in the cloud chat. Dry-run it like 0040 first.
 
-## Live changes waiting for Idan's OK
-1. ~~Apply 0040, then deploy `nutrition-suggest`~~ Done 2026-11-20. Still open: one plan from the app (מתאמנים ← client ← תפריט תזונה ← יצירת תפריט), then `select count(*) from ai_usage` shows 1+.
-2. Deploy `delete-account` (9c5eed1) through the Supabase connector, then verify with a throwaway test account.
-3. One-off sweep of orphaned photo folders (lists folder names only, removes those with no owner).
-4. R7b: add the production environment variables on expo.dev with `eas env:create` from this computer (Supabase URL, anon key, `APP_VARIANT=production`).
+## Live changes (OK'd by Idan 2026-11-20, decision 12)
+1. ✅ Apply 0040, then deploy `nutrition-suggest`: done 2026-11-20 and verified (one plan from the app; `ai_usage` count = 1).
+2. Not done yet: deploy `delete-account` (9c5eed1) through the Supabase connector, then verify with a throwaway test account.
+3. Not done yet: one-off sweep of orphaned photo folders (list folder names and object counts only; show Idan the count and get a yes before deleting, since it can't be undone; Supabase may block direct deletes from `storage.objects`, so delete through the Storage API or the dashboard).
+4. Not done yet: R7b, add the production environment variables on expo.dev with `eas env:create` from this computer (Supabase URL, anon key, `APP_VARIANT=production`).
 
 ## Idan's manual tasks
 - **Today, security:** remove his own number from Auth → Phone → test numbers (S1); confirm the Email provider is off and rotate the two dev passwords (S2); delete `send-trainer-digest` and `send-reminders` in Edge Functions (S3).
 - Set a monthly spend limit in the Anthropic console (R9's second half).
+- From the checkpoint answers: make the GitHub repo private (A14); create the CoachFlow Gmail and the public `coachflow-site` repo with Pages on (decision 4, RUNBOOK 0.4–0.5); buy the SMS4Free "CoachFlow" sender (decision 5); create the sentry.io account (EU region) and send the DSN (decision 9).
+- Report the rest of the Checkpoint 0+1 smoke test (steps 1–7 and 9).
 - RUNBOOK Part 0: Play account type/date, 15–20 Android testers, Apple Developer enrollment, support email.
 - RUNBOOK 1.1–1.3 before the first store build.
 

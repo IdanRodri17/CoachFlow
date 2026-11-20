@@ -71,7 +71,7 @@ Listed in STATUS.md → "Migrations to apply". The lead applies them through the
 
 ## Part 2 — The first Android build
 
-1. Confirm the package name `com.idan.coachflow` (it can never change after the first upload).
+1. Check that app.json says `com.coachflow.app` (decided 2026-11-20; it can never change after the first upload).
 2. From the repo folder (or ask the lead to run it):
    ```
    npx eas-cli build --platform android --profile production
@@ -132,7 +132,7 @@ Fill in each item using the drafted answers in `docs/release/store/`. Play Conso
 *(Once the Apple Developer account is active.)*
 
 ### 4.1 Create the app record
-App Store Connect → **Apps** → **+** → **New App**: iOS, name, primary language **Hebrew**, bundle ID `com.idan.coachflow` (it appears after the first build registers it, or register it under Certificates, Identifiers & Profiles), SKU `coachflow-ios`.
+App Store Connect → **Apps** → **+** → **New App**: iOS, name, primary language **Hebrew**, bundle ID `com.coachflow.app` (it appears after the first build registers it, or register it under Certificates, Identifiers & Profiles), SKU `coachflow-ios`.
 - **The name must be unique on the whole App Store.** If "CoachFlow" is taken, use a variant such as "CoachFlow – אימון אישי". The name on the phone's home screen stays "CoachFlow".
 
 ### 4.2 First iOS build (interactive, once, on this computer)
