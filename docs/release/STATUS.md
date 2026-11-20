@@ -2,7 +2,7 @@
 Phase: 1 done (audits A, B, C, D merged) · **Checkpoint 0+1 answered 2026-11-20** (see "Decisions (Idan)") · Branch: `cloud/release-1.0`
 **Priority (Idan, 2026-11-20): one united session; bugs and UI/UX first, deployment after.** Since 2026-11-20 a single local session ("CoachFlow: bugs & UI/UX, then release") does all the work. The release lead, the cloud session and 6 older local sessions are archived, and every cloud branch is contained in this one, except v28's app code (post-launch, on cloud/dev). Work from the "Now: bugs and UI/UX" list below; the release table after it is parked.
 Baseline at a6d570e: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 138/138 (9 files)
-Now: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 147/147 (10 files) · `expo export --platform ios` ✓
+Now (f8b60fb): typecheck ✓ · lint ✓ (0 errors, 4 warnings) · tests 154/154 (11 files) · `expo export --platform ios` ✓
 
 P0 = blocks store submission or leaks data · P1 = before the public launch · P2 = after launch.
 Audit ids: A = store compliance, B = Supabase security, C = app robustness, D = build config.
@@ -17,13 +17,13 @@ Merged from the cloud session's final report (it checked each item against cloud
 | 2 | CF2 | Unticking someone in a group session leaves their package one session too many used; re-ticking counts it twice | group attendance | live | ✅ **0043 live 2026-11-20** (3c3ac7d); in-app check: untick someone on a group sheet, the package gets the session back |
 | 3 | U1 | Packages already miscounted by past unticks aren't corrected | client card → package | live data | ✅ checked 2026-11-20, nothing to fix: the live DB has 1 package, in no group session. Its used_sessions = 4 = exactly the completed workouts whose log `completed_at` is after the package's `created_at` (13 more were done before it existed and correctly don't count). The app only ever completes a workout by UPDATE, so the AFTER UPDATE trigger sees every completion. Re-check if group sessions get real use before 0043 matters |
 | 4 | R2 | Deleting an account leaves progress photos on the server | Profile → delete account | live | code ✅ 9c5eed1; deploy delete-account (OK'd 2026-11-20, not done) |
-| 5 | C5, C6 | A deleted or wrong item opens a raw error | detail screens | JS | todo (batch 2) |
-| 6 | C7, C8 | Saves and deletes fail with no message when offline | most editing screens | JS | todo (batch 2) |
-| 7 | C9, C10 | Home and the Library show no error or retry when loading fails | Home, Library | JS | todo (batch 2) |
-| 8 | C11, C15, C16 | Raw English server errors in the Hebrew app (e.g. finishing a workout) | many | JS | todo (batch 2) |
-| 9 | C12 | "Not found" screens have no back button; iPhone users get stuck | detail screens | JS | todo (batch 2) |
-| 10 | C13, C14 | Two detail screens are blank while loading; a missing photo address shows a broken image | detail screens, progress photos | JS | todo (batch 2) |
-| 11 | A9 | The delete-account warning mentions "messages" (none exist) and doesn't say what a trainer's deletion removes | Profile → delete account | JS | todo |
+| 5 | C5, C6 | A deleted or wrong item opens a raw error | detail screens | JS | ✅ f8b60fb (PGRST116 → the screen's own not-found text; handlers guard instead of `data!`) · phone check |
+| 6 | C7, C8 | Saves and deletes fail with no message when offline | most editing screens | JS | ✅ f8b60fb (mutations `networkMode: "always"` + MutationCache alert unless `onError`/`meta.inlineError`) · phone check |
+| 7 | C9, C10 | Home and the Library show no error or retry when loading fails | Home, Library | JS | ✅ f8b60fb (`InlineError` + retry on both Homes, Library, templates, clients, schedule, money, nutrition) · phone check |
+| 8 | C11, C15, C16 | Raw English server errors in the Hebrew app (e.g. finishing a workout) | many | JS | ✅ f8b60fb (`lib/friendlyError.ts` + 7 tests; no `(x as Error).message` left on screen) · phone check |
+| 9 | C12 | "Not found" screens have no back button; iPhone users get stuck | detail screens | JS | ✅ f8b60fb (`ScreenMessage`: back, with a fallback route, + retry when it helps) · phone check |
+| 10 | C13, C14 | Two detail screens are blank while loading; a missing photo address shows a broken image | detail screens, progress photos | JS | ✅ f8b60fb (`ScreenLoading` on exercise + template; photos already filtered to signed ones, assertions removed) · phone check |
+| 11 | A9 | The delete-account warning mentions "messages" (none exist) and doesn't say what a trainer's deletion removes | Profile → delete account | JS | ✅ f8b60fb (role-specific he/en text) · true for photos only once delete-account (#4) is deployed |
 | 12 | U2 | The finished-workout summary still uses the pre-redesign colours (fixes doc D1) | workout summary | JS | todo |
 | 13 | U3 | A white flash before the background appears; old styling left in the exercise video box (fixes doc D3) | app start, exercise screen | JS (+ native for the splash colour) | todo |
 | 14 | U4 | No "renew package": the trainer types a running total (10 → 20), and typing 10 again still shows it used up (fixes doc P1) | client card → package | JS (+ maybe live) | todo, design first |
@@ -129,6 +129,7 @@ Asked at Checkpoint 0+1 on 2026-11-19; answered 2026-11-20.
 Result so far: step 8 passed on 2026-11-20 (with the cap live; `ai_usage` count = 1). Steps 1–7 and 9 not reported yet.
 
 ## Decisions I made (conservative defaults)
+- Batch 2 (2026-11-20): mutations use `networkMode: "always"` (queries keep "online"). Paused-while-offline saves looked like a frozen button and the app has no persisted offline queue, so failing fast with "no connection" + retry is the honest option; the workout save is safe to retry (complete_workout, F3). `.single()` stays on detail reads: `screenError()` turns its PGRST116 into the screen's not-found text, which needed no query-shape changes.
 - Migration 0039 is v28's `volume_milestones` (the `client_volume` view + 5 `volume_*` badge types). It went live on 2026-11-18 from the cloud session. It's additive, and 1.0 code doesn't read it. This branch carries the same file, byte for byte from cloud/dev, so its migrations match the live DB. v28's app code stays post-launch. R9's `ai_usage` became **0040**, R15's `trainer_clients` policy **0041**, R8's `ai_reports` is planned as **0042**. **0043** is cloud/dev's `uncomplete_returns_session` (18139dd, numbered after the release branch on purpose). The next free number is **0044**.
 - Cherry-picked cloud/dev 79c3231 (the Pressable/swipe fix): it doesn't depend on v28 (the only shared file, progress.tsx, differs by one import line). Its new lint rule flagged `ErrorScreen.tsx`; exempted it (c95b3c4) rather than importing the kit, because the root boundary renders outside every provider and uses a plain object style.
 - R9: cap 20 calls per trainer per Asia/Jerusalem day; counted after the request validates and before the Anthropic call, so a failed Anthropic call still counts; the function fails closed (500) if the check errors. `consume_ai_call` is plpgsql: the dry run showed Postgres rejects a data-modifying WITH nested inside `exists()`.
