@@ -30,7 +30,7 @@ Format: `- [ ] id · title · type · files · done when`. Audit findings get th
 - [ ] I8 · Apple Developer Program enrollment ($99/year)
 
 ## Bugs and unfinished work from the cloud chat
-*(Not visible from the local session. Idan pastes the cloud chat's list here; each line gets a B-id.)*
+Merged 2026-11-20 into STATUS.md → "Now: bugs and UI/UX" (CF/C/A/R/S ids kept, new items numbered U1–U8). That list is the source of truth; the cloud session is retired.
 
 ## Out of 1.0 (post-launch), from the cloud brief
 - V28 volume milestones app code (cloud/dev caf978c; its migration 0039 went live 2026-11-18)

@@ -1,12 +1,43 @@
 # Release 1.0 — status (updated 2026-11-19 evening by Opus 5.5)
 Phase: 1 done (audits A, B, C, D merged) · **Checkpoint 0+1 answered 2026-11-20** (see "Decisions (Idan)") · Branch: `cloud/release-1.0`
-**Priority (Idan, 2026-11-20, relayed by the other local session): one united session; bugs and UI/UX first, deployment after.** The release lead session (this file's author until now) stopped here and handed over; nothing below is in flight.
+**Priority (Idan, 2026-11-20): one united session; bugs and UI/UX first, deployment after.** Since 2026-11-20 a single local session ("CoachFlow: bugs & UI/UX, then release") does all the work. The release lead, the cloud session and 6 older local sessions are archived, and every cloud branch is contained in this one, except v28's app code (post-launch, on cloud/dev). Work from the "Now: bugs and UI/UX" list below; the release table after it is parked.
 Baseline at a6d570e: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 138/138 (9 files)
 Now: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 147/147 (10 files) · `expo export --platform ios` ✓
 
 P0 = blocks store submission or leaks data · P1 = before the public launch · P2 = after launch.
 Audit ids: A = store compliance, B = Supabase security, C = app robustness, D = build config.
 Ship type: **JS** = reaches testers by OTA update · **native** = needs a new store build · **live** = a change to Supabase/expo.dev, no build.
+
+## Now: bugs and UI/UX (united list, 2026-11-20)
+Merged from the cloud session's final report (it checked each item against cloud/dev and this branch on 2026-11-20), its fixes document ([CoachFlow — רשימת תיקונים](https://claude.ai/artifact/Cvg1hpxbs6CTiBkYF5kzzj), status section last updated 2026-11-06, now historical) and the release audits. Items that already had an id keep it; new ones get **U** ids. (The fixes document's own ids D1/D3/D4/P1–P3/F6 collide with the audit ids, so they're only quoted.) Ordered in the order to work them.
+
+| # | id | problem | where | type | state |
+|---|----|---------|-------|------|-------|
+| 1 | CF1 | Phone check of the layout fix: the "+" circle, rows side by side, swipe actions (incl. the Hebrew swipe direction, never checked on a phone) | tab bar, מתאמנים, תרגילים, תבניות, לוח זמנים | JS | **Idan:** smoke steps 1–7 and 9 below |
+| 2 | CF2 | Unticking someone in a group session leaves their package one session too many used; re-ticking counts it twice | group attendance | live | 0043 committed (3c3ac7d), **not applied**; dry-run then apply with Idan's OK |
+| 3 | U1 | Packages already miscounted by past unticks aren't corrected | client card → package | live data | after 0043: count mismatched packages (aggregates only), show Idan, fix only with his OK |
+| 4 | R2 | Deleting an account leaves progress photos on the server | Profile → delete account | live | code ✅ 9c5eed1; deploy delete-account (OK'd 2026-11-20, not done) |
+| 5 | C5, C6 | A deleted or wrong item opens a raw error | detail screens | JS | todo (batch 2) |
+| 6 | C7, C8 | Saves and deletes fail with no message when offline | most editing screens | JS | todo (batch 2) |
+| 7 | C9, C10 | Home and the Library show no error or retry when loading fails | Home, Library | JS | todo (batch 2) |
+| 8 | C11, C15, C16 | Raw English server errors in the Hebrew app (e.g. finishing a workout) | many | JS | todo (batch 2) |
+| 9 | C12 | "Not found" screens have no back button; iPhone users get stuck | detail screens | JS | todo (batch 2) |
+| 10 | C13, C14 | Two detail screens are blank while loading; a missing photo address shows a broken image | detail screens, progress photos | JS | todo (batch 2) |
+| 11 | A9 | The delete-account warning mentions "messages" (none exist) and doesn't say what a trainer's deletion removes | Profile → delete account | JS | todo |
+| 12 | U2 | The finished-workout summary still uses the pre-redesign colours (fixes doc D1) | workout summary | JS | todo |
+| 13 | U3 | A white flash before the background appears; old styling left in the exercise video box (fixes doc D3) | app start, exercise screen | JS (+ native for the splash colour) | todo |
+| 14 | U4 | No "renew package": the trainer types a running total (10 → 20), and typing 10 again still shows it used up (fixes doc P1) | client card → package | JS (+ maybe live) | todo, design first |
+| 15 | U5 | No way to archive or remove a client; the list only grows (fixes doc P2) | מתאמנים | JS + live | todo, design first |
+| 16 | U6 | A mistaken "mark as done" can't be undone outside group sessions (fixes doc P3); the DB side is ready in 0043 | calendar → workout | JS | after #2 |
+| 17 | U7 | Badges (incl. volume) aren't awarded when the trainer logs the workout, only at the client's next own save | client Progress → badges | JS or live | todo, investigate |
+| 18 | U8 | Changing a client's price rewrites past months' income and unpaid amounts (fixes doc F6) | money screen, Home money card, client card | live + JS | todo, needs a design decision (price snapshot per session) |
+| — | R12 | Icon and splash are still Expo's blue "A" (approved CF icon not wired) | home screen, launch | native | parked with the release work (Expo Go can't show it) |
+| — | R1 | "Terms of use" is underlined but opens nothing; no privacy link | onboarding, Profile | JS | blocked: hosting (decision 4) |
+| — | S1–S4 | Idan's number as a test number; dev passwords in git history; two old functions accept any user; SMS abuse | Supabase | live | **Idan's tasks** (table below) |
+| — | C17 | Six old lint warnings (setState in effects, Date.now() in render, ref read in render, i18n import style) | code health | JS | P2 |
+| — | — | v28 volume card uses stand-in icons; `client_volume` typed by hand on cloud/dev | cloud/dev only | — | post-launch, with v28 |
+
+## Release table (parked until Idan reopens deployment)
 
 | id | item | type | P | owner | done when | state |
 |----|------|------|---|-------|-----------|-------|
@@ -65,8 +96,8 @@ When release work resumes, in this order:
 3. Live changes Idan OK'd on 2026-11-20 that are **not done yet** (list under "Live changes"): deploy delete-account + verify; the orphan photo sweep (list first; confirm the count with Idan before deleting, it can't be undone); production variables on expo.dev.
 4. R1 + R3: store-writer drafts the he/en privacy, terms and deletion pages for GitHub Pages (`coachflow-site`); implementer adds `lib/legal.ts` and the links once Idan has the repo URL and the CoachFlow Gmail.
 5. R15 (0041), A10 seed SQL, then batch 2 (C5–C14).
-- Ask Idan for the cloud chat's remaining bug list (still open).
-- 0043 (CF2, the group untick fix) is committed but not applied; Idan OKs it in the cloud chat. Dry-run first.
+- ~~Ask Idan for the cloud chat's remaining bug list~~ Merged 2026-11-20 into "Now: bugs and UI/UX" at the top.
+- 0043 (CF2, the group untick fix) is committed but not applied; Idan OKs it in this session now (the cloud session is retired). Dry-run first.
 - Two local sessions shared this folder on 2026-11-19/20 and handed changes back and forth cleanly. Before editing, check `git status` for files you didn't touch.
 - Idan's deployment lessons (written 2026-11-19, private artifact): https://claude.ai/artifact/EQso9No98gJD2jLQziwbA4
 
@@ -118,7 +149,7 @@ Live through 0040.
 - ✅ **0040 `ai_usage`** (R9), applied 2026-11-20 as `0040_ai_usage`. Dry runs ✓ 2026-11-19 and 2026-11-20 (rolled back): FK rejects unknown ids; calls 1–2 of cap 2 → true, 3–4 → false with the counter staying at 2; a second trainer counted separately; `authenticated` and `anon` denied execute, select and insert; nothing persisted. After the apply: RLS on, service_role can execute, app roles have no privileges, 0 rows. Advisors: one new INFO `rls_enabled_no_policy` on ai_usage (intended); no new WARN.
 1. 0041 `trainer_clients` client delete policy (R15) — planned.
 2. 0042 `ai_reports` (R8) — planned.
-3. 0043 `uncomplete_returns_session` (CF2, cherry-picked as 3c3ac7d) — file committed; Idan OKs applying it in the cloud chat. Dry-run it like 0040 first.
+3. 0043 `uncomplete_returns_session` (CF2, cherry-picked as 3c3ac7d) — file committed; Idan OKs applying it in this session. Dry-run it like 0040 first.
 
 ## Live changes (OK'd by Idan 2026-11-20, decision 12)
 1. ✅ Apply 0040, then deploy `nutrition-suggest`: done 2026-11-20 and verified (one plan from the app; `ai_usage` count = 1).
