@@ -10,9 +10,8 @@
 //
 // Attendance opens on the day itself, like "סימון כבוצע" on the calendar. A
 // row with a workout log (logged in the workout screen) stays done here.
-// Known gap, reported rather than patched: trg_increment_used_sessions counts
-// only the change TO completed, so unchecking someone leaves their package
-// one session short.
+// Unchecking someone gives their package the session back
+// (trg_increment_used_sessions counts both ways since 0043).
 
 import { ActivityIndicator, RefreshControl, ScrollView, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
