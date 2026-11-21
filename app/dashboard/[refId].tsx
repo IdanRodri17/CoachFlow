@@ -126,8 +126,10 @@ type Detail = {
     paid: boolean;
     prs: number;
   }[];
-  /** App clients: the oldest "with trainer" session up to today that isn't
-   * marked yet — the trainer confirms "we trained" (Idan, 2026-11-21). */
+  /** App clients: the latest "with trainer" session of the last 7 days
+   * that isn't marked yet — the trainer confirms "we trained" (Idan,
+   * 2026-11-21). Newest first and only the last week: oldest-first offered a
+   * missed session from July, and each tap revealed the next old one. */
   markable: { id: string; scheduled_date: string; template_name: string } | null;
   /** Weigh-ins, oldest first. */
   weights: { date: string; value: number }[];
@@ -279,7 +281,8 @@ function ClientCardBody() {
           .eq("status", "scheduled")
           .eq("with_trainer", true)
           .lte("scheduled_date", today)
-          .order("scheduled_date", { ascending: true })
+          .gte("scheduled_date", addDays(today, -6))
+          .order("scheduled_date", { ascending: false })
           .limit(1)
           .maybeSingle();
         if (markRes.error) throw markRes.error;

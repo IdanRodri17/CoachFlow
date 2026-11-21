@@ -69,6 +69,7 @@ export const qk = {
   scheduledClient: {
     all: ["scheduled-client"] as const,
     upcoming: ["scheduled-client", "upcoming"] as const,
+    previous: ["scheduled-client", "previous"] as const,
     week: (weekStart: string) => ["scheduled-client", "week", weekStart] as const,
   },
 

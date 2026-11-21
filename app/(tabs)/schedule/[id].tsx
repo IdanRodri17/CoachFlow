@@ -23,6 +23,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Dumbbell from "lucide-react-native/icons/dumbbell";
 import Eye from "lucide-react-native/icons/eye";
+import Undo2 from "lucide-react-native/icons/undo-2";
 
 import { qk } from "@/lib/queryKeys";
 import { friendlyError, screenError } from "@/lib/friendlyError";
@@ -97,14 +98,25 @@ function EditScheduleScreenBody() {
 
   const workout = useQuery({
     queryKey: qk.scheduledTrainer.one(id),
-    queryFn: async (): Promise<{ initial: ScheduleFormInitial; row: LoadedRow }> => {
+    queryFn: async (): Promise<{ initial: ScheduleFormInitial; row: LoadedRow; hasLog: boolean }> => {
       const { data, error } = await supabase
         .from("scheduled_workouts")
         .select("*")
         .eq("id", id)
         .single();
       if (error) throw error;
+      // U6: a session only marked done (no workout log) can be un-marked.
+      let hasLog = false;
+      if (data.status === "completed") {
+        const logs = await supabase
+          .from("workout_logs")
+          .select("id", { count: "exact", head: true })
+          .eq("scheduled_workout_id", id);
+        if (logs.error) throw logs.error;
+        hasLog = (logs.count ?? 0) > 0;
+      }
       return {
+        hasLog,
         initial: {
           client: data.client_id
             ? { kind: "app", refId: data.client_id }
@@ -186,6 +198,28 @@ function EditScheduleScreenBody() {
       router.back();
     },
   });
+
+  // U6 (2026-11-21): undo a mistaken "סימון כבוצע". 0043 gives the session
+  // back to the package; 0036's guard allows the status change.
+  const unmark = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from("scheduled_workouts").update({ status: "scheduled" }).eq("id", id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.all });
+      queryClient.invalidateQueries({ queryKey: qk.package.all });
+      queryClient.invalidateQueries({ queryKey: qk.clientDetail.all });
+      queryClient.invalidateQueries({ queryKey: qk.money.all });
+    },
+  });
+
+  function confirmUnmark() {
+    Alert.alert(t("schedule.detail.undoDone"), t("schedule.detail.undoDoneConfirm"), [
+      { text: t("common.cancel"), style: "cancel" },
+      { text: t("schedule.detail.undoDone"), style: "destructive", onPress: () => unmark.mutate() },
+    ]);
+  }
 
   // How many later workouts of the series a scope question would cover.
   // Asked at tap time, so it's never stale. If the lookup fails, act on this
@@ -294,6 +328,16 @@ function EditScheduleScreenBody() {
           />
           {row.notes ? <ListRow title={row.notes} subtitle={t("sessionForm.note")} /> : null}
         </ListCard>
+        {workout.data.hasLog ? null : (
+          <Button
+            label={t("schedule.detail.undoDone")}
+            icon={Undo2}
+            variant="secondary"
+            block
+            loading={unmark.isPending}
+            onPress={confirmUnmark}
+          />
+        )}
         <Card style={{ padding: 14 }}>
           <AppText size={14} tone="graphite">
             {t("schedule.detail.completedLocked")}

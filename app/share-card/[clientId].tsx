@@ -21,6 +21,7 @@ import { Redirect, useLocalSearchParams, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { captureRef } from "react-native-view-shot";
 import * as Sharing from "expo-sharing";
+import { File, Paths } from "expo-file-system";
 import { useTranslation } from "react-i18next";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import Share from "lucide-react-native/icons/share";
@@ -30,6 +31,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
+import { shareFileName } from "@/lib/shareFileName";
 import { useMyTrainer } from "@/lib/useMyTrainer";
 import { firstName, monthName } from "@/components/home/format";
 import { AppText, Button, colors, Display, IconButton, Num } from "@/components/ui";
@@ -93,13 +95,18 @@ function ShareCardBody() {
     setError(null);
     setSharing(true);
     try {
-      const uri = await captureRef(cardRef, { format: "png", quality: 0.95 });
+      const shot = await captureRef(cardRef, { format: "png", quality: 0.95 });
       const available = await Sharing.isAvailableAsync();
       if (!available) {
         setError(t("shareCard.sharingUnavailable"));
         return;
       }
-      await Sharing.shareAsync(uri, { mimeType: "image/png" });
+      // A readable name in the share sheet, not the capture's UUID
+      // (lib/shareFileName.ts). Same name twice in a day: replace the old one.
+      const named = new File(Paths.cache, shareFileName(card.data?.name, todayISO()));
+      if (named.exists) named.delete();
+      await new File(shot).move(named);
+      await Sharing.shareAsync(named.uri, { mimeType: "image/png", UTI: "public.png" });
     } catch (e) {
       setError(friendlyError(e, t));
     } finally {

@@ -6,6 +6,14 @@
 // client completes, or one the trainer moves, shows on the other phone at
 // once. Realtime applies RLS, so no one hears about a row they can't read.
 //
+// The channel name is unique per mount. realtime-js hands back an existing
+// channel when the topic matches, so a second mount of the tab layout (it
+// happens: the client card pushes a tab route from outside the tabs) got the
+// first one's already-subscribed channel, and adding a listener to it threw
+// "cannot add postgres_changes callbacks … after subscribe()" — the crash
+// behind "something went wrong" on an upcoming session (2026-11-21). Its
+// cleanup would also have removed the first mount's channel.
+//
 // A burst of changes (a group or a repeat inserts many rows at once) is
 // collapsed into one refetch. Deletes aren't delivered to a filtered
 // subscription; the refetch on returning to the app (app/_layout.tsx)
@@ -42,8 +50,9 @@ export function useScheduleRealtime(userId: string | undefined, role: "trainer" 
       }, BURST_MS);
     };
 
+    const instance = Math.random().toString(36).slice(2, 10);
     const channel = supabase
-      .channel(`schedule:${userId}`)
+      .channel(`schedule:${userId}:${instance}`)
       .on(
         "postgres_changes",
         { event: "*", schema: "public", table: "scheduled_workouts", filter: `${column}=eq.${userId}` },

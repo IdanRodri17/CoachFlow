@@ -59,6 +59,7 @@ import {
   Icon,
   IconButton,
   ListCard,
+  ListRow,
   Num,
   type IconComponent,
   Pressable,
@@ -112,6 +113,29 @@ export function ClientToday() {
         ...s,
         template_name: s.template_id ? names.get(s.template_id) ?? "Workout" : "Workout",
       }));
+    },
+  });
+
+  // The latest completed sessions (logged by the client or marked by the
+  // trainer); each opens its summary (2026-11-21: clients only saw upcoming).
+  const previous = useQuery({
+    queryKey: qk.scheduledClient.previous,
+    queryFn: async () => {
+      const { data: sws, error } = await supabase
+        .from("scheduled_workouts")
+        .select("id, scheduled_date, template_id, with_trainer")
+        .eq("client_id", clientId)
+        .eq("status", "completed")
+        .order("scheduled_date", { ascending: false })
+        .limit(5);
+      if (error) throw error;
+      const tplIds = [...new Set(sws.map((s) => s.template_id).filter(Boolean) as string[])];
+      const names = new Map<string, string>();
+      if (tplIds.length > 0) {
+        const { data } = await supabase.from("workout_templates").select("id, name").in("id", tplIds);
+        data?.forEach((tpl) => names.set(tpl.id, tpl.name));
+      }
+      return sws.map((s) => ({ ...s, template_name: s.template_id ? names.get(s.template_id) ?? null : null }));
     },
   });
 
@@ -302,6 +326,30 @@ export function ClientToday() {
                 onOpen={() => router.push(`/workout/${s.id}`)}
                 onEarlier={() => shiftDay(s, -1)}
                 onLater={() => shiftDay(s, 1)}
+              />
+            ))}
+          </ListCard>
+        </View>
+      ) : null}
+
+      {(previous.data ?? []).length > 0 ? (
+        <View style={{ gap: 10 }}>
+          <View style={{ minHeight: 32, justifyContent: "center" }}>
+            <AppText size={18} weight="semibold" lineHeight={23}>
+              {t("today.previous")}
+            </AppText>
+          </View>
+          <ListCard>
+            {(previous.data ?? []).map((p) => (
+              <ListRow
+                key={p.id}
+                title={p.template_name ?? t("workout.freeWorkout")}
+                subtitle={`${weekdayLetter(p.scheduled_date, i18n.language)} ${shortDate(p.scheduled_date, i18n.language)} · ${
+                  p.with_trainer ? t("today.withTrainer") : t("today.solo")
+                }`}
+                trailing={<Chip kind="done" label={t("today.done")} />}
+                chevron
+                onPress={() => router.push(`/workout/${p.id}`)}
               />
             ))}
           </ListCard>
@@ -634,7 +682,8 @@ function HeroCard({
         </View>
       ) : null}
 
-      {done ? (
+      {/* A later day's workout opens as a preview (it starts on its day). */}
+      {done || !isToday ? (
         <Button label={t("today.viewWorkout")} variant="dark" size={56} block onPress={onStart} />
       ) : (
         <Button label={t("today.startWorkout")} variant="accent" size={64} icon={FilledPlay} block onPress={onStart} />

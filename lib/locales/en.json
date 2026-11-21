@@ -254,7 +254,9 @@
       "editExercises": "Edit the exercises",
       "editExercisesHint": "Changes the template, so every session that uses it.",
       "package": "Package",
-      "packageHint": "Sessions, price and renewal, on the client card."
+      "packageHint": "Sessions, price and renewal, on the client card.",
+      "undoDone": "Undo \"done\"",
+      "undoDoneConfirm": "The session goes back to not done, and the package gets it back."
     }
   },
   "clients": {
@@ -688,6 +690,7 @@
     "viewWorkout": "View workout",
     "done": "Done",
     "upNext": "Up next",
+    "previous": "Previous workouts",
     "dayEarlier": "One day earlier",
     "dayLater": "One day later",
     "checkinTitle": "Weekly check-in",
