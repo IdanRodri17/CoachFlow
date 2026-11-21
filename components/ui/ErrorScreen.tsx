@@ -8,8 +8,13 @@
 
 import { Pressable, Text, View } from "react-native";
 import { useTranslation } from "react-i18next";
+import Constants, { ExecutionEnvironment } from "expo-constants";
 
 import { layoutDirection } from "@/lib/i18n";
+
+// Expo Go = a preview update, never a store build: show what crashed so a
+// screenshot from the phone test names the cause (__DEV__ is false there).
+const SHOW_DETAILS = __DEV__ || Constants.executionEnvironment === ExecutionEnvironment.StoreClient;
 
 export function ErrorScreen({
   error,
@@ -17,7 +22,7 @@ export function ErrorScreen({
   title,
   body,
 }: {
-  /** Shown only under __DEV__. */
+  /** Shown in development and in Expo Go previews, never in a store build. */
   error?: Error;
   onRetry: () => void;
   title?: string;
@@ -41,8 +46,8 @@ export function ErrorScreen({
       <Text style={{ fontSize: 16, color: "#55585E", textAlign: "center", marginTop: 8 }}>
         {body ?? t("error.body")}
       </Text>
-      {__DEV__ && error ? (
-        <Text style={{ fontSize: 12, color: "#B0381B", textAlign: "left", marginTop: 12 }}>
+      {SHOW_DETAILS && error ? (
+        <Text selectable style={{ fontSize: 12, color: "#B0381B", textAlign: "left", marginTop: 12 }}>
           {error.message}
         </Text>
       ) : null}

@@ -518,7 +518,8 @@ function WorkoutMode({
         <RestView session={session} title={title} onMinimize={minimize} onOverview={() => setSheet("overview")} />
       ) : (
         <FinishView
-          subtitle={`${title} · ${longDate(todayISO(), i18n.language)}`}
+          // The session's own day: a late log of yesterday's workout is still yesterday's.
+          subtitle={`${title} · ${longDate(data.scheduledDate, i18n.language)}`}
           startedAt={s.startedAt}
           trainerName={trainerName}
           showDuration={data.exercises.length > 0}
