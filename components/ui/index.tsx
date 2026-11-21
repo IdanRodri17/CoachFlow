@@ -116,6 +116,8 @@ export const colors = {
   ash: "#A4A8AE",
   ash2: "#80858C",
   barPast: "#8C8F95",
+  // WhatsApp's own green; ink on it reads at 9.8:1 (white would be 2:1).
+  whatsapp: "#25D366",
 } as const;
 export type Tone = keyof typeof colors;
 
@@ -383,7 +385,8 @@ export type ButtonVariant =
   | "dark"
   | "darkOutline"
   | "darkGhost"
-  | "bone";
+  | "bone"
+  | "whatsapp";
 
 const BUTTON_LOOK: Record<ButtonVariant, { bg: string; fg: string; border?: string }> = {
   bone: { bg: colors.bone, fg: colors.ink }, // the light button on an ink card
@@ -396,6 +399,7 @@ const BUTTON_LOOK: Record<ButtonVariant, { bg: string; fg: string; border?: stri
   dark: { bg: colors.iron3, fg: colors.bone },
   darkOutline: { bg: "transparent", fg: colors.bone, border: colors.ironLine },
   darkGhost: { bg: "transparent", fg: colors.bone },
+  whatsapp: { bg: colors.whatsapp, fg: colors.ink },
 };
 
 // height → [radius, horizontal padding, font size, icon size]
@@ -524,7 +528,7 @@ export function TextButton({
   );
 }
 
-export type IconButtonVariant = "soft" | "dark" | "primary" | "ghost" | "paper";
+export type IconButtonVariant = "soft" | "dark" | "primary" | "ghost" | "paper" | "whatsapp";
 
 const ICON_BUTTON_LOOK: Record<IconButtonVariant, { bg: string; fg: string; border?: string }> = {
   soft: { bg: colors.mist, fg: colors.ink },
@@ -532,6 +536,7 @@ const ICON_BUTTON_LOOK: Record<IconButtonVariant, { bg: string; fg: string; bord
   primary: { bg: colors.ink, fg: colors.white },
   ghost: { bg: "transparent", fg: colors.ink },
   paper: { bg: colors.paper, fg: colors.ink, border: colors.lineStrong },
+  whatsapp: { bg: colors.whatsapp, fg: colors.ink },
 };
 
 /** Icon-only button. `accessibilityLabel` is required — there's no text. */

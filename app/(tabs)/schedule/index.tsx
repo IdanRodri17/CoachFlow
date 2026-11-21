@@ -562,6 +562,7 @@ function SessionRow({
           ) : link ? (
             <IconButton
               icon={MessageCircle}
+              variant="whatsapp"
               accessibilityLabel={t("trainerHome.remindWhatsApp")}
               onPress={() => Linking.openURL(link)}
             />

@@ -592,7 +592,7 @@ function ClientCardBody() {
         <QuickAction
           icon={MessageCircle}
           label={t("clientCard.actions.whatsapp")}
-          primary
+          whatsapp
           disabled={!wa}
           onPress={() => {
             if (wa) void Linking.openURL(wa);
@@ -771,14 +771,19 @@ function QuickAction({
   label,
   onPress,
   primary,
+  whatsapp,
   disabled,
 }: {
   icon: IconComponent;
   label: string;
   onPress: () => void;
   primary?: boolean;
+  /** WhatsApp's green, like every WhatsApp button in the app. */
+  whatsapp?: boolean;
   disabled?: boolean;
 }) {
+  const bg = whatsapp ? colors.whatsapp : primary ? colors.ink : colors.paper;
+  const filled = whatsapp || primary;
   return (
     <Pressable
       accessibilityRole="button"
@@ -795,12 +800,12 @@ function QuickAction({
           borderRadius: 18,
           alignItems: "center",
           justifyContent: "center",
-          backgroundColor: primary ? colors.ink : colors.paper,
-          borderWidth: primary ? 0 : 1,
+          backgroundColor: bg,
+          borderWidth: filled ? 0 : 1,
           borderColor: colors.lineStrong,
         }}
       >
-        <Icon icon={icon} size={24} color={primary ? colors.white : colors.ink} />
+        <Icon icon={icon} size={24} color={primary && !whatsapp ? colors.white : colors.ink} />
       </View>
       <AppText size={13} weight="semibold" center numberOfLines={1}>
         {label}

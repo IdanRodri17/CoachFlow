@@ -30,7 +30,14 @@ import { Alert, I18nManager, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import * as Haptics from "expo-haptics";
 import ReanimatedSwipeable, { type SwipeableMethods } from "react-native-gesture-handler/ReanimatedSwipeable";
-import Animated, { FadeInDown, FadeOutDown, useAnimatedStyle, type SharedValue } from "react-native-reanimated";
+import Animated, {
+  Extrapolation,
+  FadeInDown,
+  FadeOutDown,
+  interpolate,
+  useAnimatedStyle,
+  type SharedValue,
+} from "react-native-reanimated";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 
 import { AppText, Button, colors, fonts, Icon, Pressable, Sheet, useRTL, type IconComponent } from "./index";
@@ -50,7 +57,7 @@ export type RowAction = {
 const TONE: Record<RowActionTone, { bg: string; fg: string }> = {
   edit: { bg: colors.mist, fg: colors.ink },
   done: { bg: colors.volt, fg: colors.ink },
-  whatsapp: { bg: colors.skySoft, fg: colors.sky },
+  whatsapp: { bg: colors.whatsapp, fg: colors.ink },
   delete: { bg: colors.ember, fg: colors.white },
   neutral: { bg: colors.mist, fg: colors.graphite },
 };
@@ -116,10 +123,12 @@ export function ActionRow({
               opacity: pressed ? 0.8 : 1,
             })}
           >
-            <Icon icon={a.icon} size={22} color={tone.fg} />
-            <AppText size={12} weight="semibold" lineHeight={15} center numberOfLines={1} style={{ color: tone.fg }}>
-              {a.label}
-            </AppText>
+            <ActionContent progress={progress}>
+              <Icon icon={a.icon} size={22} color={tone.fg} />
+              <AppText size={12} weight="semibold" lineHeight={15} center numberOfLines={1} style={{ color: tone.fg }}>
+                {a.label}
+              </AppText>
+            </ActionContent>
           </Pressable>
         );
       })}
@@ -182,12 +191,24 @@ export function ActionRow({
 }
 
 /** The swipe actions, hidden while the row is closed (`progress` is 0), and in
- * the app's direction so the first one sits nearest the row. */
+ * the app's direction so the first one sits nearest the row. They fade in over
+ * the first part of the swipe; a hard 0 → 1 made them pop in at the first
+ * pixel (Idan's phone test, 2026-11-21). */
 function ActionStrip({ progress, rtl, children }: { progress: SharedValue<number>; rtl: boolean; children: ReactNode }) {
-  const visible = useAnimatedStyle(() => ({ opacity: progress.value === 0 ? 0 : 1 }));
+  const visible = useAnimatedStyle(() => ({
+    opacity: interpolate(progress.value, [0, 0.35], [0, 1], Extrapolation.CLAMP),
+  }));
   return (
     <Animated.View style={[{ flexDirection: "row", direction: rtl ? "rtl" : "ltr" }, visible]}>{children}</Animated.View>
   );
+}
+
+/** An action's icon and label grow into place as the row opens. */
+function ActionContent({ progress, children }: { progress: SharedValue<number>; children: ReactNode }) {
+  const grow = useAnimatedStyle(() => ({
+    transform: [{ scale: interpolate(progress.value, [0, 1], [0.8, 1], Extrapolation.CLAMP) }],
+  }));
+  return <Animated.View style={[{ alignItems: "center", gap: 4 }, grow]}>{children}</Animated.View>;
 }
 
 /** A dark pill at the bottom with a volt "undo"; hides itself after 5 s.

@@ -277,6 +277,7 @@ function MoneyScreenBody() {
                   {wa ? (
                     <IconButton
                       icon={MessageCircle}
+                      variant="whatsapp"
                       accessibilityLabel={t("money.waReminderLabel")}
                       onPress={() => Linking.openURL(wa)}
                     />

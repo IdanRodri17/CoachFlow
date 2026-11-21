@@ -158,7 +158,7 @@ function NutritionScreenBody() {
         <Button
           label={t("nutrition.askOnWhatsApp", { name: trainerName })}
           icon={MessageCircle}
-          variant="secondary"
+          variant="whatsapp"
           size={52}
           block
           onPress={() => Linking.openURL(wa)}

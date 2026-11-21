@@ -244,6 +244,7 @@ export function TrainerHome() {
                     ) : link ? (
                       <IconButton
                         icon={MessageCircle}
+                        variant="whatsapp"
                         accessibilityLabel={t("trainerHome.remindWhatsApp")}
                         onPress={() => Linking.openURL(link)}
                       />
@@ -437,7 +438,7 @@ function NextUpCard({
           <Button
             label={t("trainerHome.whatsapp")}
             icon={MessageCircle}
-            variant="dark"
+            variant="whatsapp"
             size={48}
             onPress={() => Linking.openURL(whatsapp)}
           />

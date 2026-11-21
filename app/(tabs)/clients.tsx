@@ -421,6 +421,7 @@ function ClientRow({ row, onOpen, onPhone }: { row: Row; onOpen: () => void; onP
           wa ? (
             <IconButton
               icon={MessageCircle}
+              variant="whatsapp"
               accessibilityLabel={t("clients.waTo", { name: client.name })}
               onPress={() => Linking.openURL(wa)}
             />
