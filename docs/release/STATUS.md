@@ -31,6 +31,14 @@ Merged from the cloud session's final report (it checked each item against cloud
 | 16 | U6 | A mistaken "mark as done" can't be undone outside group sessions (fixes doc P3); the DB side is ready in 0043 | calendar → workout | JS | after #2 |
 | 17 | U7 | Badges (incl. volume) aren't awarded when the trainer logs the workout, only at the client's next own save | client Progress → badges | JS or live | todo, investigate |
 | 18 | U8 | Changing a client's price rewrites past months' income and unpaid amounts (fixes doc F6) | money screen, Home money card, client card | live + JS | todo, needs a design decision (price snapshot per session) |
+| 19 | P1 (phone test 2026-11-21) | Smoke steps 3/5: swipe actions popped in; WhatsApp not green | clients, calendar, every WhatsApp button | JS | ✅ 78620a9 (`colors.whatsapp` #25D366 + ink; actions fade in and grow) · phone check |
+| 20 | P2 | Smoke step 9: finishing another day's session showed today's date | finish screen | JS | ✅ 975e95c (shows the scheduled date) |
+| 21 | P3 | Client card → upcoming session crashes ("something went wrong"). Logs: the session loads (200), then the first render throws before the form mounts | client card → upcoming → schedule/[id] | JS | **open**: 975e95c shows the crash text in Expo Go; needs Idan's screenshot |
+| 22 | P4 | Nobody starts a workout before its day; everyone can preview it (exercises, sets × reps, recommended weight); the trainer previews an app client's open workout instead of a "not yours" wall | workout screen | JS | ✅ (this push) `workoutAccess` preview kind + `components/workout/WorkoutDetail.tsx` · phone check |
+| 23 | U2 | Previous workout opened the pre-redesign summary | client card → previous → workout | JS | ✅ (this push) `CompletedWorkout` in the kit's look: duration, effort, both notes, sets with PRs, skips/swaps · phone check |
+| 24 | P5 | Trainer can't add a weigh-in for an app client (by design today: "add weight" only for clients without the app) | client card → weight | live + JS | **asked Idan** 2026-11-21 (needs an RLS change) |
+| 25 | P6 | Trainer can't mark an app client's session done ("we trained together") | client card, Home, calendar | JS (+ maybe live) | **asked Idan** 2026-11-21 |
+| 26 | P7 | Upcoming session from the client card: edit its exercises and the package | client card → upcoming | JS (+ migration if per-session exercises) | **asked Idan** 2026-11-21 (template vs per-session) |
 | — | R12 | Icon and splash are still Expo's blue "A" (approved CF icon not wired) | home screen, launch | native | parked with the release work (Expo Go can't show it) |
 | — | R1 | "Terms of use" is underlined but opens nothing; no privacy link | onboarding, Profile | JS | blocked: hosting (decision 4) |
 | — | S1–S4 | Idan's number as a test number; dev passwords in git history; two old functions accept any user; SMS abuse | Supabase | live | **Idan's tasks** (table below) |
@@ -115,6 +123,10 @@ Asked at Checkpoint 0+1 on 2026-11-19; answered 2026-11-20.
 10. Minimum age → **13+** (recommendation was 18+; see A11 for the guardian-consent note)
 11. AI consent (A3) → **name Anthropic in the sheet** ("anthropic is okay"); no Hebrew brand name for the feature
 12. Live changes → **yes** (0040 + nutrition-suggest done and verified; the rest under "Live changes")
+
+### Phone test answers (2026-11-21)
+- A workout starts only on its day; trainer and client can open it before then and see the exercises and recommended weights (built: P4).
+- Still to answer: P5 (trainer weigh-ins for app clients), P6 (trainer marks an app client's session done), P7 (edit an upcoming session's exercises: template vs this session only).
 
 ### Checkpoint 0+1 smoke test (as sent, 2026-11-19; open the `cloud/release-1.0` update in Expo Go)
 1. The "+" in the tab bar has its volt circle.
@@ -202,3 +214,5 @@ Also: YouTube/Vimeo embeds (trainer demo videos) load third-party players that s
 - DB performance migration: `(select auth.uid())` in 37 policies, FK indexes (B20)
 - Share card "שמירה בגלריה"; "רישום האימון" on Home's next-up card; share card opt-in deltas + bigger trainer icon
 - Separate dev/prod Supabase projects; Auth CAPTCHA
+- Idea (Idan, 2026-11-21): a client logs workouts of their own outside the trainer's plan (a walk, an extra gym session). Wait for real users' feedback before building.
+- Idea (Idan, 2026-11-21): maybe move AI nutrition-plan generation to the client. Undecided.
