@@ -126,6 +126,9 @@ type Detail = {
     paid: boolean;
     prs: number;
   }[];
+  /** App clients: the oldest "with trainer" session up to today that isn't
+   * marked yet — the trainer confirms "we trained" (Idan, 2026-11-21). */
+  markable: { id: string; scheduled_date: string; template_name: string } | null;
   /** Weigh-ins, oldest first. */
   weights: { date: string; value: number }[];
   /** Offline clients: their sessions up to today, newest first, with the
@@ -265,8 +268,24 @@ function ClientCardBody() {
       const weights: Detail["weights"] = progressRes.data.map((p) => ({ date: p.date, value: Number(p.weight) }));
       let recentRows: { id: string; scheduled_date: string; status: "scheduled" | "completed"; template_id: string | null; paid: boolean }[] = [];
       const offlineLogs = new Map<string, Detail["recent"][number]["log"]>();
+      let markableRow: { id: string; scheduled_date: string; template_id: string | null } | null = null;
 
       if (isApp) {
+        const markRes = await supabase
+          .from("scheduled_workouts")
+          .select("id, scheduled_date, template_id")
+          .eq("trainer_id", trainerId)
+          .eq("client_id", refId)
+          .eq("status", "scheduled")
+          .eq("with_trainer", true)
+          .lte("scheduled_date", today)
+          .order("scheduled_date", { ascending: true })
+          .limit(1)
+          .maybeSingle();
+        if (markRes.error) throw markRes.error;
+        markableRow = markRes.data;
+        if (markableRow?.template_id) tplIds.add(markableRow.template_id);
+
         const logsRes = await supabase
           .from("workout_logs")
           .select("id, scheduled_workout_id, completed_at, effort_rating, client_note")
@@ -361,6 +380,9 @@ function ClientCardBody() {
           paid: scheduled.get(l.scheduled_workout_id)?.paid ?? false,
           prs: prCount.get(l.id) ?? 0,
         })),
+        markable: markableRow
+          ? { id: markableRow.id, scheduled_date: markableRow.scheduled_date, template_name: tplName(markableRow.template_id) }
+          : null,
         weights,
         recent: recentRows.map((r) => ({
           id: r.id,
@@ -534,8 +556,14 @@ function ClientCardBody() {
       }`
     : null;
 
+  // Offline: the oldest unresolved session (the view's pick). App clients log
+  // their own, but the trainer confirms a "with trainer" one (d.markable).
   const actionableId = !isApp ? d.status?.actionable_id : null;
-  const actionable = actionableId ? d.recent.find((r) => r.id === actionableId) : undefined;
+  const actionable = isApp
+    ? (d.markable ?? undefined)
+    : actionableId
+      ? d.recent.find((r) => r.id === actionableId)
+      : undefined;
   const lastOffline = !isApp ? d.recent.find((r) => r.status === "completed") : undefined;
   // V17: an offline client's last session shows its log when the trainer
   // logged it; a later one only marked done shows by itself.
@@ -688,12 +716,12 @@ function ClientCardBody() {
             />
           ) : null}
 
-          {d.weights.length > 0 || !isApp ? (
-            <WeightCard
-              weights={d.weights}
-              action={isApp ? undefined : { label: t("clientCard.entry.addWeighIn"), icon: Plus, onPress: () => setEntry("weigh") }}
-            />
-          ) : null}
+          {/* 0044: the trainer adds a weigh-in for any client (an app client's
+              without a photo). */}
+          <WeightCard
+            weights={d.weights}
+            action={{ label: t("clientCard.entry.addWeighIn"), icon: Plus, onPress: () => setEntry("weigh") }}
+          />
 
           {isApp ? (
             <NotesCard
@@ -742,14 +770,14 @@ function ClientCardBody() {
 
       {tab === "details" && isApp ? <DetailsTab intake={d.intake} phone={phone} /> : null}
 
+      <WeighInSheet
+        visible={entry === "weigh"}
+        onClose={() => setEntry(null)}
+        subject={{ kind, id: refId }}
+        last={d.weights[d.weights.length - 1] ?? null}
+      />
       {!isApp ? (
         <>
-          <WeighInSheet
-            visible={entry === "weigh"}
-            onClose={() => setEntry(null)}
-            managedClientId={refId}
-            last={d.weights[d.weights.length - 1] ?? null}
-          />
           <CheckinSheet
             visible={entry === "checkin"}
             onClose={() => setEntry(null)}

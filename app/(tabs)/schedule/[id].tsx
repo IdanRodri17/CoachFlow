@@ -303,10 +303,16 @@ function EditScheduleScreenBody() {
     );
   }
 
+  // 2026-11-21 (Idan): from an upcoming session, reach its exercises (they
+  // live on the template, so editing them changes every session using it)
+  // and the client's package (on the client card).
+  const templateId = workout.data.row.template_id;
+  const clientRef = workout.data.initial.client;
+
   return (
     <View style={{ flex: 1, backgroundColor: colors.chalk }}>
-      {openWorkout ? (
-        <View style={{ paddingHorizontal: 20, paddingTop: 12 }}>
+      <View style={{ paddingHorizontal: 20, paddingTop: 12, gap: 10 }}>
+        {openWorkout ? (
           <Button
             label={t("schedule.detail.logWorkout")}
             icon={Dumbbell}
@@ -314,8 +320,28 @@ function EditScheduleScreenBody() {
             block
             onPress={() => router.push(`/workout/${id}`)}
           />
-        </View>
-      ) : null}
+        ) : null}
+        {templateId || clientRef ? (
+          <ListCard>
+            {templateId ? (
+              <ListRow
+                title={t("schedule.detail.editExercises")}
+                subtitle={t("schedule.detail.editExercisesHint")}
+                chevron
+                onPress={() => router.push(`/templates/${templateId}`)}
+              />
+            ) : null}
+            {clientRef ? (
+              <ListRow
+                title={t("schedule.detail.package")}
+                subtitle={t("schedule.detail.packageHint")}
+                chevron
+                onPress={() => router.push(`/dashboard/${clientRef.refId}?kind=${clientRef.kind}`)}
+              />
+            ) : null}
+          </ListCard>
+        ) : null}
+      </View>
 
       <ScheduleForm
         roster={roster.data ?? []}

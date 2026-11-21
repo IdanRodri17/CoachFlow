@@ -65,32 +65,37 @@ const FIRST_WEIGHT = 70;
 // Weigh-in
 // ---------------------------------------------------------------------------
 
+/** Whose weigh-in: an offline client (the trainer owns their data, photos
+ * included) or an app client (0044: weight and measurements only — their
+ * body photos stay theirs). */
+export type WeighInSubject = { kind: "app" | "managed"; id: string };
+
 export function WeighInSheet({
   visible,
   onClose,
-  managedClientId,
+  subject,
   last,
 }: {
   visible: boolean;
   onClose: () => void;
-  managedClientId: string;
+  subject: WeighInSubject;
   /** The client's latest weigh-in, for the stepper's start and the subtitle. */
   last: { date: string; value: number } | null;
 }) {
   const { t } = useTranslation();
   return (
     <Sheet visible={visible} onClose={onClose} closeLabel={t("common.cancel")} title={t("clientCard.entry.weighInTitle")}>
-      {visible ? <WeighInForm managedClientId={managedClientId} last={last} onDone={onClose} /> : null}
+      {visible ? <WeighInForm subject={subject} last={last} onDone={onClose} /> : null}
     </Sheet>
   );
 }
 
 function WeighInForm({
-  managedClientId,
+  subject,
   last,
   onDone,
 }: {
-  managedClientId: string;
+  subject: WeighInSubject;
   last: { date: string; value: number } | null;
   onDone: () => void;
 }) {
@@ -126,7 +131,7 @@ function WeighInForm({
       let photoPath: string | null = null;
       if (photo) {
         // 0032's storage policy: the managed client's folder is the trainer's.
-        const path = `${managedClientId}/${Date.now()}.jpg`;
+        const path = `${subject.id}/${Date.now()}.jpg`;
         const { error: upErr } = await supabase.storage
           .from("progress-photos")
           .upload(path, decode(photo.base64), { contentType: "image/jpeg" });
@@ -139,7 +144,7 @@ function WeighInForm({
       if (w != null) measurements.waist = w;
       if (c != null) measurements.chest = c;
       const { error: insErr } = await supabase.from("progress_entries").insert({
-        managed_client_id: managedClientId,
+        ...(subject.kind === "app" ? { client_id: subject.id } : { managed_client_id: subject.id }),
         date: todayISO(),
         weight: shownWeight,
         measurements: Object.keys(measurements).length > 0 ? measurements : null,
@@ -148,7 +153,7 @@ function WeighInForm({
       if (insErr) throw insErr;
     },
     onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: qk.clientDetail.subject("managed", managedClientId) });
+      queryClient.invalidateQueries({ queryKey: qk.clientDetail.subject(subject.kind, subject.id) });
       queryClient.invalidateQueries({ queryKey: qk.progress.all });
       onDone();
     },
@@ -243,10 +248,12 @@ function WeighInForm({
         </View>
       </View>
 
-      <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-        <Button label={t("progress.photo")} icon={Camera} variant="secondary" size={44} onPress={pickPhoto} />
-        {photo ? <Image source={{ uri: photo.uri }} style={{ width: 44, height: 44, borderRadius: 12 }} /> : null}
-      </View>
+      {subject.kind === "managed" ? (
+        <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+          <Button label={t("progress.photo")} icon={Camera} variant="secondary" size={44} onPress={pickPhoto} />
+          {photo ? <Image source={{ uri: photo.uri }} style={{ width: 44, height: 44, borderRadius: 12 }} /> : null}
+        </View>
+      ) : null}
 
       {error || save.error ? (
         <AppText size={14} tone="ember">

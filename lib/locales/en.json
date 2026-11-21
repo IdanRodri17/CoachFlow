@@ -250,7 +250,11 @@
       "saveChanges": "Save changes",
       "logWorkout": "Log this workout",
       "viewWorkout": "View the workout",
-      "completedLocked": "This workout is done, so it stays in the history as it is: its date, client and workout can't change, and it can't be deleted."
+      "completedLocked": "This workout is done, so it stays in the history as it is: its date, client and workout can't change, and it can't be deleted.",
+      "editExercises": "Edit the exercises",
+      "editExercisesHint": "Changes the template, so every session that uses it.",
+      "package": "Package",
+      "packageHint": "Sessions, price and renewal, on the client card."
     }
   },
   "clients": {

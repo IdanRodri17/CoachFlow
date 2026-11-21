@@ -250,7 +250,9 @@ export function TrainerHome() {
                       />
                     ) : null}
                   </View>
-                  {offline && !done ? (
+                  {/* Offline: the trainer is the only one who can log it. App client,
+                      "with trainer": the trainer confirms they trained (2026-11-21). */}
+                  {(offline || s.with_trainer) && !done ? (
                     // Lined up under the name: 14 padding + 50 time + 12 gap.
                     <View style={{ paddingStart: 76, paddingEnd: 14, paddingBottom: 14, marginTop: -4, flexDirection: "row" }}>
                       <Button

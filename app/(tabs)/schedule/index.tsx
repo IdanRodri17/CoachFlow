@@ -488,7 +488,9 @@ function SessionRow({
   const status = derivedStatus(w);
   const done = status === "completed";
   const offline = client?.kind === "managed";
-  const canMark = offline && !done && w.scheduled_date <= todayISO();
+  // Offline: only the trainer can log it. App client: the trainer confirms a
+  // "with trainer" session they ran together (2026-11-21); solo stays the client's.
+  const canMark = (offline || w.with_trainer) && !done && w.scheduled_date <= todayISO();
   const link = done
     ? null
     : buildWhatsAppReminderLink({
