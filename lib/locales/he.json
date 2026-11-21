@@ -404,6 +404,14 @@
     "title": "אימון",
     "exerciseFallback": "תרגיל",
     "notFound": "האימון לא נמצא.",
+    "preview": {
+      "startsOn": "האימון ייפתח ב{{date}}. עד אז אפשר לעבור עליו.",
+      "exercisesTitle": "מה באימון",
+      "lastTime": "בפעם הקודמת {{weight}} × {{reps}}",
+      "bodyweight": "משקל גוף",
+      "noExercises": "עוד אין תרגילים באימון הזה.",
+      "recommendedHint": "משקלים מומלצים: הגבוה מבין הפעם הקודמת והתוכנית."
+    },
     "completedTitle": "האימון הושלם",
     "durationMinutes": "{{count}} דקות",
     "effortLabel": "מאמץ:",

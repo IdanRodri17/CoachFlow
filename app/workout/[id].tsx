@@ -16,27 +16,27 @@
 // a set only changes local state (lib/useWorkoutSession.ts); the one save at
 // the end writes the workout_log, set_logs (with PR flags) and adjustments and
 // marks the scheduled workout completed — saveWorkout(), unchanged rules.
-// A completed workout opens the read-only summary.
+// A completed workout opens the read-only summary, and an open one before
+// its day (or an app client's, for the trainer) a preview: both in
+// components/workout/WorkoutDetail.tsx.
 //
 // D20f/g: the screen stays awake, rest ends buzz or notify, and the open
 // session is saved on the phone after every tap — minimizing (or a restart)
 // loses nothing, and opening the workout again resumes it.
 
 import { useState } from "react";
-import { ActivityIndicator, ScrollView, Text, View } from "react-native";
-import { SafeAreaView } from "react-native-safe-area-context";
+import { ActivityIndicator, View } from "react-native";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { StatusBar } from "expo-status-bar";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
-import Check from "lucide-react-native/icons/check";
 
 import { qk } from "@/lib/queryKeys";
 import { friendlyError, screenError } from "@/lib/friendlyError";
 import { ScreenMessage } from "@/components/ui/ScreenState";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { formatDisplayDate, toDateString, todayISO } from "@/lib/dates";
+import { todayISO } from "@/lib/dates";
 import { useWorkoutPrefs } from "@/lib/workoutPrefs";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import {
@@ -66,7 +66,8 @@ import { FinishView, type FinishInput } from "@/components/workout/FinishView";
 import { OverviewSheet } from "@/components/workout/OverviewSheet";
 import { RestView } from "@/components/workout/RestView";
 import { SetView } from "@/components/workout/SetView";
-import { colors, Icon, Sheet } from "@/components/ui";
+import { CompletedWorkout, WorkoutPreview } from "@/components/workout/WorkoutDetail";
+import { colors, Sheet } from "@/components/ui";
 
 // The name shown in trainer mode's header ("דנה · רגליים").
 async function subjectName(subject: WorkoutSubject): Promise<string | null> {
@@ -95,18 +96,19 @@ export default function WorkoutScreen() {
       // Whose workout is it, and may this user log it? Decided first.
       const { data: sw, error } = await supabase
         .from("scheduled_workouts")
-        .select("trainer_id, client_id, managed_client_id, status")
+        .select("trainer_id, client_id, managed_client_id, status, scheduled_date")
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
       const access: WorkoutAccess = sw
-        ? workoutAccess(sw, { id: userId, role: role! })
+        ? workoutAccess(sw, { id: userId, role: role! }, todayISO())
         : { kind: "denied", reason: "notYours" };
       if (access.kind === "denied") return { access, data: null, restored: null, name: null };
 
       const data = await loadWorkout(id, access.subject, t("workout.exerciseFallback"));
       const name = access.mode === "trainer" ? await subjectName(access.subject) : null;
-      if (data.status === "completed") {
+      // A preview never opens a session, so nothing saved on the phone applies.
+      if (data.status === "completed" || access.kind === "preview") {
         await clearSavedWorkout(userId, id);
         return { access, data, restored: null, name };
       }
@@ -137,20 +139,16 @@ export default function WorkoutScreen() {
     return (
       <>
         <StatusBar style="light" />
-        <ScreenMessage
-          dark
-          message={
-            access.kind === "denied" && access.reason === "appClientLogsOwn"
-              ? t("workout.trainerMode.appClientLogsOwn")
-              : t("workout.notFound")
-          }
-        />
+        <ScreenMessage dark message={t("workout.notFound")} />
       </>
     );
   }
 
   if (data.status === "completed") {
-    return <CompletedSummary scheduledId={id} note={data.note} />;
+    return <CompletedWorkout data={data} mode={access.mode} subjectName={name} />;
+  }
+  if (access.kind === "preview") {
+    return <WorkoutPreview data={data} mode={access.mode} reason={access.reason} subjectName={name} />;
   }
 
   return (
@@ -162,177 +160,6 @@ export default function WorkoutScreen() {
       subjectName={name}
       loggedBy={userId}
     />
-  );
-}
-
-// ---------------------------------------------------------------------------
-// Completed summary (read-only)
-// ---------------------------------------------------------------------------
-type LoggedSet = { set_index: number; reps: number | null; weight: number | null; is_pr: boolean };
-type LoggedGroup = { exerciseId: string; name: string; sets: LoggedSet[] };
-type Adj = { action: "skipped" | "swapped"; exerciseName: string; swapName: string | null; reason: string | null };
-
-function CompletedSummary({ scheduledId, note }: { scheduledId: string; note: string | null }) {
-  const { t } = useTranslation();
-  const query = useQuery({
-    queryKey: qk.workout.summary(scheduledId),
-    queryFn: async () => {
-      const { data: log, error } = await supabase
-        .from("workout_logs")
-        .select("*")
-        .eq("scheduled_workout_id", scheduledId)
-        .order("completed_at", { ascending: false })
-        .limit(1)
-        .maybeSingle();
-      if (error) throw error;
-      if (!log) return { log: null, groups: [] as LoggedGroup[], adjustments: [] as Adj[] };
-
-      const [setsRes, adjRes] = await Promise.all([
-        supabase.from("set_logs").select("*").eq("workout_log_id", log.id).order("set_index"),
-        supabase.from("exercise_adjustments").select("*").eq("workout_log_id", log.id),
-      ]);
-      if (setsRes.error) throw setsRes.error;
-      if (adjRes.error) throw adjRes.error;
-      const sets = setsRes.data ?? [];
-      const adjustmentsRaw = adjRes.data ?? [];
-
-      // Names for every exercise referenced (sets + adjustments).
-      const exIds = [
-        ...new Set([
-          ...sets.map((s) => s.exercise_id),
-          ...adjustmentsRaw.map((a) => a.exercise_id),
-          ...adjustmentsRaw.map((a) => a.swapped_for_exercise_id).filter(Boolean) as string[],
-        ]),
-      ];
-      const nameMap = new Map<string, string>();
-      if (exIds.length > 0) {
-        const { data: exs } = await supabase.from("exercises").select("id, name").in("id", exIds);
-        exs?.forEach((e) => nameMap.set(e.id, e.name));
-      }
-
-      const order: string[] = [];
-      const byEx = new Map<string, LoggedSet[]>();
-      for (const s of sets) {
-        if (!byEx.has(s.exercise_id)) {
-          byEx.set(s.exercise_id, []);
-          order.push(s.exercise_id);
-        }
-        byEx.get(s.exercise_id)!.push({ set_index: s.set_index, reps: s.reps, weight: s.weight, is_pr: s.is_pr });
-      }
-      const groups: LoggedGroup[] = order.map((exId) => ({
-        exerciseId: exId,
-        name: nameMap.get(exId) ?? t("workout.exerciseFallback"),
-        sets: byEx.get(exId)!,
-      }));
-
-      const adjustments: Adj[] = adjustmentsRaw.map((a) => ({
-        action: a.action,
-        exerciseName: nameMap.get(a.exercise_id) ?? t("workout.exerciseFallback"),
-        swapName: a.swapped_for_exercise_id ? nameMap.get(a.swapped_for_exercise_id) ?? t("workout.exerciseFallback") : null,
-        reason: a.reason,
-      }));
-
-      return { log, groups, adjustments };
-    },
-  });
-
-  if (query.isLoading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator />
-      </View>
-    );
-  }
-
-  const log = query.data?.log ?? null;
-  const groups = query.data?.groups ?? [];
-  const adjustments = query.data?.adjustments ?? [];
-
-  return (
-    <SafeAreaView className="flex-1 bg-white" edges={["bottom"]}>
-      <ScrollView contentContainerClassName="px-6 py-6">
-        <View className="mb-5 items-center">
-          <View
-            style={{ width: 56, height: 56, borderRadius: 28, alignItems: "center", justifyContent: "center", backgroundColor: colors.voltSoft }}
-          >
-            <Icon icon={Check} size={28} color={colors.voltInk} strokeWidth={2.4} />
-          </View>
-          <Text className="mt-2 text-xl font-bold text-slate-900">{t("workout.completedTitle")}</Text>
-          {log ? (
-            <Text className="mt-1 text-sm text-slate-500">
-              {formatDisplayDate(toDateString(new Date(log.completed_at)))}
-              {log.duration_seconds
-                ? ` · ${t("workout.durationMinutes", { count: Math.max(1, Math.round(log.duration_seconds / 60)) })}`
-                : ""}
-            </Text>
-          ) : null}
-        </View>
-
-        {log && (log.effort_rating != null || log.client_note) ? (
-          <View className="mb-5 rounded-xl border border-slate-200 p-4">
-            {log.effort_rating != null ? (
-              <Text className="text-sm text-slate-700">
-                {t("workout.effortLabel")} <Text className="font-bold text-slate-900">{t("workout.effortValue", { value: log.effort_rating })}</Text>
-              </Text>
-            ) : null}
-            {log.client_note ? (
-              <Text className="mt-1 text-sm text-slate-500 w-full text-left">“{log.client_note}”</Text>
-            ) : null}
-          </View>
-        ) : null}
-
-        {note ? (
-          <View className="mb-5 rounded-xl border border-amber-200 bg-amber-50 p-4">
-            <Text className="text-xs font-bold uppercase tracking-wide text-amber-700 w-full text-left">
-              {t("workout.noteFromTrainer")}
-            </Text>
-            <Text className="mt-1 text-base text-amber-900 w-full text-left">{note}</Text>
-          </View>
-        ) : null}
-
-        {groups.length === 0 && adjustments.length === 0 ? (
-          <Text className="text-center text-sm text-slate-400">{t("workout.noSetsLogged")}</Text>
-        ) : null}
-
-        {groups.map((g) => (
-          <View key={g.exerciseId} className="mb-3 rounded-2xl border border-slate-200 p-4">
-            <Text className="text-base font-bold text-slate-900 w-full text-left">{g.name}</Text>
-            <View className="mt-2 gap-1">
-              {g.sets.map((s, i) => (
-                <View key={i} className="flex-row items-center justify-between">
-                  <Text className="text-sm text-slate-500">{t("workout.setNumber", { number: s.set_index + 1 })}</Text>
-                  <View className="flex-row items-center gap-2">
-                    <Text className="text-base text-slate-900">
-                      {t("workout.repsXWeight", {
-                        reps: s.reps ?? "—",
-                        weight: `${s.weight ?? "—"}${s.weight != null ? "kg" : ""}`,
-                      })}
-                    </Text>
-                    {s.is_pr ? (
-                      <Text className="rounded-full bg-amber-100 px-2 py-0.5 text-xs font-bold text-amber-700">
-                        {t("workout.prBadge")}
-                      </Text>
-                    ) : null}
-                  </View>
-                </View>
-              ))}
-            </View>
-          </View>
-        ))}
-
-        {/* Skips / swaps */}
-        {adjustments.map((a, i) => (
-          <View key={i} className="mb-3 rounded-2xl border border-slate-200 bg-slate-50 p-4">
-            <Text className="text-sm font-semibold text-slate-700 w-full text-left">
-              {a.action === "skipped"
-                ? t("workout.skippedExercise", { name: a.exerciseName })
-                : t("workout.swappedExercise", { from: a.exerciseName, to: a.swapName })}
-            </Text>
-            {a.reason ? <Text className="mt-0.5 text-sm text-slate-500 w-full text-left">“{a.reason}”</Text> : null}
-          </View>
-        ))}
-      </ScrollView>
-    </SafeAreaView>
   );
 }
 

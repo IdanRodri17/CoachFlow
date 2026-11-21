@@ -404,6 +404,14 @@
     "title": "Workout",
     "exerciseFallback": "Exercise",
     "notFound": "Workout not found.",
+    "preview": {
+      "startsOn": "This workout opens on {{date}}. Until then you can look through it.",
+      "exercisesTitle": "What's in it",
+      "lastTime": "Last time {{weight}} × {{reps}}",
+      "bodyweight": "Bodyweight",
+      "noExercises": "This workout has no exercises yet.",
+      "recommendedHint": "Recommended weights: the higher of last time and the plan."
+    },
     "completedTitle": "Workout completed",
     "durationMinutes": "{{count}} min",
     "effortLabel": "Effort:",
