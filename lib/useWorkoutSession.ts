@@ -31,18 +31,20 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import i18next from "./i18n";
 import { cancelRestAlert, restEndHaptic, scheduleRestAlert } from "./restAlerts";
 import { supabase } from "./supabase";
-import { detectPRs, type SetPerf } from "./pr";
+import { detectPRs } from "./pr";
 import { checkAndAwardBadges } from "./badges";
 import {
   createSession,
   exerciseName,
   fromSaved,
   isPristine,
+  lastSessionOf,
   REST_STEP_SECONDS,
   RESUME_MAX_AGE_MS,
   saveRows,
   toSaved,
   workoutReducer,
+  type HistorySet,
   type SavedSession,
   type SessionExercise,
   type WorkoutState,
@@ -239,14 +241,16 @@ export async function clearSavedWorkout(loggedBy: string, scheduledId: string): 
 // Database
 // ---------------------------------------------------------------------------
 
-type HistoryRow = SetPerf & { exerciseId: string };
+type HistoryRow = HistorySet & { exerciseId: string };
 
-/** Every past set of these exercises for the subject, newest first. */
+/** Every past set of these exercises for the subject, newest first, with
+ * its set number, session (workout log) and when that session was done, so
+ * "last time" can be shown set by set (lastSessionOf). */
 export async function subjectHistory(exerciseIds: string[], subject: WorkoutSubject): Promise<HistoryRow[]> {
   if (exerciseIds.length === 0) return [];
   const { data, error } = await supabase
     .from("set_logs")
-    .select("exercise_id, weight, reps, set_index, workout_logs!inner(client_id, managed_client_id, completed_at)")
+    .select("exercise_id, weight, reps, set_index, workout_log_id, workout_logs!inner(client_id, managed_client_id, completed_at)")
     .in("exercise_id", exerciseIds)
     .eq(subject.kind === "app" ? "workout_logs.client_id" : "workout_logs.managed_client_id", subject.id);
   if (error) throw error;
@@ -256,14 +260,14 @@ export async function subjectHistory(exerciseIds: string[], subject: WorkoutSubj
       weight: row.weight,
       reps: row.reps,
       setIndex: row.set_index,
+      logId: row.workout_log_id,
       completedAt: (row.workout_logs as unknown as { completed_at: string }).completed_at,
     }))
-    .sort((a, b) => b.completedAt.localeCompare(a.completedAt) || b.setIndex - a.setIndex)
-    .map(({ exerciseId, weight, reps }) => ({ exerciseId, weight, reps }));
+    .sort((a, b) => b.completedAt.localeCompare(a.completedAt) || b.setIndex - a.setIndex);
 }
 
 /** The scheduled workout and its exercises, with "last time" (the subject's
- * most recent set) and the PR baseline per exercise. */
+ * last session of each, set by set) and the PR baseline per exercise. */
 export async function loadWorkout(
   scheduledId: string,
   subject: WorkoutSubject,
@@ -313,6 +317,7 @@ export async function loadWorkout(
       targetWeight: te.target_weight,
       restSeconds: te.rest_seconds,
       last: sets[0] ? { weight: sets[0].weight, reps: sets[0].reps } : null,
+      lastSession: lastSessionOf(sets),
       history: sets.map(({ weight, reps }) => ({ weight, reps })),
     };
   });

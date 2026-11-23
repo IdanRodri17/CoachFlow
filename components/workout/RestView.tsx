@@ -17,7 +17,7 @@ import Vibrate from "lucide-react-native/icons/vibrate";
 
 import { ltr } from "@/lib/i18n";
 import type { WorkoutSession } from "@/lib/useWorkoutSession";
-import { exerciseName, formatClock, formatWeight, prefill, restLeftMs } from "@/lib/workoutSession";
+import { exerciseName, formatClock, formatWeight, numbersAt, restLeftMs } from "@/lib/workoutSession";
 import { AppText, Button, colors, Icon, Num, TextButton } from "@/components/ui";
 
 import { WorkoutHeader } from "./WorkoutHeader";
@@ -65,21 +65,19 @@ export function RestView({
   }, [rest, progress]);
   const ringProps = useAnimatedProps(() => ({ strokeDashoffset: CIRCUMFERENCE * (1 - progress.get()) }));
 
-  // "Up next": the same exercise keeps the numbers just logged; another one
-  // shows its own starting numbers.
+  // "Up next": exactly where the next set starts (numbersAt: last time's same
+  // set when there is one, else the numbers just logged / the pre-fill).
   let nextTitle = "";
   let nextNums = "";
   if (s.next) {
     const ne = s.exercises[s.next.ex];
     if (s.next.ex === s.ex) {
       nextTitle = t("workout.mode.nextSet", { n: s.next.set + 1, total: ne.sets, name: exerciseName(s, s.ex) });
-      nextNums = s.weight != null ? `${formatWeight(s.weight)} × ${s.reps}` : `${s.reps}`;
     } else {
-      const a = s.adjustments[s.next.ex];
-      const start = a?.type === "swap" ? { weight: a.weight, reps: a.reps } : prefill(ne);
       nextTitle = t("workout.mode.nextExercise", { name: exerciseName(s, s.next.ex) });
-      nextNums = start.weight != null ? `${formatWeight(start.weight)} × ${start.reps}` : `${start.reps}`;
     }
+    const start = numbersAt(s, s.next);
+    nextNums = start.weight != null ? `${formatWeight(start.weight)} × ${start.reps}` : `${start.reps}`;
   }
 
   return (

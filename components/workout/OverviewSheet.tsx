@@ -12,6 +12,8 @@ import ChevronsRight from "lucide-react-native/icons/chevrons-right";
 import X from "lucide-react-native/icons/x";
 
 import { ltr } from "@/lib/i18n";
+import { toDateString } from "@/lib/dates";
+import { shortDate } from "@/components/home/format";
 import type { WorkoutSession } from "@/lib/useWorkoutSession";
 import { formatElapsed, formatWeight, overview, type OverviewRow } from "@/lib/workoutSession";
 import { AppText, Button, colors, Icon, IconButton, Num, Pressable, Sheet } from "@/components/ui";
@@ -78,7 +80,7 @@ export function OverviewSheet({
 }
 
 function ExerciseRow({ row, onPress }: { row: OverviewRow; onPress: () => void }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const canJump = row.status === "current" || row.status === "open";
   const startNums =
     row.start.weight != null
@@ -105,6 +107,15 @@ function ExerciseRow({ row, onPress }: { row: OverviewRow; onPress: () => void }
   }
 
   const muted = row.status === "done" || row.status === "skipped";
+  // Last time's sets, in order (2026-11-23): "בפעם הקודמת (20.11): 40×10 · 42.5×8".
+  const lastLine = row.lastTime
+    ? t("workout.overview.lastTime", {
+        date: ltr(shortDate(toDateString(new Date(row.lastTime.completedAt)), i18n.language)),
+        sets: row.lastTime.sets
+          .map((x) => ltr(x.weight != null ? `${formatWeight(x.weight)}×${x.reps ?? "—"}` : `${x.reps ?? "—"}`))
+          .join(" · "),
+      })
+    : null;
   return (
     <Pressable
       accessibilityRole="button"
@@ -130,6 +141,11 @@ function ExerciseRow({ row, onPress }: { row: OverviewRow; onPress: () => void }
         <AppText size={13} tone={row.status === "current" ? "volt" : muted ? "ash2" : "ash"} numberOfLines={1}>
           {sub}
         </AppText>
+        {lastLine ? (
+          <AppText size={12} tone="ash2" numberOfLines={2}>
+            {lastLine}
+          </AppText>
+        ) : null}
       </View>
       {row.status === "open" ? <Icon icon={ChevronRight} size={18} color={colors.ash} mirror /> : null}
     </Pressable>

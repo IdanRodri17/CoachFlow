@@ -12,10 +12,14 @@ import {
   fromSaved,
   isPristine,
   isLastSetOverall,
+  lastSessionOf,
+  lastTimeSet,
   nextOpen,
+  numbersAt,
   overview,
   pills,
   prefill,
+  prefillSet,
   progress,
   raisedTarget,
   restLeftMs,
@@ -26,6 +30,7 @@ import {
   streakAfterCompleting,
   toSaved,
   workoutReducer,
+  type HistorySet,
   type SessionExercise,
   type WorkoutAction,
   type WorkoutState,
@@ -364,5 +369,90 @@ describe("resume (D20g)", () => {
     expect(fromSaved(saved, exercises, T0 + 13 * 60 * 60 * 1000)).toBeNull();
     expect(fromSaved({ v: 2 }, exercises, T0)).toBeNull();
     expect(fromSaved("nope", exercises, T0)).toBeNull();
+  });
+});
+
+describe("last time, set by set (2026-11-23)", () => {
+  const h = (logId: string, completedAt: string, setIndex: number, weight: number | null, reps: number): HistorySet => ({
+    logId,
+    completedAt,
+    setIndex,
+    weight,
+    reps,
+  });
+  // Newest first, as subjectHistory returns them; two sessions of one exercise.
+  const rows = [
+    h("L2", "2026-11-20T08:00:00Z", 2, 45, 6),
+    h("L2", "2026-11-20T08:00:00Z", 0, 40, 10),
+    h("L2", "2026-11-20T08:00:00Z", 1, 42.5, 8),
+    h("L1", "2026-11-13T08:00:00Z", 0, 37.5, 10),
+    h("L1", "2026-11-13T08:00:00Z", 1, 37.5, 10),
+  ];
+  const lastSession = lastSessionOf(rows);
+  const press = ex({ exerciseId: "press", sets: 3, targetReps: null, last: { weight: 45, reps: 6 }, lastSession });
+
+  it("groups the history by session and keeps only the latest, in set order", () => {
+    expect(lastSession).toEqual({
+      completedAt: "2026-11-20T08:00:00Z",
+      sets: [
+        { weight: 40, reps: 10 },
+        { weight: 42.5, reps: 8 },
+        { weight: 45, reps: 6 },
+      ],
+    });
+    expect(lastSessionOf([])).toBeNull();
+  });
+
+  it("reads the same set, else that session's last set, else `last`", () => {
+    expect(lastTimeSet(press, 1)).toEqual({ weight: 42.5, reps: 8 });
+    // This time has a 4th set; last time had 3.
+    expect(lastTimeSet(press, 3)).toEqual({ weight: 45, reps: 6 });
+    // Not loaded set by set: `last` stands in for every set.
+    expect(lastTimeSet(ex({ exerciseId: "x", last: { weight: 20, reps: 12 } }), 2)).toEqual({ weight: 20, reps: 12 });
+    expect(lastTimeSet(ex({ exerciseId: "x" }), 0)).toBeNull();
+  });
+
+  it("prefills each set from last time's same set; the target wins on reps, the higher wins on weight", () => {
+    expect(prefillSet(press, 0)).toEqual({ weight: 40, reps: 10 });
+    expect(prefillSet(press, 2)).toEqual({ weight: 45, reps: 6 });
+    const planned = { ...press, targetReps: 8, targetWeight: 42.5 };
+    expect(prefillSet(planned, 0)).toEqual({ weight: 42.5, reps: 8 });
+    expect(prefillSet(planned, 2)).toEqual({ weight: 45, reps: 8 });
+    // Bodyweight last time and no target weight: stays bodyweight.
+    const pushup = ex({
+      exerciseId: "pushup",
+      targetReps: null,
+      lastSession: { completedAt: "2026-11-20T08:00:00Z", sets: [{ weight: null, reps: 15 }] },
+    });
+    expect(prefillSet(pushup, 0)).toEqual({ weight: null, reps: 15 });
+  });
+
+  it("starts the workout on last time's first set, and each next set on its own", () => {
+    let s = createSession([press], T0);
+    expect([s.weight, s.reps]).toEqual([40, 10]);
+    s = run(s, { type: "weight", delta: 2.5 }, { type: "logSet", now: T0 }, { type: "restDone", now: T0 + 1000 });
+    expect([s.weight, s.reps]).toEqual([42.5, 8]);
+    s = run(s, { type: "logSet", now: T0 + 2000 }, { type: "restDone", now: T0 + 3000 });
+    expect([s.weight, s.reps]).toEqual([45, 6]);
+  });
+
+  it("without a last session, the next set keeps the numbers just logged, as before", () => {
+    let s = createSession([ex({ exerciseId: "new", sets: 2, targetReps: 10, targetWeight: 25 })], T0);
+    s = run(s, { type: "setWeight", value: 30 }, { type: "logSet", now: T0 }, { type: "restDone", now: T0 + 1000 });
+    expect([s.weight, s.reps]).toEqual([30, 10]);
+  });
+
+  it("the rest screen's up-next numbers are exactly where the next set starts", () => {
+    const s = run(createSession([press], T0), { type: "logSet", now: T0 });
+    expect(s.next).not.toBeNull();
+    expect(numbersAt(s, s.next!)).toEqual({ weight: 42.5, reps: 8 });
+  });
+
+  it("the overview carries last time's sets, but not for a swap", () => {
+    const s = createSession([press, ex({ exerciseId: "other" })], T0);
+    expect(overview(s)[0].lastTime).toEqual(lastSession);
+    expect(overview(s)[1].lastTime).toBeNull();
+    const swapped = run(s, { type: "swap", reason: "", exerciseId: "alt", name: "Alt", weight: 30, reps: 10 });
+    expect(overview(swapped)[0].lastTime).toBeNull();
   });
 });

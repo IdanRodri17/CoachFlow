@@ -441,6 +441,7 @@
       "skip": "Skip",
       "setOf": "Set {{n}} of {{total}}",
       "lastTime": "Last time {{nums}}",
+      "lastTimeOn": "Last time ({{date}}): {{nums}}",
       "swappedNoHistory": "Substitute — no history yet",
       "kg": "kg",
       "reps": "reps",
@@ -517,6 +518,7 @@
       "skipped": "Skipped",
       "now": "Now · set {{n}} of {{total}}",
       "partial": "{{done}} of {{total}} sets done",
+      "lastTime": "Last time ({{date}}): {{sets}}",
       "finishNow": "Finish the workout now"
     },
     "finish": {

@@ -29,7 +29,7 @@ import { ltr } from "@/lib/i18n";
 import { friendlyError } from "@/lib/friendlyError";
 import type { WorkoutData, WorkoutMode } from "@/lib/useWorkoutSession";
 import { formatWeight, prefill } from "@/lib/workoutSession";
-import { longDate } from "@/components/home/format";
+import { longDate, shortDate } from "@/components/home/format";
 import { AppText, Card, Chip, colors, Display, Icon, ListCard, Num, SectionHeader, type IconComponent } from "@/components/ui";
 import { InlineError } from "@/components/ui/ScreenState";
 
@@ -38,7 +38,12 @@ function Page({ title, subtitle, children }: { title: string; subtitle: string; 
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.chalk }}
-      contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 16) + 16, gap: 16 }}
+      // Recent iOS draws the stack header see-through over the page; without
+      // this the title started under it (Idan, 2026-11-23: "too high, I need to
+      // scroll down to see the title"). iOS adds the header's and the home
+      // indicator's height itself; a no-op where the header is opaque.
+      contentInsetAdjustmentBehavior="automatic"
+      contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 16), gap: 16 }}
     >
       <StatusBar style="dark" />
       <View style={{ gap: 6 }}>
@@ -147,7 +152,16 @@ export function WorkoutPreview({
                       <AppText size={16} weight="semibold" numberOfLines={2}>
                         {e.name}
                       </AppText>
-                      {e.last && e.last.weight != null ? (
+                      {e.lastSession && e.lastSession.sets.length > 0 ? (
+                        <AppText size={13} tone="graphite">
+                          {t("workout.overview.lastTime", {
+                            date: ltr(shortDate(toDateString(new Date(e.lastSession.completedAt)), lang)),
+                            sets: e.lastSession.sets
+                              .map((x) => ltr(x.weight != null ? `${formatWeight(x.weight)}×${x.reps ?? "—"}` : `${x.reps ?? "—"}`))
+                              .join(" · "),
+                          })}
+                        </AppText>
+                      ) : e.last && e.last.weight != null ? (
                         <AppText size={13} tone="graphite">
                           {t("workout.preview.lastTime", { weight: kg(e.last.weight, unit), reps: ltr(String(e.last.reps)) })}
                         </AppText>

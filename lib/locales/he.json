@@ -441,6 +441,7 @@
       "skip": "דילוג",
       "setOf": "סט {{n}} מתוך {{total}}",
       "lastTime": "בפעם הקודמת {{nums}}",
+      "lastTimeOn": "בפעם הקודמת ({{date}}): {{nums}}",
       "swappedNoHistory": "תרגיל חלופי — עוד אין היסטוריה",
       "kg": "ק״ג",
       "reps": "חזרות",
@@ -517,6 +518,7 @@
       "skipped": "דילגת",
       "now": "עכשיו · סט {{n}} מתוך {{total}}",
       "partial": "{{done}} מתוך {{total}} סטים בוצעו",
+      "lastTime": "בפעם הקודמת ({{date}}): {{sets}}",
       "finishNow": "סיום האימון עכשיו"
     },
     "finish": {

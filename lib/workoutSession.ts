@@ -25,6 +25,16 @@ export const DEFAULT_REST_SECONDS = 60;
 /** Stepper start when neither the template nor history says anything. */
 export const DEFAULT_REPS = 10;
 
+/** One set of last time; weight null = bodyweight. */
+export type LastSet = { weight: number | null; reps: number | null };
+
+/** The subject's most recent session of an exercise, set by set (2026-11-23:
+ * "last time, set by set"). `completedAt` is the workout log's timestamp. */
+export type LastSession = { completedAt: string; sets: LastSet[] };
+
+/** One past set as the history query returns it, before grouping. */
+export type HistorySet = SetPerf & { setIndex: number; completedAt: string; logId: string };
+
 export type SessionExercise = {
   exerciseId: string;
   name: string;
@@ -33,8 +43,12 @@ export type SessionExercise = {
   targetReps: number | null;
   targetWeight: number | null;
   restSeconds: number | null;
-  /** The subject's most recent set of this exercise, or null. */
+  /** The subject's most recent set of this exercise (the final set of the
+   * last session), or null. */
   last: { weight: number | null; reps: number | null } | null;
+  /** The last session of this exercise, set by set; null or absent = none
+   * (or not loaded: then `last` stands in for every set). */
+  lastSession?: LastSession | null;
   /** Every past set of this exercise for this subject — the PR baseline. */
   history: SetPerf[];
 };
@@ -117,14 +131,43 @@ export type WorkoutAction =
 // Rules
 // ---------------------------------------------------------------------------
 
-/** Rule 1: weight = the higher of last time and the template target (null
- * when neither exists = bodyweight); reps = target, else last time. */
-export function prefill(e: SessionExercise): { weight: number | null; reps: number } {
-  const candidates = [e.last?.weight, e.targetWeight].filter((w): w is number => w != null);
+/** The most recent session in one exercise's history, its sets in order. */
+export function lastSessionOf(rows: HistorySet[]): LastSession | null {
+  let latest: HistorySet | null = null;
+  for (const r of rows) if (!latest || r.completedAt > latest.completedAt) latest = r;
+  if (!latest) return null;
+  const logId = latest.logId;
+  const sets = rows
+    .filter((r) => r.logId === logId)
+    .sort((a, b) => a.setIndex - b.setIndex)
+    .map(({ weight, reps }) => ({ weight, reps }));
+  return { completedAt: latest.completedAt, sets };
+}
+
+/** Last time's set number `index` (0-based): the same set of the last
+ * session, or that session's final set when it had fewer. Without a loaded
+ * last session, `last` stands in. null = never done. */
+export function lastTimeSet(e: SessionExercise, index: number): LastSet | null {
+  const sets = e.lastSession?.sets;
+  if (sets && sets.length > 0) return sets[Math.min(Math.max(0, index), sets.length - 1)];
+  return e.last;
+}
+
+/** Rule 1, set by set: weight = the higher of last time's same set and the
+ * template target (null when neither exists = bodyweight); reps = the
+ * template target, else last time's same set. */
+export function prefillSet(e: SessionExercise, index: number): { weight: number | null; reps: number } {
+  const last = lastTimeSet(e, index);
+  const candidates = [last?.weight, e.targetWeight].filter((w): w is number => w != null);
   return {
     weight: candidates.length ? Math.max(...candidates) : null,
-    reps: e.targetReps ?? e.last?.reps ?? DEFAULT_REPS,
+    reps: e.targetReps ?? last?.reps ?? DEFAULT_REPS,
   };
+}
+
+/** An exercise's first set (the preview, the overview's "3 × 10" line). */
+export function prefill(e: SessionExercise): { weight: number | null; reps: number } {
+  return prefillSet(e, 0);
 }
 
 export function restSecondsOf(e: SessionExercise): number {
@@ -150,17 +193,31 @@ export function nextOpen(
   return null;
 }
 
+/** How an exercise starts (the overview's "3 × 10 · 60 ק״ג" line): its swap's
+ * numbers, else its first set's pre-fill. */
 function startingNumbers(s: WorkoutState, ex: number) {
   const a = s.adjustments[ex];
   if (a?.type === "swap") return { weight: a.weight, reps: a.reps };
   return prefill(s.exercises[ex]);
 }
 
-/** Move to a position. Same exercise keeps the numbers just logged; another
- * exercise starts from its pre-fill. */
-function goTo(s: WorkoutState, pos: Position): WorkoutState {
+/** The numbers a set starts from. A swapped exercise starts from the swap's
+ * numbers and then keeps what was just logged. Otherwise last time's same set
+ * (prefillSet) when the exercise has a last session; without one, the same
+ * exercise keeps the numbers just logged and another starts from its
+ * pre-fill. Exported so the rest screen's "up next" matches exactly. */
+export function numbersAt(s: WorkoutState, pos: Position): { weight: number | null; reps: number } {
   const same = pos.ex === s.ex;
-  const nums = same ? { weight: s.weight, reps: s.reps } : startingNumbers(s, pos.ex);
+  const a = s.adjustments[pos.ex];
+  if (a?.type === "swap") return same ? { weight: s.weight, reps: s.reps } : { weight: a.weight, reps: a.reps };
+  const e = s.exercises[pos.ex];
+  if (same && !e.lastSession?.sets.length) return { weight: s.weight, reps: s.reps };
+  return prefillSet(e, pos.set);
+}
+
+/** Move to a position, starting from numbersAt(). */
+function goTo(s: WorkoutState, pos: Position): WorkoutState {
+  const nums = numbersAt(s, pos);
   return {
     ...s,
     screen: "set",
@@ -189,7 +246,7 @@ function livePr(s: WorkoutState, ex: number, set: { weight: number | null; reps:
 export function createSession(exercises: SessionExercise[], now: number): WorkoutState {
   const logs = exercises.map(() => [] as LoggedSet[]);
   const adjustments = exercises.map(() => null);
-  const first = exercises.length ? prefill(exercises[0]) : { weight: null, reps: DEFAULT_REPS };
+  const first = exercises.length ? prefillSet(exercises[0], 0) : { weight: null, reps: DEFAULT_REPS };
   return {
     exercises,
     screen: exercises.length ? "set" : "finish",
@@ -383,7 +440,7 @@ export function pills(s: WorkoutState): Pill[] {
 export function raisedTarget(s: WorkoutState): number | null {
   const e = s.exercises[s.ex];
   if (isSwapped(s, s.ex) || s.logs[s.ex].length > 0) return null;
-  const last = e.last?.weight;
+  const last = lastTimeSet(e, 0)?.weight;
   if (e.targetWeight == null || last == null || e.targetWeight <= last) return null;
   return s.weight === e.targetWeight ? e.targetWeight : null;
 }
@@ -421,6 +478,8 @@ export type OverviewRow = {
   reason: string | null;
   /** The numbers the exercise starts from (the "3 × 10 · 60 ק״ג" line). */
   start: { weight: number | null; reps: number };
+  /** Last time's sets of this exercise (none for a swap: no history). */
+  lastTime: LastSession | null;
 };
 
 /** The all-exercises sheet (D20d): one row per exercise with its status. */
@@ -441,6 +500,7 @@ export function overview(s: WorkoutState): OverviewRow[] {
       swapped: a?.type === "swap",
       reason: a && a.reason.trim() !== "" ? a.reason.trim() : null,
       start: startingNumbers(s, i),
+      lastTime: a?.type === "swap" ? null : (e.lastSession ?? null),
     };
   });
 }

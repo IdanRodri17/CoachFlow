@@ -20,6 +20,8 @@ import Plus from "lucide-react-native/icons/plus";
 import Trophy from "lucide-react-native/icons/trophy";
 
 import { layoutDirection, ltr } from "@/lib/i18n";
+import { toDateString } from "@/lib/dates";
+import { shortDate } from "@/components/home/format";
 import type { WorkoutSession } from "@/lib/useWorkoutSession";
 import {
   exerciseName,
@@ -27,6 +29,7 @@ import {
   formatWeight,
   isLastSetOverall,
   isSwapped,
+  lastTimeSet,
   pills,
   raisedTarget,
   restSecondsOf,
@@ -74,7 +77,7 @@ export function SetView({
   onSwap: () => void;
   onSkip: () => void;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const insets = useSafeAreaInsets();
   const { state: s, now } = session;
   const e = s.exercises[s.ex];
@@ -84,11 +87,15 @@ export function SetView({
   const lastSet = isLastSetOverall(s);
   const showRestOver = s.restEndedAt != null && now - s.restEndedAt < REST_OVER_BANNER_MS;
 
-  const lastNums = e.last
-    ? e.last.weight != null
-      ? `${formatWeight(e.last.weight)} × ${e.last.reps ?? "—"}`
-      : `${e.last.reps ?? "—"}`
+  // Last time's same set (or that session's last, when it had fewer), with
+  // the day it was done: "בפעם הקודמת (20.11): 42.5 × 8" (2026-11-23).
+  const prev = swapped ? null : lastTimeSet(e, s.logs[s.ex].length);
+  const lastNums = prev
+    ? prev.weight != null
+      ? `${formatWeight(prev.weight)} × ${prev.reps ?? "—"}`
+      : `${prev.reps ?? "—"}`
     : null;
+  const lastDate = e.lastSession ? shortDate(toDateString(new Date(e.lastSession.completedAt)), i18n.language) : null;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.iron }}>
@@ -176,7 +183,9 @@ export function SetView({
             {swapped
               ? t("workout.mode.swappedNoHistory")
               : lastNums
-                ? t("workout.mode.lastTime", { nums: ltr(lastNums) })
+                ? lastDate
+                  ? t("workout.mode.lastTimeOn", { date: ltr(lastDate), nums: ltr(lastNums) })
+                  : t("workout.mode.lastTime", { nums: ltr(lastNums) })
                 : ""}
           </AppText>
         </View>
