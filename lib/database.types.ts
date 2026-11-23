@@ -754,6 +754,12 @@ export type Database = {
       };
     };
     Functions: {
+      // 0045: the trainer reopens a completed session whose log holds no sets or
+      // skips/swaps (an empty log is removed). Raises workout_has_sets / workout_not_found.
+      reopen_workout: {
+        Args: { p_scheduled_workout_id: string };
+        Returns: undefined;
+      };
       // R9 (0040): counts one AI call for the trainer today; false = cap reached. Service role only.
       consume_ai_call: {
         Args: { p_trainer: string; p_cap: number };

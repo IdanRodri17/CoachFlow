@@ -14,9 +14,11 @@ import type { ReactNode } from "react";
 import { ActivityIndicator, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
+import { Stack, useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import Check from "lucide-react-native/icons/check";
+import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import Clock from "lucide-react-native/icons/clock";
 import MessageSquare from "lucide-react-native/icons/message-square";
 import Repeat from "lucide-react-native/icons/repeat";
@@ -30,22 +32,50 @@ import { friendlyError } from "@/lib/friendlyError";
 import type { WorkoutData, WorkoutMode } from "@/lib/useWorkoutSession";
 import { formatWeight, prefill } from "@/lib/workoutSession";
 import { longDate, shortDate } from "@/components/home/format";
-import { AppText, Card, Chip, colors, Display, Icon, ListCard, Num, SectionHeader, type IconComponent } from "@/components/ui";
+import {
+  AppText,
+  Card,
+  Chip,
+  colors,
+  Display,
+  Icon,
+  IconButton,
+  ListCard,
+  Num,
+  SectionHeader,
+  type IconComponent,
+} from "@/components/ui";
 import { InlineError } from "@/components/ui/ScreenState";
 
+/** These pages draw their own top bar, like the group and share screens: the
+ * stack header is hidden. Recent iOS draws that header see-through over the
+ * page, and letting iOS inset the page left it opening half-scrolled, the
+ * title still under the header (Idan's video, 2026-11-23). */
 function Page({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
   const insets = useSafeAreaInsets();
+  const router = useRouter();
+  const { t } = useTranslation();
   return (
     <ScrollView
       style={{ flex: 1, backgroundColor: colors.chalk }}
-      // Recent iOS draws the stack header see-through over the page; without
-      // this the title started under it (Idan, 2026-11-23: "too high, I need to
-      // scroll down to see the title"). iOS adds the header's and the home
-      // indicator's height itself; a no-op where the header is opaque.
-      contentInsetAdjustmentBehavior="automatic"
-      contentContainerStyle={{ padding: 20, paddingBottom: Math.max(insets.bottom, 16), gap: 16 }}
+      contentContainerStyle={{
+        paddingTop: insets.top + 8,
+        paddingHorizontal: 20,
+        paddingBottom: Math.max(insets.bottom, 16) + 16,
+        gap: 16,
+      }}
     >
+      <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="dark" />
+      <View style={{ height: 52, flexDirection: "row", alignItems: "center" }}>
+        <IconButton
+          icon={ChevronLeft}
+          mirror
+          iconSize={22}
+          accessibilityLabel={t("common.back")}
+          onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
+        />
+      </View>
       <View style={{ gap: 6 }}>
         <Display size={38} numberOfLines={2}>
           {title}

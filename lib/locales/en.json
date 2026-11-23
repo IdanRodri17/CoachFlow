@@ -256,7 +256,7 @@
       "package": "Package",
       "packageHint": "Sessions, price and renewal, on the client card.",
       "undoDone": "Undo \"done\"",
-      "undoDoneConfirm": "The session goes back to not done, and the package gets it back."
+      "undoDoneConfirm": "The session goes back to not done, and the package gets it back. Any effort or note logged with it is removed."
     }
   },
   "clients": {

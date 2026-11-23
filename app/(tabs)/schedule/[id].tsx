@@ -98,25 +98,36 @@ function EditScheduleScreenBody() {
 
   const workout = useQuery({
     queryKey: qk.scheduledTrainer.one(id),
-    queryFn: async (): Promise<{ initial: ScheduleFormInitial; row: LoadedRow; hasLog: boolean }> => {
+    queryFn: async (): Promise<{ initial: ScheduleFormInitial; row: LoadedRow; hasTraining: boolean }> => {
       const { data, error } = await supabase
         .from("scheduled_workouts")
         .select("*")
         .eq("id", id)
         .single();
       if (error) throw error;
-      // U6: a session only marked done (no workout log) can be un-marked.
-      let hasLog = false;
+      // U6 + 0045: a completed session can be reopened unless its log holds
+      // real training (sets, skips or swaps). Marked-only sessions and empty
+      // logs (a free workout finished with nothing in it) qualify.
+      let hasTraining = false;
       if (data.status === "completed") {
-        const logs = await supabase
+        const { data: log, error: logErr } = await supabase
           .from("workout_logs")
-          .select("id", { count: "exact", head: true })
-          .eq("scheduled_workout_id", id);
-        if (logs.error) throw logs.error;
-        hasLog = (logs.count ?? 0) > 0;
+          .select("id")
+          .eq("scheduled_workout_id", id)
+          .maybeSingle();
+        if (logErr) throw logErr;
+        if (log) {
+          const [sets, adj] = await Promise.all([
+            supabase.from("set_logs").select("id", { count: "exact", head: true }).eq("workout_log_id", log.id),
+            supabase.from("exercise_adjustments").select("id", { count: "exact", head: true }).eq("workout_log_id", log.id),
+          ]);
+          if (sets.error) throw sets.error;
+          if (adj.error) throw adj.error;
+          hasTraining = (sets.count ?? 0) + (adj.count ?? 0) > 0;
+        }
       }
       return {
-        hasLog,
+        hasTraining,
         initial: {
           client: data.client_id
             ? { kind: "app", refId: data.client_id }
@@ -199,11 +210,12 @@ function EditScheduleScreenBody() {
     },
   });
 
-  // U6 (2026-11-21): undo a mistaken "סימון כבוצע". 0043 gives the session
-  // back to the package; 0036's guard allows the status change.
+  // U6: undo a mistaken "סימון כבוצע", or a session finished with nothing in
+  // it. reopen_workout (0045) removes an empty log and reopens the session;
+  // 0043 gives the package its session back.
   const unmark = useMutation({
     mutationFn: async () => {
-      const { error } = await supabase.from("scheduled_workouts").update({ status: "scheduled" }).eq("id", id);
+      const { error } = await supabase.rpc("reopen_workout", { p_scheduled_workout_id: id });
       if (error) throw error;
     },
     onSuccess: () => {
@@ -328,7 +340,7 @@ function EditScheduleScreenBody() {
           />
           {row.notes ? <ListRow title={row.notes} subtitle={t("sessionForm.note")} /> : null}
         </ListCard>
-        {workout.data.hasLog ? null : (
+        {workout.data.hasTraining ? null : (
           <Button
             label={t("schedule.detail.undoDone")}
             icon={Undo2}
