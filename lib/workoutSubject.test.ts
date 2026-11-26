@@ -15,6 +15,7 @@ const appWorkout = {
   managed_client_id: null,
   status: "scheduled" as const,
   scheduled_date: TODAY,
+  with_trainer: true,
 };
 const offlineWorkout = {
   trainer_id: "t1",
@@ -22,6 +23,7 @@ const offlineWorkout = {
   managed_client_id: "m1",
   status: "scheduled" as const,
   scheduled_date: TODAY,
+  with_trainer: true,
 };
 
 describe("workoutAccess", () => {
@@ -56,7 +58,7 @@ describe("workoutAccess", () => {
     ).toBe("view");
   });
 
-  it("a future workout is a preview for everyone, never a start", () => {
+  it("a future 'with trainer' workout is a preview for everyone, never a start", () => {
     const tomorrow = { scheduled_date: "2026-11-22" };
     expect(workoutAccess({ ...appWorkout, ...tomorrow }, CLIENT, TODAY)).toEqual({
       kind: "preview",
@@ -75,6 +77,19 @@ describe("workoutAccess", () => {
       subject: { kind: "app", id: "c1" },
       mode: "trainer",
       reason: "notYet",
+    });
+  });
+
+  it("a future solo workout can be done early (2026-11-26)", () => {
+    const tomorrowSolo = { scheduled_date: "2026-11-22", with_trainer: false };
+    expect(workoutAccess({ ...appWorkout, ...tomorrowSolo }, CLIENT, TODAY).kind).toBe("log");
+    expect(workoutAccess({ ...offlineWorkout, ...tomorrowSolo }, TRAINER, TODAY).kind).toBe("log");
+    // An app client's solo workout is still theirs to log, not the trainer's.
+    expect(workoutAccess({ ...appWorkout, ...tomorrowSolo }, TRAINER, TODAY)).toEqual({
+      kind: "preview",
+      subject: { kind: "app", id: "c1" },
+      mode: "trainer",
+      reason: "clientLogs",
     });
   });
 

@@ -31,12 +31,14 @@ import { activateKeepAwakeAsync, deactivateKeepAwake } from "expo-keep-awake";
 import i18next from "./i18n";
 import { cancelRestAlert, restEndHaptic, scheduleRestAlert } from "./restAlerts";
 import { supabase } from "./supabase";
+import { todayISO } from "./dates";
 import { detectPRs } from "./pr";
 import { checkAndAwardBadges } from "./badges";
 import {
   createSession,
   exerciseName,
   fromSaved,
+  ADDED_SETS,
   isPristine,
   lastSessionOf,
   REST_STEP_SECONDS,
@@ -177,6 +179,9 @@ export function useWorkoutSession({
       swap: (sub: { reason: string; exerciseId: string; name: string; weight: number | null; reps: number }) =>
         dispatch({ type: "swap", ...sub }),
       finishNow: () => dispatch({ type: "finishNow" }),
+      addExercise: (exercise: SessionExercise) => dispatch({ type: "addExercise", exercise }),
+      openPicker: () => dispatch({ type: "openPicker" }),
+      closePicker: () => dispatch({ type: "closePicker" }),
     }),
     [autoRest],
   );
@@ -324,6 +329,30 @@ export async function loadWorkout(
   return { ...base, title: tplRes.data?.name ?? null, exercises };
 }
 
+/** An exercise picked from the library during the workout (2026-11-26: a
+ * free workout picks as it goes), with the subject's own history so last
+ * time, the prefill and live PRs work as for a planned one. */
+export async function loadAddedExercise(
+  row: { id: string; name: string; muscle_group: string | null; video_url: string | null; default_reps: number | null },
+  subject: WorkoutSubject,
+): Promise<LoadedExercise> {
+  const sets = await subjectHistory([row.id], subject);
+  return {
+    exerciseId: row.id,
+    name: row.name,
+    muscleGroup: row.muscle_group,
+    videoUrl: row.video_url,
+    sets: ADDED_SETS,
+    // No template: last time leads; with no history, the library's default.
+    targetReps: sets.length === 0 ? row.default_reps : null,
+    targetWeight: null,
+    restSeconds: null,
+    last: sets[0] ? { weight: sets[0].weight, reps: sets[0].reps } : null,
+    lastSession: lastSessionOf(sets),
+    history: sets.map(({ weight, reps }) => ({ weight, reps })),
+  };
+}
+
 /** The one save: the workout log (+ effort and note), its sets with PR flags,
  * the skips and swaps, the scheduled workout marked completed — all in one
  * transaction (rpc complete_workout, 0037), safe to retry — then (client
@@ -331,10 +360,28 @@ export async function loadWorkout(
  * (0032's default). */
 export async function saveWorkout(
   session: Pick<WorkoutSession, "state" | "scheduledId" | "subject" | "loggedBy" | "mode">,
-  { durationSeconds, effort, note }: { durationSeconds: number | null; effort: number | null; note: string | null },
+  {
+    durationSeconds,
+    effort,
+    note,
+    scheduledDate,
+  }: { durationSeconds: number | null; effort: number | null; note: string | null; scheduledDate: string },
 ): Promise<void> {
   const { state, scheduledId, subject, loggedBy, mode } = session;
   const rows = saveRows(state);
+
+  // A solo workout done before its day (2026-11-26) moves to today, so the
+  // calendar shows when it really happened and the planned day frees up.
+  // 0045 refuses completing anything dated after today; RLS and
+  // prevent_client_reschedule let a client move their own solo session.
+  const today = todayISO();
+  if (scheduledDate > today) {
+    const { error: moveErr } = await supabase
+      .from("scheduled_workouts")
+      .update({ scheduled_date: today })
+      .eq("id", scheduledId);
+    if (moveErr) throw moveErr;
+  }
 
   // PR flags against the subject's own history (lib/pr.ts) — the same rule
   // the live trophies use, recomputed here because a swap has no history.

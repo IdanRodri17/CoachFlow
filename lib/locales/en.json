@@ -410,6 +410,16 @@
     "title": "Workout",
     "exerciseFallback": "Exercise",
     "notFound": "Workout not found.",
+    "pick": {
+      "firstTitle": "What are you starting with?",
+      "nextTitle": "What's next?",
+      "freeHint": "Nothing is planned for this workout. Pick exercises as you go; each one runs like a planned exercise.",
+      "hint": "Pick an exercise to add. It starts with {{count}} sets.",
+      "search": "Search exercises",
+      "empty": "No exercises found.",
+      "back": "Back to the exercise",
+      "finish": "Finish the workout"
+    },
     "preview": {
       "startsOn": "This workout opens on {{date}}. Until then you can look through it.",
       "exercisesTitle": "What's in it",
@@ -519,7 +529,8 @@
       "now": "Now · set {{n}} of {{total}}",
       "partial": "{{done}} of {{total}} sets done",
       "lastTime": "Last time ({{date}}): {{sets}}",
-      "finishNow": "Finish the workout now"
+      "finishNow": "Finish the workout now",
+      "add": "Add an exercise"
     },
     "finish": {
       "title": "Done!",
@@ -810,6 +821,9 @@
     "smsRemindersHint": "The day before and on the morning of a workout"
   },
   "sessionForm": {
+    "pastTitle": "This time has passed",
+    "pastBody": "The session will be scheduled for a time that already passed. Schedule it anyway?",
+    "pastConfirm": "Schedule anyway",
     "untilPackageEnds": "Until the package ends · {{n}}",
     "untilPackageEndsShort": "Until the package ends",
     "packageNone": "This client has no package.",

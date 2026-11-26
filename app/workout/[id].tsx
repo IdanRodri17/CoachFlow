@@ -41,17 +41,20 @@ import { useWorkoutPrefs } from "@/lib/workoutPrefs";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import {
   clearSavedWorkout,
+  loadAddedExercise,
   loadSavedWorkout,
   loadWorkout,
   saveWorkout,
   subjectHistory,
   useWorkoutSession,
+  type LoadedExercise,
   type WorkoutData,
   type WorkoutMode as SessionMode,
   type WorkoutSubject,
 } from "@/lib/useWorkoutSession";
 import { workoutAccess, type WorkoutAccess } from "@/lib/workoutSubject";
 import {
+  ADDED_SETS,
   exerciseName,
   isSwapped,
   sessionPrs,
@@ -67,6 +70,7 @@ import { OverviewSheet } from "@/components/workout/OverviewSheet";
 import { RestView } from "@/components/workout/RestView";
 import { SetView } from "@/components/workout/SetView";
 import { CompletedWorkout, WorkoutPreview } from "@/components/workout/WorkoutDetail";
+import { PickView, type PickRow } from "@/components/workout/PickView";
 import { colors, Sheet } from "@/components/ui";
 
 // The name shown in trainer mode's header ("דנה · רגליים").
@@ -96,7 +100,7 @@ export default function WorkoutScreen() {
       // Whose workout is it, and may this user log it? Decided first.
       const { data: sw, error } = await supabase
         .from("scheduled_workouts")
-        .select("trainer_id, client_id, managed_client_id, status, scheduled_date")
+        .select("trainer_id, client_id, managed_client_id, status, scheduled_date, with_trainer")
         .eq("id", id)
         .maybeSingle();
       if (error) throw error;
@@ -208,8 +212,14 @@ function WorkoutMode({
   const { state: s } = session;
   const [sheet, setSheet] = useState<"adjust" | "overview" | "demo" | null>(null);
   const [adjustMode, setAdjustMode] = useState<"swap" | "skip">("swap");
+  const [addingId, setAddingId] = useState<string | null>(null);
 
-  const current = data.exercises[s.ex];
+  // From the session, not data.exercises: an exercise added during the
+  // workout (the picker) is only there.
+  const current = s.exercises[s.ex] as LoadedExercise | undefined;
+  // A solo workout done before its day moves to today on save (saveWorkout).
+  const today = todayISO();
+  const doneOn = data.scheduledDate > today ? today : data.scheduledDate;
   const adj = s.adjustments[s.ex];
 
   // The swap list shares the exercise library's cache entry (same shape).
@@ -237,7 +247,7 @@ function WorkoutMode({
     },
   });
   const finishStreak =
-    streak.data != null ? streakAfterCompleting(streak.data, data.scheduledDate, todayISO()) : null;
+    streak.data != null ? streakAfterCompleting(streak.data, doneOn, today) : null;
 
   // Minimize (or back) just leaves: the session is saved on the phone and
   // opening this workout again resumes it.
@@ -250,10 +260,11 @@ function WorkoutMode({
     meta: { inlineError: true },
     mutationFn: (input: FinishInput) =>
       saveWorkout(session, {
-        // A free workout (no exercises) had no timed session.
-        durationSeconds: data.exercises.length > 0 ? input.durationSeconds : null,
+        // A workout with no exercises at all had no timed session.
+        durationSeconds: s.exercises.length > 0 ? input.durationSeconds : null,
         effort: input.effort,
         note: input.note,
+        scheduledDate: data.scheduledDate,
       }),
   });
 
@@ -317,6 +328,35 @@ function WorkoutMode({
     session.swap({ reason: r.reason, exerciseId: r.swapId, name: r.swapName, weight, reps });
   }
 
+  // The picker (a free workout, or "add an exercise"): load the picked one's
+  // history first, so last time and the prefill are there from its first set.
+  async function pick(row: PickRow) {
+    const full = library.data?.find((e) => e.id === row.id);
+    if (!full || addingId) return;
+    setAddingId(row.id);
+    try {
+      session.addExercise(await loadAddedExercise(full, subject));
+    } catch {
+      // No history (offline): start it without one rather than not at all.
+      const bare: LoadedExercise = {
+        exerciseId: full.id,
+        name: full.name,
+        muscleGroup: full.muscle_group,
+        videoUrl: full.video_url,
+        sets: ADDED_SETS,
+        targetReps: full.default_reps,
+        targetWeight: null,
+        restSeconds: null,
+        last: null,
+        lastSession: null,
+        history: [],
+      };
+      session.addExercise(bare);
+    } finally {
+      setAddingId(null);
+    }
+  }
+
   const swapLibrary = (library.data ?? []).filter(
     (e) => e.id !== current?.exerciseId && !(adj?.type === "swap" && adj.exerciseId === e.id),
   );
@@ -330,7 +370,18 @@ function WorkoutMode({
     <View style={{ flex: 1, backgroundColor: colors.iron }}>
       <StatusBar style="light" />
 
-      {s.screen === "set" ? (
+      {s.screen === "pick" ? (
+        <PickView
+          session={session}
+          title={title}
+          library={library.data ?? []}
+          loadingLibrary={library.isLoading}
+          addingId={addingId}
+          onPick={(row) => void pick(row)}
+          onMinimize={minimize}
+          onOverview={() => setSheet("overview")}
+        />
+      ) : s.screen === "set" ? (
         <SetView
           session={session}
           title={title}
@@ -345,11 +396,13 @@ function WorkoutMode({
         <RestView session={session} title={title} onMinimize={minimize} onOverview={() => setSheet("overview")} />
       ) : (
         <FinishView
-          // The session's own day: a late log of yesterday's workout is still yesterday's.
-          subtitle={`${title} · ${longDate(data.scheduledDate, i18n.language)}`}
+          // The session's own day (a late log of yesterday's is still
+          // yesterday's); a solo one done early is today's.
+          subtitle={`${title} · ${longDate(doneOn, i18n.language)}`}
           startedAt={s.startedAt}
           trainerName={trainerName}
-          showDuration={data.exercises.length > 0}
+          showDuration={s.exercises.length > 0}
+          onMinimize={minimize}
           sets={setsLogged(s)}
           streak={finishStreak}
           prs={sessionPrs(s)}
@@ -366,7 +419,7 @@ function WorkoutMode({
         visible={sheet === "adjust"}
         mode={adjustMode}
         exerciseName={name}
-        exerciseLabel={t("workout.mode.exerciseOf", { n: s.ex + 1, total: data.exercises.length })}
+        exerciseLabel={t("workout.mode.exerciseOf", { n: s.ex + 1, total: s.exercises.length })}
         muscleGroup={isSwapped(s, s.ex) ? null : current?.muscleGroup}
         trainerName={trainerName}
         trainerMode={trainerMode}
@@ -387,6 +440,10 @@ function WorkoutMode({
         onFinish={() => {
           setSheet(null);
           session.finishNow();
+        }}
+        onAdd={() => {
+          setSheet(null);
+          session.openPicker();
         }}
       />
 

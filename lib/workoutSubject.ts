@@ -9,9 +9,11 @@
 //   * An APP client's workout is theirs to log. The trainer sees it read-only:
 //     a preview while it's open, the summary once it's completed (RLS gives
 //     trainers read access, never write).
-//   * Nobody starts a workout before its day (Idan, 2026-11-21). A future
-//     workout opens as a preview: what's coming, with the recommended
-//     weights. A past one that was missed can still be logged late.
+//   * A "with trainer" workout opens on its day (Idan, 2026-11-21); before
+//     then it's a preview: what's coming, with the recommended weights. A
+//     solo one can be done any day (2026-11-26: people training on their own
+//     choose when); finished early, the save moves it to today
+//     (saveWorkout). A past one that was missed can still be logged late.
 //
 // Pure, unit-tested in lib/workoutSubject.test.ts.
 
@@ -29,13 +31,15 @@ export function workoutAccess(
     managed_client_id: string | null;
     status: "scheduled" | "completed";
     scheduled_date: string;
+    with_trainer: boolean;
   },
   user: { id: string; role: "trainer" | "client" },
   /** YYYY-MM-DD in the user's zone (lib/dates.ts todayISO). */
   today: string,
 ): WorkoutAccess {
   const done = sw.status === "completed";
-  const notYet = !done && sw.scheduled_date > today;
+  // Only a "with trainer" session waits for its day.
+  const notYet = !done && sw.scheduled_date > today && sw.with_trainer;
 
   if (user.role === "client") {
     if (sw.client_id !== user.id) return { kind: "denied", reason: "notYours" };

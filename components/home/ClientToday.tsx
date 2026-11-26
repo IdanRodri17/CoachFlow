@@ -682,8 +682,9 @@ function HeroCard({
         </View>
       ) : null}
 
-      {/* A later day's workout opens as a preview (it starts on its day). */}
-      {done || !isToday ? (
+      {/* A later day's "with trainer" workout opens as a preview (it starts on
+          its day); a solo one can be done any day (2026-11-26). */}
+      {done || (!isToday && item.with_trainer) ? (
         <Button label={t("today.viewWorkout")} variant="dark" size={56} block onPress={onStart} />
       ) : (
         <Button label={t("today.startWorkout")} variant="accent" size={64} icon={FilledPlay} block onPress={onStart} />

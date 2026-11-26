@@ -5,6 +5,8 @@
 import { describe, expect, it } from "vitest";
 
 import {
+  ADDED_SETS,
+  canClosePicker,
   createSession,
   formatClock,
   formatElapsed,
@@ -454,5 +456,76 @@ describe("last time, set by set (2026-11-23)", () => {
     expect(overview(s)[1].lastTime).toBeNull();
     const swapped = run(s, { type: "swap", reason: "", exerciseId: "alt", name: "Alt", weight: 30, reps: 10 });
     expect(overview(swapped)[0].lastTime).toBeNull();
+  });
+});
+
+describe("free workout: pick exercises as you go (2026-11-26)", () => {
+  const bench = ex({
+    exerciseId: "bench",
+    sets: ADDED_SETS,
+    targetReps: null,
+    last: { weight: 60, reps: 8 },
+    lastSession: { completedAt: "2026-11-20T08:00:00Z", sets: [{ weight: 55, reps: 10 }, { weight: 60, reps: 8 }] },
+  });
+
+  it("starts on the picker, not on Finish", () => {
+    const s = createSession([], T0);
+    expect(s.screen).toBe("pick");
+    expect(s.planned).toBe(0);
+    expect(isPristine(s)).toBe(true);
+  });
+
+  it("adding an exercise starts its first set from last time", () => {
+    const s = run(createSession([], T0), { type: "addExercise", exercise: bench });
+    expect(s.screen).toBe("set");
+    expect(s.ex).toBe(0);
+    expect([s.weight, s.reps]).toEqual([55, 10]);
+    expect(s.logs).toEqual([[]]);
+    expect(s.adjustments).toEqual([null]);
+    expect(isPristine(s)).toBe(false);
+  });
+
+  it("a free workout goes back to the picker when its exercises are done", () => {
+    let s = run(createSession([], T0), { type: "addExercise", exercise: ex({ exerciseId: "row", sets: 2 }) });
+    expect(isLastSetOverall(s)).toBe(false);
+    s = run(s, { type: "logSet", now: T0 }, { type: "restDone", now: T0 + 1000 }, { type: "logSet", now: T0 + 2000 });
+    expect(s.screen).toBe("pick");
+    expect(canClosePicker(s)).toBe(false);
+    // ...and from there, Finish.
+    expect(run(s, { type: "finishNow" }).screen).toBe("finish");
+  });
+
+  it("a planned workout can add an exercise from the overview, and go back", () => {
+    let s = createSession([squat], T0);
+    s = run(s, { type: "openPicker" });
+    expect(s.screen).toBe("pick");
+    expect(canClosePicker(s)).toBe(true);
+    expect(run(s, { type: "closePicker" }).screen).toBe("set");
+    s = run(s, { type: "addExercise", exercise: bench });
+    expect(s.exercises.map((e) => e.exerciseId)).toEqual(["squat", "bench"]);
+    expect(s.planned).toBe(1);
+    expect(s.ex).toBe(1);
+  });
+
+  it("closing the picker with nothing open stays put", () => {
+    const s = createSession([], T0);
+    expect(run(s, { type: "closePicker" })).toBe(s);
+  });
+
+  it("the sets of an added exercise save like planned ones", () => {
+    const s = run(createSession([], T0), { type: "addExercise", exercise: bench }, { type: "logSet", now: T0 });
+    expect(saveRows(s).sets).toEqual([expect.objectContaining({ exercise_id: "bench", set_index: 0, weight: 55, reps: 10 })]);
+  });
+
+  it("resumes with the added exercises (and old saves still load)", () => {
+    const s = run(createSession([squat], T0), { type: "addExercise", exercise: bench }, { type: "logSet", now: T0 });
+    const saved = JSON.parse(JSON.stringify(toSaved(s)));
+    const back = fromSaved(saved, [squat], T0 + 60_000);
+    expect(back?.exercises.map((e) => e.exerciseId)).toEqual(["squat", "bench"]);
+    expect(back?.planned).toBe(1);
+    expect(back?.logs[1]).toHaveLength(1);
+    // A save from before this change: no `added`.
+    const old = { ...saved, added: undefined, logs: [saved.logs[0]], adjustments: [saved.adjustments[0]], ex: 0 };
+    expect(fromSaved(old, [squat], T0 + 60_000)?.exercises).toHaveLength(1);
   });
 });

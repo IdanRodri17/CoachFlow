@@ -9,6 +9,7 @@ import { useTranslation } from "react-i18next";
 import Check from "lucide-react-native/icons/check";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import ChevronsRight from "lucide-react-native/icons/chevrons-right";
+import Plus from "lucide-react-native/icons/plus";
 import X from "lucide-react-native/icons/x";
 
 import { ltr } from "@/lib/i18n";
@@ -25,6 +26,7 @@ export function OverviewSheet({
   onClose,
   onJump,
   onFinish,
+  onAdd,
 }: {
   visible: boolean;
   session: WorkoutSession;
@@ -33,6 +35,8 @@ export function OverviewSheet({
   onClose: () => void;
   onJump: (ex: number) => void;
   onFinish: () => void;
+  /** Opens the exercise picker (2026-11-26). */
+  onAdd: () => void;
 }) {
   const { t } = useTranslation();
   const { state: s, now } = session;
@@ -74,6 +78,7 @@ export function OverviewSheet({
         ))}
       </ScrollView>
 
+      <Button label={t("workout.overview.add")} icon={Plus} variant="dark" size={52} block onPress={onAdd} />
       <Button label={t("workout.overview.finishNow")} variant="darkOutline" size={52} block onPress={onFinish} />
     </Sheet>
   );

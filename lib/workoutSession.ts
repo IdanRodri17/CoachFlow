@@ -24,6 +24,9 @@ export const REST_STEP_SECONDS = 15;
 export const DEFAULT_REST_SECONDS = 60;
 /** Stepper start when neither the template nor history says anything. */
 export const DEFAULT_REPS = 10;
+/** Sets an exercise added during the workout starts with (a free workout
+ * picks its exercises as it goes, 2026-11-26). */
+export const ADDED_SETS = 3;
 
 /** One set of last time; weight null = bodyweight. */
 export type LastSet = { weight: number | null; reps: number | null };
@@ -79,7 +82,12 @@ export type RestState = {
 
 export type WorkoutState = {
   exercises: SessionExercise[];
-  screen: "set" | "rest" | "finish";
+  /** How many of `exercises` came from the template; the rest were added
+   * during the workout. 0 = a free workout (no template): it starts on the
+   * exercise picker and goes back to it when an exercise is done. */
+  planned: number;
+  /** "pick": choosing the next exercise from the library. */
+  screen: "set" | "rest" | "finish" | "pick";
   /** The exercise on screen. */
   ex: number;
   /** The stepper values. null weight = bodyweight. */
@@ -125,7 +133,12 @@ export type WorkoutAction =
       weight: number | null;
       reps: number;
     }
-  | { type: "finishNow" };
+  | { type: "finishNow" }
+  /** Add an exercise from the library and start its first set. */
+  | { type: "addExercise"; exercise: SessionExercise }
+  | { type: "openPicker" }
+  /** Back from the picker to the next open set (nothing open: stays). */
+  | { type: "closePicker" };
 
 // ---------------------------------------------------------------------------
 // Rules
@@ -249,7 +262,9 @@ export function createSession(exercises: SessionExercise[], now: number): Workou
   const first = exercises.length ? prefillSet(exercises[0], 0) : { weight: null, reps: DEFAULT_REPS };
   return {
     exercises,
-    screen: exercises.length ? "set" : "finish",
+    planned: exercises.length,
+    // A free workout (no template) starts by picking its first exercise.
+    screen: exercises.length ? "set" : "pick",
     ex: 0,
     weight: first.weight,
     reps: first.reps,
@@ -289,8 +304,9 @@ export function workoutReducer(s: WorkoutState, a: WorkoutAction): WorkoutState 
       const logs = s.logs.map((l, i) => (i === s.ex ? [...l, { ...set, pr }] : l));
       const lastLog = { ex: s.ex, set: s.logs[s.ex].length, ...set };
       const next = nextOpen(s.exercises, logs, s.adjustments, s.ex);
-      // Last set of the whole workout: straight to Finish, no rest.
-      if (!next) return { ...s, logs, lastLog, screen: "finish", rest: null, next: null, restOfferSeconds: null };
+      // Last set of the whole workout: straight to Finish, no rest. A free
+      // workout has no last set: back to the picker (next exercise, or finish).
+      if (!next) return { ...s, logs, lastLog, screen: endScreen(s), rest: null, next: null, restOfferSeconds: null };
       const seconds = restSecondsOf(s.exercises[s.ex]);
       if (a.autoRest === false) {
         return { ...goTo({ ...s, logs }, next), restOfferSeconds: seconds };
@@ -369,7 +385,7 @@ export function workoutReducer(s: WorkoutState, a: WorkoutAction): WorkoutState 
     case "skip": {
       const adjustments = s.adjustments.map((x, i) => (i === s.ex ? { type: "skip" as const, reason: a.reason } : x));
       const next = nextOpen(s.exercises, s.logs, adjustments, s.ex);
-      if (!next) return { ...s, adjustments, screen: "finish", rest: null, next: null };
+      if (!next) return { ...s, adjustments, screen: endScreen(s), rest: null, next: null };
       return goTo({ ...s, adjustments }, next);
     }
 
@@ -392,7 +408,47 @@ export function workoutReducer(s: WorkoutState, a: WorkoutAction): WorkoutState 
 
     case "finishNow":
       return { ...s, screen: "finish", rest: null, next: null };
+
+    case "addExercise": {
+      const exercises = [...s.exercises, a.exercise];
+      const first = prefillSet(a.exercise, 0);
+      return {
+        ...s,
+        exercises,
+        logs: [...s.logs, []],
+        adjustments: [...s.adjustments, null],
+        screen: "set",
+        ex: exercises.length - 1,
+        weight: first.weight,
+        reps: first.reps,
+        rest: null,
+        next: null,
+        lastLog: null,
+        restOfferSeconds: null,
+      };
+    }
+
+    case "openPicker":
+      if (s.screen === "finish") return s;
+      return { ...s, screen: "pick", rest: null, next: null, restOfferSeconds: null };
+
+    case "closePicker": {
+      if (s.screen !== "pick") return s;
+      const pos = nextOpen(s.exercises, s.logs, s.adjustments, s.ex);
+      return pos ? goTo(s, pos) : s;
+    }
   }
+}
+
+/** Where a workout lands when nothing is left open: Finish, or for a free
+ * workout the picker (another exercise, or finish from there). */
+function endScreen(s: WorkoutState): WorkoutState["screen"] {
+  return s.planned === 0 ? "pick" : "finish";
+}
+
+/** The picker can go back to a set only while one is still open. */
+export function canClosePicker(s: WorkoutState): boolean {
+  return nextOpen(s.exercises, s.logs, s.adjustments, s.ex) != null;
 }
 
 // ---------------------------------------------------------------------------
@@ -447,6 +503,8 @@ export function raisedTarget(s: WorkoutState): number | null {
 
 /** True when logging the set on screen ends the workout (no rest follows). */
 export function isLastSetOverall(s: WorkoutState): boolean {
+  // A free workout never ends on a set: the picker comes next.
+  if (s.planned === 0) return false;
   const logs = s.logs.map((l, i) => (i === s.ex ? [...l, { weight: null, reps: 0, pr: false }] : l));
   return nextOpen(s.exercises, logs, s.adjustments, s.ex) == null;
 }
@@ -599,17 +657,24 @@ export const RESUME_MAX_AGE_MS = 12 * 60 * 60 * 1000;
 
 /** What's stored on the phone: the state minus the loaded exercises (they're
  * re-read on open), plus their ids to check the template didn't change. */
-export type SavedSession = Omit<WorkoutState, "exercises"> & { v: 1; exerciseIds: string[] };
+export type SavedSession = Omit<WorkoutState, "exercises" | "planned"> & {
+  v: 1;
+  /** The template's exercises, to check it didn't change. */
+  exerciseIds: string[];
+  /** Exercises added during the workout (not in the template), kept whole. */
+  added?: SessionExercise[];
+};
 
 /** Nothing worth resuming yet: no set logged, nothing skipped or swapped. */
 export function isPristine(s: WorkoutState): boolean {
-  return setsLogged(s) === 0 && s.adjustments.every((a) => a == null);
+  return setsLogged(s) === 0 && s.adjustments.every((a) => a == null) && s.exercises.length === s.planned;
 }
 
 export function toSaved(s: WorkoutState): SavedSession {
   return {
     v: 1,
-    exerciseIds: s.exercises.map((e) => e.exerciseId),
+    exerciseIds: s.exercises.slice(0, s.planned).map((e) => e.exerciseId),
+    added: s.exercises.slice(s.planned),
     screen: s.screen,
     ex: s.ex,
     weight: s.weight,
@@ -633,12 +698,15 @@ export function fromSaved(saved: unknown, exercises: SessionExercise[], now: num
   if (v.v !== 1 || typeof v.startedAt !== "number" || now - v.startedAt > RESUME_MAX_AGE_MS) return null;
   const ids = exercises.map((e) => e.exerciseId);
   if (!Array.isArray(v.exerciseIds) || v.exerciseIds.join("|") !== ids.join("|")) return null;
-  if (!Array.isArray(v.logs) || v.logs.length !== ids.length) return null;
-  if (!Array.isArray(v.adjustments) || v.adjustments.length !== ids.length) return null;
-  if (typeof v.ex !== "number" || v.ex < 0 || (ids.length > 0 && v.ex >= ids.length)) return null;
-  if (v.screen !== "set" && v.screen !== "rest" && v.screen !== "finish") return null;
+  const added = Array.isArray(v.added) ? v.added : [];
+  const all = [...exercises, ...added];
+  if (!Array.isArray(v.logs) || v.logs.length !== all.length) return null;
+  if (!Array.isArray(v.adjustments) || v.adjustments.length !== all.length) return null;
+  if (typeof v.ex !== "number" || v.ex < 0 || (all.length > 0 && v.ex >= all.length)) return null;
+  if (v.screen !== "set" && v.screen !== "rest" && v.screen !== "finish" && v.screen !== "pick") return null;
   return {
-    exercises,
+    exercises: all,
+    planned: exercises.length,
     screen: v.screen,
     ex: v.ex,
     weight: v.weight ?? null,

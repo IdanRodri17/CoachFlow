@@ -1,5 +1,8 @@
 // app/workout/_layout.tsx — a stack for the active-workout flow (outside the
-// tabs). Gives the logging screen a header with a back button.
+// tabs). No stack header: recent iOS draws it see-through over the screen, and
+// it covered the dark workout's top ("סיימת!", 2026-11-26). Every state draws
+// its own way out: WorkoutHeader / FinishView minimize, the read-only pages'
+// back bar, ScreenMessage's back.
 
 import { Stack } from "expo-router";
 import { useTranslation } from "react-i18next";
@@ -13,7 +16,7 @@ export default function WorkoutLayout() {
   const { t } = useTranslation();
   return (
     <Stack>
-      <Stack.Screen name="[id]" options={{ title: t("workout.title") }} />
+      <Stack.Screen name="[id]" options={{ title: t("workout.title"), headerShown: false }} />
     </Stack>
   );
 }

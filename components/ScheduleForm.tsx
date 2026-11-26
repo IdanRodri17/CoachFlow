@@ -29,7 +29,7 @@
 // group, and no "עד סוף החבילה": each attendee has their own package.
 
 import { useState, type ReactNode } from "react";
-import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
+import { Alert, KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
@@ -49,7 +49,7 @@ import { expandScheduleDates, sessionsUntilPackageEnds, type PackageBalance, typ
 import type { RosterClient } from "@/lib/useRoster";
 import { DateChips } from "@/components/DateChips";
 import { TimeChips } from "@/components/TimeChips";
-import { firstName, shortDate, weekdayLetter } from "@/components/home/format";
+import { firstName, localMinutesNow, minutesOf, shortDate, weekdayLetter } from "@/components/home/format";
 import {
   AppText,
   Avatar,
@@ -258,7 +258,7 @@ export function ScheduleForm({
     }
     setValidationError(null);
     const fullNote = [...noteChips.map((k) => t(`sessionForm.${k}`)), note.trim()].filter(Boolean).join(" · ");
-    onSubmit({
+    const payload: SchedulePayload = {
       client,
       templateId,
       date,
@@ -267,7 +267,20 @@ export function ScheduleForm({
       withTrainer,
       repeat,
       group: groupMode ? group : undefined,
-    });
+    };
+    // 2026-11-26 (Idan): a time that has already passed is allowed, with a
+    // warning. An edit that keeps the session's own day and time isn't asked
+    // again (a note on yesterday's session shouldn't nag).
+    const ownSlot = initial != null && initial.date === date && (initial.time ? initial.time.slice(0, 5) : null) === time;
+    const past = date < today || (date === today && time != null && minutesOf(time) < localMinutesNow());
+    if (past && !ownSlot) {
+      Alert.alert(t("sessionForm.pastTitle"), t("sessionForm.pastBody"), [
+        { text: t("common.cancel"), style: "cancel" },
+        { text: t("sessionForm.pastConfirm"), onPress: () => onSubmit(payload) },
+      ]);
+      return;
+    }
+    onSubmit(payload);
   }
 
   const inGroup = (c: ClientRef) => group.some((g) => g.kind === c.kind && g.refId === c.refId);

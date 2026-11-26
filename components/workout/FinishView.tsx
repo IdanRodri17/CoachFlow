@@ -10,6 +10,7 @@ import { ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useTranslation } from "react-i18next";
 import Check from "lucide-react-native/icons/check";
+import ChevronDown from "lucide-react-native/icons/chevron-down";
 import Dumbbell from "lucide-react-native/icons/dumbbell";
 import Flame from "lucide-react-native/icons/flame";
 import Pencil from "lucide-react-native/icons/pencil";
@@ -18,7 +19,19 @@ import Trophy from "lucide-react-native/icons/trophy";
 
 import { ltr } from "@/lib/i18n";
 import { formatElapsed, formatWeight } from "@/lib/workoutSession";
-import { AppText, Button, colors, Display, Icon, Input, Num, Pressable, SelectChip, type IconComponent } from "@/components/ui";
+import {
+  AppText,
+  Button,
+  colors,
+  Display,
+  Icon,
+  IconButton,
+  Input,
+  Num,
+  Pressable,
+  SelectChip,
+  type IconComponent,
+} from "@/components/ui";
 
 const NOTE_CHIPS = ["great", "knee", "tired", "rushed"] as const;
 type NoteChip = (typeof NOTE_CHIPS)[number];
@@ -38,6 +51,7 @@ export function FinishView({
   errorMessage,
   onSave,
   onShare,
+  onMinimize,
 }: {
   /** "רגליים + ליבה · יום שבת, 3 באוקטובר". */
   subtitle: string;
@@ -57,6 +71,8 @@ export function FinishView({
   errorMessage: string | null;
   onSave: (input: FinishInput) => void;
   onShare?: (input: FinishInput) => void;
+  /** Leave without saving (the session stays on the phone). */
+  onMinimize: () => void;
 }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -95,6 +111,13 @@ export function FinishView({
           gap: 22,
         }}
       >
+        <IconButton
+          icon={ChevronDown}
+          variant="dark"
+          iconSize={22}
+          accessibilityLabel={t("workout.mode.minimize")}
+          onPress={onMinimize}
+        />
         <View style={{ gap: 6 }}>
           <Display size={76} tone="bone">
             {t("workout.finish.title")}
