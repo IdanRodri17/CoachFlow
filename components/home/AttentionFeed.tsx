@@ -43,7 +43,9 @@ export function AttentionFeed({ roster }: { roster: RosterClient[] }) {
   // Shared with the clients list (lib/queries.ts): sorted, all rows.
   const feed = useQuery(attentionQuery);
 
-  const items = (feed.data ?? []).slice(0, MAX_ROWS);
+  // U5: nothing about a client the trainer archived.
+  const archived = new Set(roster.filter((c) => c.archived).map((c) => (c.kind === "app" ? c.refId : `m:${c.refId}`)));
+  const items = (feed.data ?? []).filter((it) => !archived.has(it.subject_key ?? "")).slice(0, MAX_ROWS);
   if (items.length === 0) return null;
 
   function clientOf(it: Item): RosterClient | undefined {

@@ -31,7 +31,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { todayISO } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
-import { useRosterClients, type RosterClient } from "@/lib/useRoster";
+import { activeClients, useRosterClients, type RosterClient } from "@/lib/useRoster";
 import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import { buildWhatsAppReminderLink } from "@/lib/whatsapp";
 import {
@@ -330,7 +330,7 @@ export function TrainerHome() {
         </Pressable>
       ) : null}
 
-      {roster.data && roster.data.length === 0 ? (
+      {roster.data && activeClients(roster.data).length === 0 ? (
         <Card style={{ gap: 12 }}>
           <AppText size={16} weight="semibold">
             {t("trainerHome.noClients")}

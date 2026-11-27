@@ -400,7 +400,12 @@ function EditScheduleScreenBody() {
       </View>
 
       <ScheduleForm
-        roster={roster.data ?? []}
+        // U5: no archived client to switch to; this session's own client stays.
+        roster={(roster.data ?? []).filter(
+          (c) =>
+            !c.archived ||
+            (c.kind === workout.data.initial.client?.kind && c.refId === workout.data.initial.client?.refId),
+        )}
         templates={templates.data ?? []}
         loadingRoster={false}
         loadingTemplates={false}

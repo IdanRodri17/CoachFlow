@@ -285,7 +285,8 @@
       "risk": "At risk",
       "unpaid": "To pay",
       "package": "Package ending",
-      "noApp": "No app"
+      "noApp": "No app",
+      "archived": "Archive"
     },
     "chip": {
       "missedStreak": "Missed in a row",
@@ -327,6 +328,17 @@
       "badPrice": "Enter a price, like 180.",
       "badPackage": "Enter a number of sessions, like 10.",
       "priceNeedsPackage": "A price goes with a package: enter the number of sessions too."
+    },
+    "archive": {
+      "action": "Archive",
+      "restore": "Bring back",
+      "chip": "Archived",
+      "confirm": "Archive",
+      "confirmTitle": "Archive {{name}}?",
+      "confirmBody": "They leave your list, scheduling and Home. Their history and payments stay, and you can bring them back from the archive.",
+      "confirmBodySessions_one": "They leave your list, scheduling and Home, and their upcoming session is removed. History and payments stay; you can bring them back from the archive.",
+      "confirmBodySessions_two": "They leave your list, scheduling and Home, and their 2 upcoming sessions are removed. History and payments stay; you can bring them back from the archive.",
+      "confirmBodySessions_other": "They leave your list, scheduling and Home, and their {{count}} upcoming sessions are removed. History and payments stay; you can bring them back from the archive."
     }
   },
   "join": {
@@ -1005,7 +1017,18 @@
       "usedSoFar_one": "1 session used so far",
       "usedSoFar_two": "{{count}} sessions used so far",
       "usedSoFar_other": "{{count}} sessions used so far",
-      "save": "Save"
+      "save": "Save",
+      "renew": "Renew package",
+      "renewTitle": "Renew package",
+      "renewSize": "Sessions in the new package",
+      "renewCarry_one": "1 session left in the current package carries over.",
+      "renewCarry_two": "2 sessions left in the current package carry over.",
+      "renewCarry_other": "{{count}} sessions left in the current package carry over.",
+      "renewOver_one": "1 session was already done beyond the current package; it counts against the new one.",
+      "renewOver_two": "2 sessions were already done beyond the current package; they count against the new one.",
+      "renewOver_other": "{{count}} sessions were already done beyond the current package; they count against the new one.",
+      "renewResult": "After renewing: {{left}} left of {{total}}",
+      "renewSave": "Renew"
     },
     "lastWorkout": "Last workout · {{day}}",
     "done": "Done",
@@ -1061,7 +1084,13 @@
     "phone": "Phone",
     "intakeNone": "The intake isn't filled in yet.",
     "intakeEmpty": "Nothing shared.",
-    "ownChip": "On their own"
+    "ownChip": "On their own",
+    "archive": "Archive client",
+    "archived": {
+      "title": "In the archive",
+      "body": "Off your list and scheduling. Their history and payments are kept.",
+      "restore": "Bring back"
+    }
   },
   "whatsapp": {
     "reminder": "Hi {{name}}! Just a reminder about your \"{{template}}\" workout {{when}} with {{trainer}}. See you then!",

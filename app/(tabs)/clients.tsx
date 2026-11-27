@@ -26,6 +26,9 @@
 //   side by side. App client → create_invite with the price + package (B5,
 //   accept_invite creates the package on consent) and WhatsApp with the code;
 //   offline client → managed_clients + its package, then its card.
+// U5 (2026-11-27): "לארכיון" in a row's actions archives a client (0048:
+// off the list, the pickers and Home; their upcoming sessions removed; history
+// and money kept). The "ארכיון" filter lists them, with "החזרה".
 
 import { useMemo, useState } from "react";
 import { Linking, RefreshControl, ScrollView, View } from "react-native";
@@ -33,6 +36,8 @@ import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useLocalSearchParams, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import Archive from "lucide-react-native/icons/archive";
+import ArchiveRestore from "lucide-react-native/icons/archive-restore";
 import Info from "lucide-react-native/icons/info";
 import MessageCircle from "lucide-react-native/icons/message-circle";
 import Phone from "lucide-react-native/icons/phone";
@@ -50,6 +55,7 @@ import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { toE164IL, useAuth } from "@/lib/auth";
 import { useRosterClients, type RosterClient } from "@/lib/useRoster";
+import { useArchiveClient } from "@/lib/useArchiveClient";
 import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import { addDays, formatDisplayDate, toDateString, todayISO } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
@@ -78,7 +84,7 @@ import {
   SmartphoneOff,
 } from "@/components/ui";
 
-type Filter = "all" | "risk" | "unpaid" | "package" | "noApp";
+type Filter = "all" | "risk" | "unpaid" | "package" | "noApp" | "archived";
 
 type Row = {
   client: RosterClient;
@@ -194,13 +200,16 @@ function ClientsScreenBody() {
     });
   }, [roster.data, attention.data, status.data, owed.data]);
 
+  // U5: every filter but "archived" is about the clients the trainer works with now.
   const matches: Record<Filter, (r: Row) => boolean> = {
-    all: () => true,
-    risk: (r) => r.risk != null,
-    unpaid: (r) => r.unpaid > 0,
-    package: (r) => r.packageLeft != null,
-    noApp: (r) => r.client.kind === "managed",
+    all: (r) => !r.client.archived,
+    risk: (r) => !r.client.archived && r.risk != null,
+    unpaid: (r) => !r.client.archived && r.unpaid > 0,
+    package: (r) => !r.client.archived && r.packageLeft != null,
+    noApp: (r) => !r.client.archived && r.client.kind === "managed",
+    archived: (r) => r.client.archived,
   };
+  const archive = useArchiveClient();
   const q = search.trim().toLowerCase();
   const shown = rows
     .filter((r) => matches[filter](r) && (!q || r.client.name.toLowerCase().includes(q)))
@@ -210,7 +219,9 @@ function ClientsScreenBody() {
       const next = (r: Row) => (r.next ? `${r.next.date} ${r.next.time ?? "99"}` : "~");
       return rank(a) - rank(b) || next(a).localeCompare(next(b)) || a.client.name.localeCompare(b.client.name);
     });
-  const offlineCount = rows.filter((r) => r.client.kind === "managed").length;
+  const activeRows = rows.filter(matches.all);
+  const offlineCount = activeRows.filter((r) => r.client.kind === "managed").length;
+  const archivedCount = rows.filter(matches.archived).length;
 
   const FILTERS: { value: Filter; label: string }[] = [
     { value: "all", label: t("clients.filter.all") },
@@ -218,6 +229,7 @@ function ClientsScreenBody() {
     { value: "unpaid", label: t("clients.filter.unpaid") },
     { value: "package", label: t("clients.filter.package") },
     { value: "noApp", label: t("clients.filter.noApp") },
+    ...(archivedCount > 0 || filter === "archived" ? [{ value: "archived" as const, label: t("clients.filter.archived") }] : []),
   ];
 
   // Pull down: the roster, its statuses / money / attention (scheduled-trainer), invites.
@@ -237,11 +249,11 @@ function ClientsScreenBody() {
         <View style={{ flexDirection: "row", alignItems: "flex-end", gap: 12 }}>
           <View style={{ flex: 1, gap: 6 }}>
             <Display size={44}>{t("clients.title")}</Display>
-            {rows.length > 0 ? (
+            {activeRows.length > 0 ? (
               <AppText size={14} tone="graphite">
                 {offlineCount > 0
-                  ? `${t("clients.activeCount", { count: rows.length })} · ${t("clients.offlineCount", { count: offlineCount })}`
-                  : t("clients.activeCount", { count: rows.length })}
+                  ? `${t("clients.activeCount", { count: activeRows.length })} · ${t("clients.offlineCount", { count: offlineCount })}`
+                  : t("clients.activeCount", { count: activeRows.length })}
               </AppText>
             ) : null}
           </View>
@@ -293,13 +305,15 @@ function ClientsScreenBody() {
                 row={r}
                 onOpen={() => router.push(`/dashboard/${r.client.refId}?kind=${r.client.kind}`)}
                 onPhone={() => setPhoneFor(r.client)}
+                onArchive={() => void archive.archive(r.client)}
+                onRestore={() => archive.restore(r.client)}
               />
             ))}
           </ListCard>
         ) : roster.isSuccess ? (
           <Card>
             <AppText size={15} tone="graphite">
-              {rows.length === 0 ? t("clients.noClientsYet") : t("clients.noMatches")}
+              {activeRows.length === 0 && filter !== "archived" ? t("clients.noClientsYet") : t("clients.noMatches")}
             </AppText>
           </Card>
         ) : null}
@@ -354,7 +368,19 @@ function ClientsScreenBody() {
 // A roster row
 // ---------------------------------------------------------------------------
 
-function ClientRow({ row, onOpen, onPhone }: { row: Row; onOpen: () => void; onPhone: () => void }) {
+function ClientRow({
+  row,
+  onOpen,
+  onPhone,
+  onArchive,
+  onRestore,
+}: {
+  row: Row;
+  onOpen: () => void;
+  onPhone: () => void;
+  onArchive: () => void;
+  onRestore: () => void;
+}) {
   const { t, i18n } = useTranslation();
   const { client } = row;
   const today = todayISO();
@@ -373,11 +399,17 @@ function ClientRow({ row, onOpen, onPhone }: { row: Row; onOpen: () => void; onP
     nextLine = t("clients.noNext");
   }
 
-  const actions = [
-    { key: "card", label: t("clients.card"), icon: User, tone: "neutral" as const, onPress: onOpen },
-    { key: "phone", label: t("clients.phone"), icon: Phone, tone: "edit" as const, onPress: onPhone },
-    ...(wa ? [{ key: "wa", label: "WhatsApp", icon: MessageCircle, tone: "whatsapp" as const, onPress: () => Linking.openURL(wa) }] : []),
-  ];
+  const actions = client.archived
+    ? [
+        { key: "card", label: t("clients.card"), icon: User, tone: "neutral" as const, onPress: onOpen },
+        { key: "restore", label: t("clients.archive.restore"), icon: ArchiveRestore, tone: "done" as const, onPress: onRestore },
+      ]
+    : [
+        { key: "card", label: t("clients.card"), icon: User, tone: "neutral" as const, onPress: onOpen },
+        { key: "phone", label: t("clients.phone"), icon: Phone, tone: "edit" as const, onPress: onPhone },
+        ...(wa ? [{ key: "wa", label: "WhatsApp", icon: MessageCircle, tone: "whatsapp" as const, onPress: () => Linking.openURL(wa) }] : []),
+        { key: "archive", label: t("clients.archive.action"), icon: Archive, tone: "neutral" as const, onPress: onArchive },
+      ];
 
   return (
     <ActionRow actions={actions} sheetTitle={client.name}>
@@ -413,6 +445,7 @@ function ClientRow({ row, onOpen, onPhone }: { row: Row; onOpen: () => void; onP
                 <Chip kind="unpaid" label={t("clients.chip.unpaid", { amount: ltr(`₪${formatMoney(row.unpaid, i18n.language)}`) })} />
               ) : null}
               {client.kind === "managed" ? <Chip kind="noApp" label={t("trainerHome.noApp")} /> : null}
+              {client.archived ? <Chip kind="neutral" label={t("clients.archive.chip")} /> : null}
             </View>
           </View>
         </Pressable>

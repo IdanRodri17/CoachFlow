@@ -21,7 +21,7 @@ import { friendlyError } from "@/lib/friendlyError";
 import { RoleGate } from "@/components/RoleGate";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { useRosterClients } from "@/lib/useRoster";
+import { activeClients, useRosterClients } from "@/lib/useRoster";
 import { expandScheduleDates } from "@/lib/schedule";
 import { ScheduleForm, type SchedulePayload } from "@/components/ScheduleForm";
 
@@ -126,7 +126,8 @@ function NewScheduleScreenBody() {
 
   return (
     <ScheduleForm
-      roster={roster.data ?? []}
+      // U5: an archived client can't be scheduled.
+      roster={activeClients(roster.data)}
       templates={templates.data ?? []}
       loadingRoster={roster.isLoading}
       loadingTemplates={templates.isLoading}

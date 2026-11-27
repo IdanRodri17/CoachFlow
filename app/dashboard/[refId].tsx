@@ -29,6 +29,9 @@ import { useLocalSearchParams, useRouter } from "expo-router";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
+import Archive from "lucide-react-native/icons/archive";
+import ArchiveRestore from "lucide-react-native/icons/archive-restore";
+import RotateCcw from "lucide-react-native/icons/rotate-ccw";
 import Activity from "lucide-react-native/icons/activity";
 import Apple from "lucide-react-native/icons/apple";
 import ArrowDown from "lucide-react-native/icons/arrow-down";
@@ -63,6 +66,8 @@ import { useRosterClients } from "@/lib/useRoster";
 import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { ownWorkoutRouteId } from "@/lib/workoutSubject";
+import { useArchiveClient } from "@/lib/useArchiveClient";
+import { RenewPackageSheet } from "@/components/RenewPackageSheet";
 import { LineChart } from "@/components/LineChart";
 import { firstName, formatMoney, monthName, shortDate, weekdayLetter } from "@/components/home/format";
 import { CheckinSheet, WeighInSheet } from "@/components/ProgressEntrySheets";
@@ -417,7 +422,11 @@ function ClientCardBody() {
 
   const context = useQuery(clientContextQuery(kind, refId));
   const roster = useRosterClients(trainerId);
-  const phone = (roster.data ?? []).find((c) => c.kind === kind && c.refId === refId)?.phone ?? null;
+  const rosterEntry = (roster.data ?? []).find((c) => c.kind === kind && c.refId === refId);
+  const phone = rosterEntry?.phone ?? null;
+  // U5 (0048): an archived client's card says so and offers to bring them back.
+  const archived = rosterEntry?.archived ?? false;
+  const archive = useArchiveClient();
   const owed = useQuery(owedQuery(trainerId));
   const owedHere = owed.data?.get(isApp ? refId : `m:${refId}`) ?? null;
 
@@ -601,7 +610,7 @@ function ClientCardBody() {
       automaticallyAdjustKeyboardInsets
       refreshControl={<RefreshControl {...refresh} />}
     >
-      <View style={{ height: 52, flexDirection: "row", alignItems: "center" }}>
+      <View style={{ height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <IconButton
           icon={ChevronLeft}
           mirror
@@ -609,6 +618,15 @@ function ClientCardBody() {
           accessibilityLabel={t("common.back")}
           onPress={() => (router.canGoBack() ? router.back() : router.replace("/clients"))}
         />
+        {rosterEntry && !archived ? (
+          <IconButton
+            icon={Archive}
+            iconSize={20}
+            accessibilityLabel={t("clientCard.archive")}
+            disabled={archive.pending}
+            onPress={() => void archive.archive({ kind, refId, name: d.name })}
+          />
+        ) : null}
       </View>
 
       {/* Hero */}
@@ -634,6 +652,28 @@ function ClientCardBody() {
         </View>
       </View>
 
+      {archived ? (
+        <Card style={{ padding: 14, gap: 12 }}>
+          <View style={{ gap: 2 }}>
+            <AppText size={16} weight="semibold">
+              {t("clientCard.archived.title")}
+            </AppText>
+            <AppText size={14} tone="graphite">
+              {t("clientCard.archived.body")}
+            </AppText>
+          </View>
+          <Button
+            label={t("clientCard.archived.restore")}
+            icon={ArchiveRestore}
+            variant="secondary"
+            size={44}
+            loading={archive.pending}
+            style={{ alignSelf: "flex-start" }}
+            onPress={() => archive.restore({ kind, refId, name: d.name })}
+          />
+        </Card>
+      ) : null}
+
       {/* Quick actions */}
       <View style={{ flexDirection: "row", alignItems: "flex-start", gap: 8 }}>
         <QuickAction
@@ -645,7 +685,10 @@ function ClientCardBody() {
             if (wa) void Linking.openURL(wa);
           }}
         />
-        <QuickAction icon={CalendarPlus} label={t("clientCard.actions.schedule")} onPress={openSchedule} />
+        {/* An archived client isn't scheduled (U5); bring them back first. */}
+        {!archived ? (
+          <QuickAction icon={CalendarPlus} label={t("clientCard.actions.schedule")} onPress={openSchedule} />
+        ) : null}
         {isApp ? (
           <QuickAction
             icon={StickyNote}
@@ -884,6 +927,7 @@ function PackageCard({
 }) {
   const { t, i18n } = useTranslation();
   const [editing, setEditing] = useState(false);
+  const [renewing, setRenewing] = useState(false);
   const total = pkg?.total_sessions ?? 0;
   const used = pkg?.used_sessions ?? 0;
   const left = Math.max(0, total - used);
@@ -942,6 +986,17 @@ function PackageCard({
           ? t("clientCard.package.price", { price: money(Number(pkg.price_per_session)) })
           : t("clientCard.package.noPrice")}
       </AppText>
+      {/* U4: a new package carries what's left over (lib/packageRenewal.ts). */}
+      {pkg && total > 0 ? (
+        <Button
+          label={t("clientCard.package.renew")}
+          icon={RotateCcw}
+          variant={total - used <= 2 ? "primary" : "secondary"}
+          size={44}
+          style={{ alignSelf: "flex-start" }}
+          onPress={() => setRenewing(true)}
+        />
+      ) : null}
 
       <Divider inset={0} />
       {owed && owed.count > 0 ? (
@@ -992,6 +1047,9 @@ function PackageCard({
           />
         ) : null}
       </Sheet>
+      {pkg ? (
+        <RenewPackageSheet visible={renewing} onClose={() => setRenewing(false)} kind={kind} refId={refId} pkg={pkg} />
+      ) : null}
     </Card>
   );
 }

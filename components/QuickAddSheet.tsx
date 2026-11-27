@@ -22,7 +22,7 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { addDays, todayISO } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
-import { useRosterClients } from "@/lib/useRoster";
+import { activeClients, useRosterClients } from "@/lib/useRoster";
 import { firstName } from "@/components/home/format";
 import { AppText, Avatar, Button, colors, Icon, Pressable, Sheet, type IconComponent } from "@/components/ui";
 
@@ -41,7 +41,8 @@ export function QuickAddSheet({ visible, onClose }: { visible: boolean; onClose:
   });
   const todays = useQuery({ ...todaySessionsQuery(trainerId, today), enabled: visible && !!trainerId });
 
-  const byKey = new Map((roster.data ?? []).map((c) => [c.kind === "app" ? c.refId : `m:${c.refId}`, c]));
+  // U5: no archived client among the shortcuts.
+  const byKey = new Map(activeClients(roster.data).map((c) => [c.kind === "app" ? c.refId : `m:${c.refId}`, c]));
   const quick = (frequent.data ?? []).map((k) => byKey.get(k)).filter((c) => c != null);
   const waiting = (todays.data ?? []).find((w) => w.managed_client_id && w.status !== "completed");
   const waitingClient = waiting ? byKey.get(`m:${waiting.managed_client_id}`) : undefined;
