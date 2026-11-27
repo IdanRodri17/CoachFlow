@@ -10,9 +10,14 @@
 // block, default sets / reps as mini steppers, cues (the description) and
 // one save button. The props and the payload are unchanged; thumbnail_url has
 // no field in the design, so an existing value is passed through untouched.
+//
+// 2026-11-27 (Idan): the preview plays the video right here (ExerciseVideo)
+// instead of handing the link to iOS, which opened the YouTube app; and a
+// long link wraps inside its field instead of running past it (the design
+// drew a short youtu.be link; the standard library's are full watch links).
 
 import { useState, type ReactNode } from "react";
-import { KeyboardAvoidingView, Linking, Platform, ScrollView, View } from "react-native";
+import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
 import { useTranslation } from "react-i18next";
 import type { LucideProps } from "lucide-react-native";
 import Play from "lucide-react-native/icons/play";
@@ -20,6 +25,7 @@ import Plus from "lucide-react-native/icons/plus";
 
 import i18next from "@/lib/i18n";
 import { isValidVideoUrl, parseVideoUrl } from "@/lib/video";
+import { ExerciseVideo } from "@/components/ExerciseVideo";
 import {
   AppText,
   Button,
@@ -108,8 +114,11 @@ export function ExerciseForm({
   const [sets, setSets] = useState<number | null>(initial?.default_sets ?? null);
   const [reps, setReps] = useState<number | null>(initial?.default_reps ?? null);
   const [validationError, setValidationError] = useState<string | null>(null);
+  // Which video the preview is playing; a changed link shows its poster again.
+  const [playing, setPlaying] = useState<string | null>(null);
 
   const video = parseVideoUrl(videoUrl);
+  const videoKey = video ? `${video.provider}:${video.id}` : null;
 
   function handleSubmit() {
     if (name.trim().length === 0) {
@@ -191,23 +200,34 @@ export function ExerciseForm({
         <View style={{ gap: 10 }}>
           <View style={{ gap: 8 }}>
             <FieldLabel>{t("exercises.edit.video")}</FieldLabel>
+            {/* Wraps instead of scrolling sideways, so the whole link stays
+                in the box; Return closes the keyboard, and a link has no
+                spaces or line breaks to keep. */}
             <Input
               size="md"
               ltr
+              multiline
+              scrollEnabled={false}
+              submitBehavior="blurAndSubmit"
+              returnKeyType="done"
               value={videoUrl}
-              onChangeText={setVideoUrl}
+              onChangeText={(v) => setVideoUrl(v.replace(/\s+/g, ""))}
               placeholder="youtube.com/watch?v=…"
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
               editable={!submitting}
               accessibilityLabel={t("exercises.edit.video")}
+              style={{ lineHeight: 22 }}
             />
           </View>
-          {video ? (
+          {video && playing === videoKey ? (
+            <ExerciseVideo url={videoUrl} autoPlay />
+          ) : video ? (
             <Pressable
               accessibilityRole="button"
-              onPress={() => Linking.openURL(videoUrl.trim())}
+              accessibilityLabel={t("exercises.view.play")}
+              onPress={() => setPlaying(videoKey)}
               style={({ pressed }) => ({
                 height: 170,
                 borderRadius: 18,

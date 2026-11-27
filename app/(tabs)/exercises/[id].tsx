@@ -191,7 +191,7 @@ function ClientExercise({ exercise }: { exercise: Exercise }) {
     >
       {video ? (
         playing ? (
-          <ExerciseVideo url={exercise.video_url} />
+          <ExerciseVideo url={exercise.video_url} autoPlay />
         ) : (
           <Pressable
             accessibilityRole="button"
