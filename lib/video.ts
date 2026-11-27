@@ -38,3 +38,16 @@ export function parseVideoUrl(url: string): VideoSource | null {
 export function isValidVideoUrl(url: string): boolean {
   return parseVideoUrl(url) !== null;
 }
+
+/**
+ * The short link for a recognized video: https://youtu.be/ID or
+ * https://vimeo.com/ID. The exercise form shows and saves this form, which
+ * fits its one-line field; a full watch link (with &t=, ?si= and the like)
+ * doesn't. Only the id matters to the player, so nothing is lost.
+ * Anything unrecognized comes back trimmed, for the form to reject.
+ */
+export function canonicalVideoUrl(url: string): string {
+  const source = parseVideoUrl(url);
+  if (!source) return url.trim();
+  return source.provider === "youtube" ? `https://youtu.be/${source.id}` : `https://vimeo.com/${source.id}`;
+}

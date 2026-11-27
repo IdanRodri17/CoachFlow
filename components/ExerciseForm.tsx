@@ -12,9 +12,11 @@
 // no field in the design, so an existing value is passed through untouched.
 //
 // 2026-11-27 (Idan): the preview plays the video right here (ExerciseVideo)
-// instead of handing the link to iOS, which opened the YouTube app; and a
-// long link wraps inside its field instead of running past it (the design
-// drew a short youtu.be link; the standard library's are full watch links).
+// instead of handing the link to iOS, which opened the YouTube app. A
+// recognized link is shown and saved short (youtu.be/ID, canonicalVideoUrl),
+// so it fits the one-line field as the design draws it; the standard
+// library's full watch links ran past the box. (A wrapping field was tried
+// first: on iOS it didn't grow, and the second line hung below the box.)
 
 import { useState, type ReactNode } from "react";
 import { KeyboardAvoidingView, Platform, ScrollView, View } from "react-native";
@@ -24,7 +26,7 @@ import Play from "lucide-react-native/icons/play";
 import Plus from "lucide-react-native/icons/plus";
 
 import i18next from "@/lib/i18n";
-import { isValidVideoUrl, parseVideoUrl } from "@/lib/video";
+import { canonicalVideoUrl, isValidVideoUrl, parseVideoUrl } from "@/lib/video";
 import { ExerciseVideo } from "@/components/ExerciseVideo";
 import {
   AppText,
@@ -110,7 +112,7 @@ export function ExerciseForm({
   const [description, setDescription] = useState(initial?.description ?? "");
   const [muscle, setMuscle] = useState<MuscleKey | null>(initialKey);
   const [otherMuscle, setOtherMuscle] = useState(initialKey === "other" ? (initial?.muscle_group ?? "") : "");
-  const [videoUrl, setVideoUrl] = useState(initial?.video_url ?? "");
+  const [videoUrl, setVideoUrl] = useState(canonicalVideoUrl(initial?.video_url ?? ""));
   const [sets, setSets] = useState<number | null>(initial?.default_sets ?? null);
   const [reps, setReps] = useState<number | null>(initial?.default_reps ?? null);
   const [validationError, setValidationError] = useState<string | null>(null);
@@ -137,7 +139,7 @@ export function ExerciseForm({
       name: name.trim(),
       description: nullable(description),
       muscle_group: muscleGroup,
-      video_url: nullable(videoUrl),
+      video_url: nullable(canonicalVideoUrl(videoUrl)),
       thumbnail_url: initial?.thumbnail_url ?? null,
       default_sets: sets,
       default_reps: reps,
@@ -200,25 +202,23 @@ export function ExerciseForm({
         <View style={{ gap: 10 }}>
           <View style={{ gap: 8 }}>
             <FieldLabel>{t("exercises.edit.video")}</FieldLabel>
-            {/* Wraps instead of scrolling sideways, so the whole link stays
-                in the box; Return closes the keyboard, and a link has no
-                spaces or line breaks to keep. */}
+            {/* One line, as designed: a recognized link turns short when the
+                field is left (canonicalVideoUrl), and the box clips a longer
+                one while it's being typed. A link has no spaces to keep. */}
             <Input
               size="md"
               ltr
-              multiline
-              scrollEnabled={false}
-              submitBehavior="blurAndSubmit"
               returnKeyType="done"
               value={videoUrl}
               onChangeText={(v) => setVideoUrl(v.replace(/\s+/g, ""))}
+              onBlur={() => setVideoUrl((v) => canonicalVideoUrl(v))}
               placeholder="youtube.com/watch?v=…"
               autoCapitalize="none"
               autoCorrect={false}
               keyboardType="url"
               editable={!submitting}
               accessibilityLabel={t("exercises.edit.video")}
-              style={{ lineHeight: 22 }}
+              containerStyle={{ overflow: "hidden" }}
             />
           </View>
           {video && playing === videoKey ? (
