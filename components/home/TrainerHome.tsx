@@ -123,7 +123,7 @@ export function TrainerHome() {
       trainerName: profile?.display_name ?? "",
       dateLabel: t("whatsapp.today"),
       timeLabel: s.scheduled_time ? s.scheduled_time.slice(0, 5) : null,
-      templateName: s.template_name,
+      templateName: s.template_name ?? t("workout.freeWorkout"),
     });
   }
 
@@ -216,7 +216,8 @@ export function TrainerHome() {
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 12, paddingVertical: 12, paddingHorizontal: 14, minHeight: 72 }}>
                     <View style={{ width: 50 }}>
                       <Num size={21} weight="semibold" tone={done ? "smoke" : "ink"}>
-                        {s.scheduled_time ? s.scheduled_time.slice(0, 5) : "—"}
+                        {/* No time set: nothing, not a dash (Idan, 2026-11-27). */}
+                        {s.scheduled_time ? s.scheduled_time.slice(0, 5) : ""}
                       </Num>
                     </View>
                     <Pressable
@@ -229,7 +230,7 @@ export function TrainerHome() {
                         {client?.name ?? "—"}
                       </AppText>
                       <AppText size={14} tone="graphite" numberOfLines={1}>
-                        {`${s.template_name} · ${
+                        {`${s.template_name ?? t("workout.freeWorkout")} · ${
                           offline && !done
                             ? t("trainerHome.notMarked")
                             : s.with_trainer
@@ -409,7 +410,7 @@ function NextUpCard({
             {client?.name ?? "—"}
           </Display>
           <AppText size={15} tone="ash" numberOfLines={1}>
-            {`${s.template_name} · ${s.with_trainer ? t("trainerHome.withTrainer") : t("trainerHome.solo")}`}
+            {`${s.template_name ?? t("workout.freeWorkout")} · ${s.with_trainer ? t("trainerHome.withTrainer") : t("trainerHome.solo")}`}
           </AppText>
         </View>
       </View>

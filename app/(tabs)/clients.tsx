@@ -404,11 +404,13 @@ function ClientRow({
         { key: "card", label: t("clients.card"), icon: User, tone: "neutral" as const, onPress: onOpen },
         { key: "restore", label: t("clients.archive.restore"), icon: ArchiveRestore, tone: "done" as const, onPress: onRestore },
       ]
-    : [
-        { key: "card", label: t("clients.card"), icon: User, tone: "neutral" as const, onPress: onOpen },
-        { key: "phone", label: t("clients.phone"), icon: Phone, tone: "edit" as const, onPress: onPhone },
+    : // A swipe shows three: WhatsApp (when there's a phone), phone, archive.
+      // The card is the row's own tap; a long-press lists all four.
+      [
         ...(wa ? [{ key: "wa", label: "WhatsApp", icon: MessageCircle, tone: "whatsapp" as const, onPress: () => Linking.openURL(wa) }] : []),
+        { key: "phone", label: t("clients.phone"), icon: Phone, tone: "edit" as const, onPress: onPhone },
         { key: "archive", label: t("clients.archive.action"), icon: Archive, tone: "neutral" as const, onPress: onArchive },
+        { key: "card", label: t("clients.card"), icon: User, tone: "neutral" as const, onPress: onOpen },
       ];
 
   return (

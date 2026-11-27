@@ -162,7 +162,7 @@ export function QuickAddSheet({ visible, onClose }: { visible: boolean; onClose:
                   : waitingClient.name}
               </AppText>
               <AppText size={13} tone="graphite" numberOfLines={1}>
-                {`${waiting.template_name} · ${t("trainerHome.notMarked")}`}
+                {`${waiting.template_name ?? t("workout.freeWorkout")} · ${t("trainerHome.notMarked")}`}
               </AppText>
             </View>
             <Button

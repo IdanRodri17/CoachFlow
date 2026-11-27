@@ -63,6 +63,8 @@ export const qk = {
     frequent: (from: string) => ["scheduled-trainer", "frequent", from] as const,
     /** A group session's attendees (0035) — the attendance sheet (V23 Step 15). */
     group: (groupId: Id) => ["scheduled-trainer", "group", groupId] as const,
+    /** One client's finished, unpaid sessions — the client card's list (2026-11-27). */
+    unpaid: (kind: SubjectKind, refId: Id) => ["scheduled-trainer", "unpaid", kind, refId] as const,
   },
 
   /** The signed-in client's own scheduled workouts. */

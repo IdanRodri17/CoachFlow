@@ -18,9 +18,11 @@
 // D20g: while a workout is open (saved on the phone, not finished), a dark
 // "חזרה לאימון" card sits at the top and reopens it where it was left.
 //
-// 2026-11-27: "אימון עצמאי" starts a workout of the client's own (no trainer's
+// 2026-11-27: "אימון נוסף" starts a workout of the client's own (no trainer's
 // session; 0047): it picks exercises as it goes, uses no package session and
-// never moves the streak. Saved ones join "אימונים קודמים".
+// never moves the streak. Saved ones join "אימונים קודמים". (It was "אימון
+// עצמאי" for an evening; "עצמאי" already names a solo session, Idan read the
+// one as the other.)
 
 import { useCallback } from "react";
 import { RefreshControl, ScrollView, View } from "react-native";

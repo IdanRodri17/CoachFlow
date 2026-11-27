@@ -68,6 +68,7 @@ import { buildWhatsAppLink } from "@/lib/whatsapp";
 import { ownWorkoutRouteId } from "@/lib/workoutSubject";
 import { useArchiveClient } from "@/lib/useArchiveClient";
 import { RenewPackageSheet } from "@/components/RenewPackageSheet";
+import { UnpaidSessionsSheet } from "@/components/UnpaidSessionsSheet";
 import { LineChart } from "@/components/LineChart";
 import { firstName, formatMoney, monthName, shortDate, weekdayLetter } from "@/components/home/format";
 import { CheckinSheet, WeighInSheet } from "@/components/ProgressEntrySheets";
@@ -501,6 +502,7 @@ function ClientCardBody() {
     queryClient.invalidateQueries({ queryKey: qk.clientDetail.subject(kind, refId) });
     queryClient.invalidateQueries({ queryKey: qk.money.all });
     queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.owed });
+    queryClient.invalidateQueries({ queryKey: qk.scheduledTrainer.unpaid(kind, refId) });
   };
   const togglePaid = useMutation({
     mutationFn: async ({ id, paid }: { id: string; paid: boolean }) => {
@@ -928,6 +930,7 @@ function PackageCard({
   const { t, i18n } = useTranslation();
   const [editing, setEditing] = useState(false);
   const [renewing, setRenewing] = useState(false);
+  const [unpaidOpen, setUnpaidOpen] = useState(false);
   const total = pkg?.total_sessions ?? 0;
   const used = pkg?.used_sessions ?? 0;
   const left = Math.max(0, total - used);
@@ -1001,16 +1004,23 @@ function PackageCard({
       <Divider inset={0} />
       {owed && owed.count > 0 ? (
         <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
-          <View style={{ flex: 1, gap: 2 }}>
+          {/* Tap to see which sessions (a marked one has no workout log, so it
+              was in the count and nowhere else). */}
+          <Pressable
+            accessibilityRole="button"
+            accessibilityHint={t("clientCard.unpaidList.hint")}
+            onPress={() => setUnpaidOpen(true)}
+            style={({ pressed }) => ({ flex: 1, gap: 2, opacity: pressed ? 0.6 : 1 })}
+          >
             <AppText size={15} weight="semibold">
               {t("clientCard.package.unpaid", { count: owed.count })}
             </AppText>
-            {owed.amount > 0 ? (
-              <AppText size={14} weight="semibold" tone="gold">
-                {money(owed.amount)}
-              </AppText>
-            ) : null}
-          </View>
+            <AppText size={14} weight="semibold" tone={owed.amount > 0 ? "gold" : "graphite"}>
+              {owed.amount > 0
+                ? `${money(owed.amount)} · ${t("clientCard.unpaidList.show")}`
+                : t("clientCard.unpaidList.show")}
+            </AppText>
+          </Pressable>
           <Button
             label={t("clientCard.package.markPaid")}
             icon={Banknote}
@@ -1050,6 +1060,14 @@ function PackageCard({
       {pkg ? (
         <RenewPackageSheet visible={renewing} onClose={() => setRenewing(false)} kind={kind} refId={refId} pkg={pkg} />
       ) : null}
+      <UnpaidSessionsSheet
+        visible={unpaidOpen}
+        onClose={() => setUnpaidOpen(false)}
+        kind={kind}
+        refId={refId}
+        trainerId={trainerId}
+        packagePrice={pkg?.price_per_session != null ? Number(pkg.price_per_session) : null}
+      />
     </Card>
   );
 }

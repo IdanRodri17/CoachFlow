@@ -82,7 +82,8 @@ export function ActionRow({
   sheetTitle,
   disabled,
 }: {
-  /** Up to three; the first sits nearest the row. */
+  /** A swipe shows the first three, the first nearest the row; a
+   * long-press lists them all (2026-11-27: a fourth, "archive", was dropped). */
   actions: RowAction[];
   /** The row; or a function given `openMenu`, for a card with its own "⋯"
    * button that opens the same sheet as a long-press (D29a). */
@@ -158,9 +159,9 @@ export function ActionRow({
           }}
           delayLongPress={350}
           accessibilityHint={sheetTitle}
-          accessibilityActions={shown.map((a) => ({ name: a.key, label: a.label }))}
+          accessibilityActions={actions.map((a) => ({ name: a.key, label: a.label }))}
           onAccessibilityAction={(e) => {
-            const a = shown.find((x) => x.key === e.nativeEvent.actionName);
+            const a = actions.find((x) => x.key === e.nativeEvent.actionName);
             if (a) run(a, cancelLabel);
           }}
         >
@@ -170,7 +171,7 @@ export function ActionRow({
 
       <Sheet visible={menuOpen} onClose={() => setMenuOpen(false)} closeLabel={cancelLabel} title={sheetTitle}>
         <View style={{ gap: 8 }}>
-          {shown.map((a) => (
+          {actions.map((a) => (
             <Button
               key={a.key}
               label={a.label}

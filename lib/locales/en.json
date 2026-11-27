@@ -585,7 +585,7 @@
       "appClientLogsOwn": "This client logs this workout from their own phone."
     },
     "own": {
-      "title": "Your own workout",
+      "title": "Extra workout",
       "discard": "Discard the workout",
       "discardTitle": "Discard this workout?",
       "discardBody": "Nothing was logged, so there's nothing to save."
@@ -763,7 +763,7 @@
     "noteFrom": "Note from {{name}}",
     "withName": "With {{name}}",
     "own": {
-      "title": "Your own workout",
+      "title": "Extra workout",
       "hint": "Training on your own? Pick exercises as you go. Your trainer will see it."
     }
   },
@@ -1084,12 +1084,18 @@
     "phone": "Phone",
     "intakeNone": "The intake isn't filled in yet.",
     "intakeEmpty": "Nothing shared.",
-    "ownChip": "On their own",
+    "ownChip": "Extra",
     "archive": "Archive client",
     "archived": {
       "title": "In the archive",
       "body": "Off your list and scheduling. Their history and payments are kept.",
       "restore": "Bring back"
+    },
+    "unpaidList": {
+      "title": "Unpaid sessions",
+      "show": "Show",
+      "hint": "Lists each unpaid session",
+      "paid": "Paid"
     }
   },
   "whatsapp": {

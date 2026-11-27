@@ -119,7 +119,8 @@ export type TodaySession = {
   scheduled_time: string | null;
   status: "scheduled" | "completed";
   with_trainer: boolean;
-  template_name: string;
+  /** null: a free workout (no template); the screens say so. */
+  template_name: string | null;
 };
 
 /** The trainer's sessions on one day, in time order, with template names — the
@@ -142,7 +143,7 @@ export function todaySessionsQuery(trainerId: string, date: string) {
         const { data: tpls } = await supabase.from("workout_templates").select("id, name").in("id", tplIds);
         tpls?.forEach((tpl) => names.set(tpl.id, tpl.name));
       }
-      return data.map((x) => ({ ...x, template_name: x.template_id ? (names.get(x.template_id) ?? "—") : "—" }));
+      return data.map((x) => ({ ...x, template_name: x.template_id ? (names.get(x.template_id) ?? null) : null }));
     },
   });
 }
