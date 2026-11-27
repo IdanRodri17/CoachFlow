@@ -180,6 +180,8 @@ export type Database = {
           created_at: string;
           // --- V11: 0011_reminders.sql ---
           contact_phone: string | null;
+          // U5 (0048): set while the trainer has the client archived.
+          archived_at: string | null;
         };
         Insert: {
           id?: string;
@@ -188,6 +190,7 @@ export type Database = {
           status?: "active" | "paused";
           created_at?: string;
           contact_phone?: string | null;
+          archived_at?: string | null;
         };
         Update: {
           id?: string;
@@ -196,6 +199,7 @@ export type Database = {
           status?: "active" | "paused";
           created_at?: string;
           contact_phone?: string | null;
+          archived_at?: string | null;
         };
         Relationships: [];
       };
@@ -269,6 +273,8 @@ export type Database = {
           series_id: string | null;
           // V23 (0035): shared by the attendees of one group slot; null = solo.
           session_group_id: string | null;
+          // U8 (0049): the price it was done at, fixed by a trigger on completion; null while open.
+          price: number | null;
         };
         Insert: {
           id?: string;
@@ -289,6 +295,7 @@ export type Database = {
           morning_sms_reminded_at?: string | null;
           series_id?: string | null;
           session_group_id?: string | null;
+          price?: number | null;
         };
         Update: {
           id?: string;
@@ -309,6 +316,7 @@ export type Database = {
           morning_sms_reminded_at?: string | null;
           series_id?: string | null;
           session_group_id?: string | null;
+          price?: number | null;
         };
         Relationships: [];
       };
@@ -322,6 +330,8 @@ export type Database = {
           created_at: string;
           // --- V11: 0011_reminders.sql ---
           phone: string | null;
+          // U5 (0048): set while the trainer has the client archived.
+          archived_at: string | null;
         };
         Insert: {
           id?: string;
@@ -330,6 +340,7 @@ export type Database = {
           note?: string | null;
           created_at?: string;
           phone?: string | null;
+          archived_at?: string | null;
         };
         Update: {
           id?: string;
@@ -338,6 +349,7 @@ export type Database = {
           note?: string | null;
           created_at?: string;
           phone?: string | null;
+          archived_at?: string | null;
         };
         Relationships: [];
       };
@@ -807,6 +819,12 @@ export type Database = {
           p_pr_updates: Json;
         };
         Returns: string;
+      };
+      // U5 (0048): archive (or restore) one of the calling trainer's clients;
+      // archiving also deletes their upcoming sessions. Returns how many.
+      set_client_archived: {
+        Args: { p_kind: string; p_ref_id: string; p_archived: boolean };
+        Returns: number;
       };
       // 0047: saves the calling client's own workout (no scheduled session)
       // under the id the app made at its start; a retry writes nothing.

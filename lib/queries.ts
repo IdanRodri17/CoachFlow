@@ -50,7 +50,7 @@ export function owedQuery(trainerId: string) {
       const [unpaidRes, pkgRes] = await Promise.all([
         supabase
           .from("scheduled_workouts")
-          .select("client_id, managed_client_id")
+          .select("client_id, managed_client_id, price")
           .eq("trainer_id", trainerId)
           .eq("status", "completed")
           .eq("paid", false),
@@ -65,7 +65,8 @@ export function owedQuery(trainerId: string) {
       const out = new Map<string, Owed>();
       unpaidRes.data.forEach((w) => {
         const key = w.client_id ?? `m:${w.managed_client_id}`;
-        const p = price.get(key);
+        // U8 (0049): the price it was done at; the package's only when it had none.
+        const p = w.price ?? price.get(key);
         if (p == null) return;
         const cur = out.get(key) ?? { count: 0, amount: 0 };
         out.set(key, { count: cur.count + 1, amount: cur.amount + p });
