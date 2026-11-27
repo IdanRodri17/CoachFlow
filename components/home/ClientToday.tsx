@@ -406,9 +406,14 @@ export function ClientToday() {
               <ListRow
                 key={p.key}
                 title={p.own ? t("workout.own.title") : (p.template_name ?? t("workout.freeWorkout"))}
-                subtitle={`${weekdayLetter(p.date, i18n.language)} ${shortDate(p.date, i18n.language)} · ${
-                  p.with_trainer ? t("today.withTrainer") : t("today.solo")
-                }`}
+                // An extra workout's title says what it is; "עצמאי" names a
+                // solo session (P22), so it isn't repeated under it.
+                subtitle={[
+                  `${weekdayLetter(p.date, i18n.language)} ${shortDate(p.date, i18n.language)}`,
+                  p.own ? null : p.with_trainer ? t("today.withTrainer") : t("today.solo"),
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
                 trailing={<Chip kind="done" label={t("today.done")} />}
                 chevron
                 onPress={() => router.push(`/workout/${p.route}`)}
