@@ -30,6 +30,7 @@ import { ltr } from "@/lib/i18n";
 import { parseVideoUrl } from "@/lib/video";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import { formatWeight } from "@/lib/workoutSession";
+import { subjectSets } from "@/lib/useWorkoutSession";
 import { ExerciseForm, type ExerciseInput } from "@/components/ExerciseForm";
 import { ExerciseVideo } from "@/components/ExerciseVideo";
 import { shortDate } from "@/components/home/format";
@@ -148,22 +149,18 @@ function ClientExercise({ exercise }: { exercise: Exercise }) {
   const clientId = session?.user.id ?? "";
 
   // The client's own past sets of this exercise, newest session first.
+  // Paged (subjectSets): one request stops at the API's 1,000-row cap, in no
+  // particular order, and the newest sessions could be the ones cut.
   const history = useQuery({
     queryKey: qk.exercises.history(exercise.id, clientId),
     enabled: !!clientId,
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from("set_logs")
-        .select("weight, reps, is_pr, set_index, workout_log_id, workout_logs!inner(completed_at, client_id)")
-        .eq("exercise_id", exercise.id)
-        .eq("workout_logs.client_id", clientId);
-      if (error) throw error;
+      const sets = await subjectSets([exercise.id], { kind: "app", id: clientId });
       const byLog = new Map<string, { completedAt: string; sets: { weight: number | null; reps: number | null; isPr: boolean; idx: number }[] }>();
-      data.forEach((row) => {
-        const log = row.workout_logs as unknown as { completed_at: string };
-        const entry = byLog.get(row.workout_log_id) ?? { completedAt: log.completed_at, sets: [] };
-        entry.sets.push({ weight: row.weight, reps: row.reps, isPr: row.is_pr, idx: row.set_index });
-        byLog.set(row.workout_log_id, entry);
+      sets.forEach((s) => {
+        const entry = byLog.get(s.logId) ?? { completedAt: s.completedAt, sets: [] };
+        entry.sets.push({ weight: s.weight, reps: s.reps, isPr: s.isPr, idx: s.setIndex });
+        byLog.set(s.logId, entry);
       });
       return [...byLog.values()]
         .sort((a, b) => b.completedAt.localeCompare(a.completedAt))

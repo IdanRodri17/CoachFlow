@@ -258,23 +258,23 @@ type HistoryRow = HistorySet & { exerciseId: string };
 
 /** Every past set of these exercises for the subject, newest first, with
  * its set number, session (workout log) and when that session was done, so
- * "last time" can be shown set by set (lastSessionOf). */
+ * "last time" can be shown set by set (lastSessionOf).
+ *
+ * Paged (subjectSets, 2026-11-27): a single request stops at the API's
+ * 1,000-row cap, in no particular order. An active client's history of a
+ * workout's exercises passes that within months, and the newest sets would
+ * go missing: "last time" would show old numbers and the PRs (lib/pr.ts)
+ * would be measured against an old best. */
 export async function subjectHistory(exerciseIds: string[], subject: WorkoutSubject): Promise<HistoryRow[]> {
-  if (exerciseIds.length === 0) return [];
-  const { data, error } = await supabase
-    .from("set_logs")
-    .select("exercise_id, weight, reps, set_index, workout_log_id, workout_logs!inner(client_id, managed_client_id, completed_at)")
-    .in("exercise_id", exerciseIds)
-    .eq(subject.kind === "app" ? "workout_logs.client_id" : "workout_logs.managed_client_id", subject.id);
-  if (error) throw error;
-  return data
-    .map((row) => ({
-      exerciseId: row.exercise_id,
-      weight: row.weight,
-      reps: row.reps,
-      setIndex: row.set_index,
-      logId: row.workout_log_id,
-      completedAt: (row.workout_logs as unknown as { completed_at: string }).completed_at,
+  const stored = await subjectSets(exerciseIds, subject);
+  return stored
+    .map((s) => ({
+      exerciseId: s.exerciseId,
+      weight: s.weight,
+      reps: s.reps,
+      setIndex: s.setIndex,
+      logId: s.logId,
+      completedAt: s.completedAt,
     }))
     .sort((a, b) => b.completedAt.localeCompare(a.completedAt) || b.setIndex - a.setIndex);
 }
