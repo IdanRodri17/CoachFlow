@@ -10,13 +10,13 @@
 // 0038: it also opens the live schedule subscription for whoever is signed
 // in (lib/useScheduleRealtime.ts), once, for every tab.
 
-import { ActivityIndicator, View } from "react-native";
 import { Redirect, Tabs } from "expo-router";
 import { useTranslation } from "react-i18next";
 
 import { profileComplete, useAuth } from "@/lib/auth";
 import { authRoute } from "@/lib/authRoute";
 import { ErrorScreen, RouteErrorBoundary } from "@/components/ui/ErrorScreen";
+import { ScreenLoading } from "@/components/ui/ScreenState";
 import { TabBar } from "@/components/TabBar";
 import { useScheduleRealtime } from "@/lib/useScheduleRealtime";
 
@@ -30,13 +30,9 @@ export default function TabsLayout() {
   useScheduleRealtime(session?.user.id, profileComplete(profile) ? profile?.role : null);
 
   // While auth is resolving, show a spinner (avoids flashing the wrong screen).
-  if (loading) {
-    return (
-      <View className="flex-1 items-center justify-center bg-white">
-        <ActivityIndicator />
-      </View>
-    );
-  }
+  // U3: on the app's chalk, not white: this is what showed between the splash
+  // and Home ("a white flash before the background appears").
+  if (loading) return <ScreenLoading />;
 
   // Not signed in -> sign-in. Signed in but not onboarded -> onboarding.
   // A FAILED profile read (cold start, no cached profile) is a retry screen,

@@ -54,7 +54,7 @@ import i18next, { layoutDirection, restoreSavedLocale } from "@/lib/i18n";
 
 import { useEffect } from "react";
 import { Alert, AppState, Platform, View } from "react-native";
-import { LocaleProvider, Stack } from "expo-router";
+import { DefaultTheme, LocaleProvider, Stack, ThemeProvider, type Theme } from "expo-router";
 import * as SplashScreen from "expo-splash-screen";
 import { useFonts } from "expo-font";
 import { Karantina_700Bold } from "@expo-google-fonts/karantina/700Bold";
@@ -74,10 +74,16 @@ import { friendlyError } from "@/lib/friendlyError";
 import { AuthProvider } from "@/lib/auth";
 import { supabase } from "@/lib/supabase";
 import { RouteErrorBoundary } from "@/components/ui/ErrorScreen";
+import { colors } from "@/components/ui";
 
 // R6: renders in place of the whole root layout, so outside every provider —
 // the fallback uses only react-native primitives and useTranslation.
 export const ErrorBoundary = RouteErrorBoundary;
+
+// U3: the navigator's own background is the app's chalk, not React
+// Navigation's near-white, so nothing flashes white behind a screen that
+// hasn't painted yet (a cold start, a screen sliding in).
+const NAV_THEME: Theme = { ...DefaultTheme, colors: { ...DefaultTheme.colors, background: colors.chalk } };
 
 // Keep the splash up until the fonts are in (hidden in RootLayout below).
 // Module scope, per the SDK 58 docs, so it runs before the first render.
@@ -164,12 +170,14 @@ export default function RootLayout() {
 
   return (
     <GestureHandlerRootView style={{ flex: 1 }}>
-      <View style={{ flex: 1, direction: dir }}>
+      <View style={{ flex: 1, direction: dir, backgroundColor: colors.chalk }}>
         <SafeAreaProvider>
           <QueryClientProvider client={queryClient}>
             <AuthProvider>
               <LocaleProvider direction={dir}>
-                <Stack screenOptions={{ headerShown: false }} />
+                <ThemeProvider value={NAV_THEME}>
+                  <Stack screenOptions={{ headerShown: false }} />
+                </ThemeProvider>
               </LocaleProvider>
             </AuthProvider>
           </QueryClientProvider>
