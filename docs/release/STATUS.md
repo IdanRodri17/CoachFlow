@@ -2,7 +2,7 @@
 Phase: 1 done (audits A, B, C, D merged) · **Checkpoint 0+1 answered 2026-11-20** (see "Decisions (Idan)") · Branch: `cloud/release-1.0`
 **Priority (Idan, 2026-11-20): one united session; bugs and UI/UX first, deployment after.** Since 2026-11-20 a single local session ("CoachFlow: bugs & UI/UX, then release") does all the work. The release lead, the cloud session and 6 older local sessions are archived, and every cloud branch is contained in this one, except v28's app code (post-launch, on cloud/dev). Work from the "Now: bugs and UI/UX" list below; the release table after it is parked.
 Baseline at a6d570e: typecheck ✓ · lint ✓ (0 errors, 6 warnings) · tests 138/138 (9 files)
-Now (2026-11-27, night): typecheck ✓ · lint ✓ (0 errors, 4 warnings) · tests 206/206 (16 files) · `expo export --platform ios` ✓
+Now (2026-11-27, night): typecheck ✓ · lint ✓ (0 errors, 4 warnings) · tests 206/206 (16 files) · `expo export` iOS ✓ Android ✓ · expo-doctor 20/20 ✓
 
 P0 = blocks store submission or leaks data · P1 = before the public launch · P2 = after launch.
 Audit ids: A = store compliance, B = Supabase security, C = app robustness, D = build config.
@@ -50,6 +50,9 @@ Merged from the cloud session's final report (it checked each item against cloud
 | 44 | P23 | No standard exercises: each trainer typed the whole library by hand (Idan: common exercises with general videos, which each trainer can change) | Library → תרגילים | live + JS | ✅ (2026-11-27 night) Idan: every trainer starts with it. **0051 live**: `exercise_catalog`, 44 common exercises (legs, glutes, back, chest, shoulders, arms, core, other), with Hebrew and English names and cues, default sets × reps and a YouTube demo each (every video checked on 2026-11-27: it exists and allows embedding). Each trainer gets the whole list as their own exercises (`exercises.catalog_slug`): a new trainer on sign-up, in their language; existing trainers once, by the migration. They edit or delete them like any exercise. When some are missing, a "ספרייה כללית" card on תרגילים adds them back, one or all (`components/CatalogSheet.tsx`, `add_catalog_exercises`, which skips what's already there) · phone check |
 | 45 | P24 | Test data that touches each feature, on Idan's test trainer, app client and offline clients | everywhere | live data | ✅ (2026-11-27 night) seeded; see "Test data and previews". The 4 old test exercises and 2 old templates were replaced; the app client's SMS reminders are off · phone check |
 | 46 | P25 | Pressing an exercise's video opened the YouTube app; the standard library's long links ran past the link field | Library → exercise (trainer), exercise (client) | JS | ✅ (2026-11-27 night) the trainer's preview handed the link to iOS (`Linking.openURL`), which opens YouTube's app. It now plays in place with the in-app player, and both posters start the video on the first tap (`ExerciseVideo` autoPlay; the client used to tap twice). A recognized link is shown and saved in its short form (`https://youtu.be/ID`, `canonicalVideoUrl` + `lib/video.test.ts`), which fits the one-line field as the design draws it. The first try, a wrapping field (86643b0), didn't grow on iOS, and the second line hung below the box (Idan's screenshot). YouTube's own title and logo inside the player still lead to YouTube, as YouTube's player does · phone check |
+| 47 | P26 | A workout's "last time" and PR baseline read the client's history in one request, which the API cuts at 1,000 rows in no set order: an active client would pass it within months and lose the newest sets (old "last time", PRs against an old best) | workout, client exercise screen | JS | ✅ (night test, 37ae322) `subjectHistory` and the client's exercise history page through `subjectSets`, as the editor already did |
+| 48 | P27 | An extra workout in the client's "אימונים קודמים" read "אימון נוסף · … · עצמאי", the word P22 kept for solo sessions | client Home | JS | ✅ (night test, 0c5a81b) the row shows the day only · phone check |
+| 49 | D-doc | expo-doctor: 15 Expo packages a few patches behind SDK 58's expected versions | build | JS | ✅ (night test, 50df23b) `npx expo install --fix` (expo 58.1.0, expo-router 58.0.33, …); doctor 20/20, both bundles build. Same SDK: the preview runtime and Expo Go are unaffected |
 | 18 | U8 | Changing a client's price rewrites past months' income and unpaid amounts (fixes doc F6) | money screen, Home money card, client card | live + JS | ✅ (2026-11-27 evening push) Idan: from now on only. **0049 live**: `scheduled_workouts.price`, set by a trigger when a session completes (the package's price then), cleared when it's reopened, and nobody can change it through the app or the API; backfilled for the 26 finished sessions that had a package price (the money checksum was identical before and after). `trainer_monthly_money` and the app's "owed" use the session's own price, the package's only for upcoming sessions or ones that had none · phone check |
 | 19 | P1 (phone test 2026-11-21) | Smoke steps 3/5: swipe actions popped in; WhatsApp not green | clients, calendar, every WhatsApp button | JS | ✅ 78620a9 (`colors.whatsapp` #25D366 + ink; actions fade in and grow) · phone check |
 | 20 | P2 | Smoke step 9: finishing another day's session showed today's date | finish screen | JS | ✅ 975e95c (shows the scheduled date) |
@@ -157,6 +160,39 @@ When release work resumes, in this order:
     - 64 sessions (44 done) and 20 workout logs (304 sets, 42 PRs).
     - The 5 older weigh-ins (July and 21.11) and the June check-in were left as they were.
 - **Expo Workflows minutes ran out** on the free plan (60/month; reset 2026-12-01 00:00 UTC). The push-triggered preview fails with "Free plan CI/CD … limit reached" until then. With Idan's OK (2026-11-27) previews are published from this computer instead, which uses no CI minutes: `npx eas-cli update --branch cloud/release-1.0 --environment preview --message "…" --non-interactive`.
+
+## Night test (2026-11-27, while Idan slept: "do some tests and fix what is problematic")
+Nothing in Idan's data changed: every write ran in a transaction that rolled back, and reads were counts.
+- **Logs, last 24 h:** no failed API request (all 1,074 were 2xx/101); every database error came from my own rolled-back dry runs; the edge functions logged no errors (send-sms-reminders runs hourly and sent nothing after the seed: Idan's SMS is off, the offline clients have no phones).
+- **Security:**
+  - Every view is security_invoker; every table has RLS; every SECURITY DEFINER function pins its search_path.
+  - Anon sees 0 rows in all 16 tables it's granted. A signed-in stranger sees 0 everywhere except the public exercise catalog. The app client sees only their own rows: no private notes, no offline clients, no other client's sessions, logs, weigh-ins, check-ins or packages; its 241 sets are exactly its own.
+  - The client can read `trainer_monthly_money`, but under RLS it only adds up their own sessions (the app doesn't show it).
+  - Advisors: nothing new. Known: the 4 intended SECURITY DEFINER RPCs, `ai_usage` without policies (intended), leaked-password protection (the app uses OTP, no passwords). Performance: Step 2g's 37 policies and now 13 FK indexes (0051's `catalog_slug` FK added one; it's only used if a catalog row is deleted).
+- **Data invariants (all 0 violations):**
+  - Packages: used = finished sessions for all 7; none negative.
+  - Sessions: one owner each; priced and paid only when completed; none completed in the future.
+  - Logs: none on unfinished sessions, no duplicates, no owner mismatch; sets use the session's trainer's exercises.
+  - Groups share a slot. No archived client has upcoming sessions. Both trainers have the 44 catalog copies.
+- **Flows (16, as the client and the trainer, rolled back):**
+  - The client finishes today's session (₪200, package 16/16, streak 8; a retry returns the same log).
+  - Refused, as they should be: a future session (`workout_not_yet`), moving a trainer-led session, marking paid. Setting a price leaves it unchanged.
+  - A solo session done early moves to today (package 17/16: overdrawn, which the card shows as 0 left / used up and the renewal counts against the new package).
+  - An extra workout uses no package session and no streak, and its edit saves.
+  - The trainer can't reopen a session with sets. Marking an offline client done → package +1, ₪160; undo → back, no price.
+  - Paid lowers what's owed by exactly ₪160; a price change leaves earned unchanged.
+  - Archiving נועה removed her 1 upcoming session and restoring works (the view keeps archived clients; the app's feed and lists filter them).
+  - A deleted catalog exercise comes back once.
+  - The trainer edits an offline client's log but not an app client's (`workout_not_found`). A client calling `add_catalog_exercises` gets `trainers_only`.
+- **App checks:**
+  - Text keys: 1,097 key uses (10 dynamic) all exist in he and en; the two files have the same keys; all 38 plural keys have one/two/other.
+  - No masculine imperatives in he.json. No UTC date slicing outside lib/dates.ts; no right-aligned Text.
+  - Code review of today's changes (renewal, unpaid list, archive, the workout editor, client Home) found the two bugs fixed above (P26, P27).
+- **Left as is, for Idan:**
+  - `npm audit`: 8 advisories in the production tree, all in build tooling (xmldom, browserslist, shell-quote, source-map-js, minimatch via the CLI and config plugins). None ships in the app bundle; npm's only "fix" for `expo` is a downgrade to SDK 52. Revisit with `npm audit fix` before the store build.
+  - Tomorrow the seeded 27.11 sessions that weren't done (Idan's solo 19:00, דני's 17:00) count as missed, so the client's streak shows 0. That's the rule (a missed session breaks it), not a bug.
+  - `exercise_catalog_label` is executable by anon (a pure text lookup, harmless).
+  - The backup schema `backup_20261127` is still there.
 
 ## What's left (checked 2026-11-27)
 Against `docs/COACHFLOW_ROADMAP.md`, `docs/PLAYBOOK_V17plus.md`, `docs/design/PLAYBOOK.md`, `RELEASE_PLAYBOOK.md` and this file. Built: V17 (offline clients' logging), V18/18a/18b/18c, V19's hygiene (CI, tests, lint, query keys, refresh, encrypted session), V23 (series + groups), V25 (`trainer_attention`), V26 (client context), the whole redesign D19–D31, and the bugs/UI rows above.
