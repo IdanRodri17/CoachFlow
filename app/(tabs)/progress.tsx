@@ -49,7 +49,7 @@ import { addDays, daysBetween, todayISO, toDateString, weekStartOf } from "@/lib
 import { ltr } from "@/lib/i18n";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import { formatWeight } from "@/lib/workoutSession";
-import type { BadgeType } from "@/lib/badges";
+import { checkAndAwardBadges, firstWorkoutDay, type BadgeType } from "@/lib/badges";
 import { LineChart } from "@/components/LineChart";
 import { monthName } from "@/components/home/format";
 import {
@@ -217,6 +217,11 @@ function ProgressScreenBody() {
   const badges = useQuery({
     queryKey: qk.badges.own(clientId),
     queryFn: async () => {
+      // U7: badges were only checked at the client's own save, so a session
+      // the trainer marked done earned nothing until the next one. Checked
+      // here too; idempotent (unique per client and type). A failed check
+      // still shows the badges already earned.
+      await checkAndAwardBadges(clientId).catch(() => undefined);
       const { data, error: e } = await supabase
         .from("badges")
         .select("type, earned_at")
@@ -227,19 +232,10 @@ function ProgressScreenBody() {
     },
   });
   const streak = useQuery(clientStreakQuery(clientId));
+  // The day of the first completed workout, logged or marked done (U7).
   const firstWorkout = useQuery({
     queryKey: qk.badges.firstWorkout(clientId),
-    queryFn: async () => {
-      const { data, error: e } = await supabase
-        .from("workout_logs")
-        .select("completed_at")
-        .eq("client_id", clientId)
-        .order("completed_at", { ascending: true })
-        .limit(1)
-        .maybeSingle();
-      if (e) throw e;
-      return data?.completed_at ?? null;
-    },
+    queryFn: () => firstWorkoutDay(clientId),
   });
 
   const entries = progress.data?.entries ?? [];
@@ -321,7 +317,7 @@ function ProgressScreenBody() {
     if (type === "first_workout") return t("progress.badgeLeft.workouts", { count: 1 });
     // first_month: 30 days after the first workout.
     if (!firstWorkout.data) return t("progress.badgeLeft.afterFirst");
-    const days = 30 - daysBetween(today, toDateString(new Date(firstWorkout.data)));
+    const days = 30 - daysBetween(today, firstWorkout.data);
     return t("progress.badgeLeft.days", { count: Math.max(1, days) });
   }
 
