@@ -6,6 +6,8 @@
 // exercises are done; a planned workout reaches it from the overview's "add
 // an exercise". A picked exercise runs like a planned one (lib/workoutSession
 // addExercise): ADDED_SETS sets, last time's numbers, live PRs, rest.
+// A client's own workout with nothing logged yet ends with "ביטול האימון"
+// (onDiscard): there's nothing to save (2026-11-27).
 
 import { useMemo, useState } from "react";
 import { ActivityIndicator, ScrollView, TextInput, View } from "react-native";
@@ -31,6 +33,7 @@ export function PickView({
   onPick,
   onMinimize,
   onOverview,
+  onDiscard,
 }: {
   session: WorkoutSession;
   title: string;
@@ -41,6 +44,8 @@ export function PickView({
   onPick: (row: PickRow) => void;
   onMinimize: () => void;
   onOverview: () => void;
+  /** Given: the last button drops the workout instead of finishing it. */
+  onDiscard?: () => void;
 }) {
   const { t } = useTranslation();
   const insets = useSafeAreaInsets();
@@ -160,7 +165,11 @@ export function PickView({
         {canClosePicker(s) ? (
           <Button label={t("workout.pick.back")} variant="darkOutline" size={52} block onPress={session.closePicker} />
         ) : null}
-        <Button label={t("workout.pick.finish")} variant="accent" size={56} block disabled={busy} onPress={session.finishNow} />
+        {onDiscard ? (
+          <Button label={t("workout.own.discard")} variant="darkOutline" size={56} block disabled={busy} onPress={onDiscard} />
+        ) : (
+          <Button label={t("workout.pick.finish")} variant="accent" size={56} block disabled={busy} onPress={session.finishNow} />
+        )}
       </ScrollView>
     </View>
   );

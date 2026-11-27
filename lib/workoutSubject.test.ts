@@ -3,7 +3,7 @@
 
 import { describe, expect, it } from "vitest";
 
-import { workoutAccess } from "@/lib/workoutSubject";
+import { ownLogIdOf, ownWorkoutAccess, ownWorkoutRouteId, workoutAccess } from "@/lib/workoutSubject";
 
 const TRAINER = { id: "t1", role: "trainer" as const };
 const CLIENT = { id: "c1", role: "client" as const };
@@ -120,6 +120,35 @@ describe("workoutAccess", () => {
     expect(workoutAccess({ ...offlineWorkout, trainer_id: "t2" }, TRAINER, TODAY)).toEqual({
       kind: "denied",
       reason: "notYours",
+    });
+  });
+});
+
+describe("a client's own workout (2026-11-27)", () => {
+  const LOG = "0b7e8c1a-3f2d-4c5e-9a1b-2c3d4e5f6a7b";
+
+  it("reads its log id from the route, and nothing else", () => {
+    expect(ownLogIdOf(ownWorkoutRouteId(LOG))).toBe(LOG);
+    expect(ownLogIdOf(LOG)).toBeNull(); // a scheduled workout's id
+    expect(ownLogIdOf("own-")).toBeNull();
+    expect(ownLogIdOf("own-not-a-uuid")).toBeNull();
+  });
+
+  it("before the save, only a client can open one, to log it", () => {
+    expect(ownWorkoutAccess(null, CLIENT)).toEqual({ kind: "log", subject: { kind: "app", id: "c1" }, mode: "client" });
+    expect(ownWorkoutAccess(null, TRAINER)).toEqual({ kind: "denied", reason: "notYours" });
+  });
+
+  it("once saved, the client views their own and the trainer views it read-only", () => {
+    expect(ownWorkoutAccess({ client_id: "c1" }, CLIENT)).toEqual({
+      kind: "view",
+      subject: { kind: "app", id: "c1" },
+      mode: "client",
+    });
+    expect(ownWorkoutAccess({ client_id: "c1" }, TRAINER)).toEqual({
+      kind: "view",
+      subject: { kind: "app", id: "c1" },
+      mode: "trainer",
     });
   });
 });

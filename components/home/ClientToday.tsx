@@ -17,12 +17,17 @@
 //
 // D20g: while a workout is open (saved on the phone, not finished), a dark
 // "חזרה לאימון" card sits at the top and reopens it where it was left.
+//
+// 2026-11-27: "אימון עצמאי" starts a workout of the client's own (no trainer's
+// session; 0047): it picks exercises as it goes, uses no package session and
+// never moves the streak. Saved ones join "אימונים קודמים".
 
 import { useCallback } from "react";
 import { RefreshControl, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { Link, useFocusEffect, useRouter } from "expo-router";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { randomUUID } from "expo-crypto";
 import { useTranslation } from "react-i18next";
 import type { LucideProps } from "lucide-react-native";
 import Activity from "lucide-react-native/icons/activity";
@@ -43,10 +48,11 @@ import { qk } from "@/lib/queryKeys";
 import { friendlyError } from "@/lib/friendlyError";
 import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
-import { addDays, todayISO, weekStartOf } from "@/lib/dates";
+import { addDays, toDateString, todayISO, weekStartOf } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
 import { ownPackageQuery } from "@/lib/queries";
 import { listOpenWorkouts, type OpenWorkout } from "@/lib/useWorkoutSession";
+import { OWN_WORKOUT_PREFIX, ownWorkoutRouteId } from "@/lib/workoutSubject";
 import { trainerFirstName, useMyTrainer } from "@/lib/useMyTrainer";
 import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import {
@@ -117,25 +123,55 @@ export function ClientToday() {
   });
 
   // The latest completed sessions (logged by the client or marked by the
-  // trainer); each opens its summary (2026-11-21: clients only saw upcoming).
+  // trainer) and own workouts (2026-11-27), newest first; each opens its
+  // summary (2026-11-21: clients only saw upcoming).
   const previous = useQuery({
     queryKey: qk.scheduledClient.previous,
     queryFn: async () => {
-      const { data: sws, error } = await supabase
-        .from("scheduled_workouts")
-        .select("id, scheduled_date, template_id, with_trainer")
-        .eq("client_id", clientId)
-        .eq("status", "completed")
-        .order("scheduled_date", { ascending: false })
-        .limit(5);
-      if (error) throw error;
+      const [swRes, ownRes] = await Promise.all([
+        supabase
+          .from("scheduled_workouts")
+          .select("id, scheduled_date, template_id, with_trainer")
+          .eq("client_id", clientId)
+          .eq("status", "completed")
+          .order("scheduled_date", { ascending: false })
+          .limit(5),
+        supabase
+          .from("workout_logs")
+          .select("id, completed_at")
+          .eq("client_id", clientId)
+          .is("scheduled_workout_id", null)
+          .order("completed_at", { ascending: false })
+          .limit(5),
+      ]);
+      if (swRes.error) throw swRes.error;
+      if (ownRes.error) throw ownRes.error;
+      const sws = swRes.data;
       const tplIds = [...new Set(sws.map((s) => s.template_id).filter(Boolean) as string[])];
       const names = new Map<string, string>();
       if (tplIds.length > 0) {
         const { data } = await supabase.from("workout_templates").select("id, name").in("id", tplIds);
         data?.forEach((tpl) => names.set(tpl.id, tpl.name));
       }
-      return sws.map((s) => ({ ...s, template_name: s.template_id ? names.get(s.template_id) ?? null : null }));
+      const rows = [
+        ...sws.map((s) => ({
+          key: s.id,
+          route: s.id,
+          date: s.scheduled_date,
+          own: false,
+          with_trainer: s.with_trainer,
+          template_name: s.template_id ? names.get(s.template_id) ?? null : null,
+        })),
+        ...ownRes.data.map((l) => ({
+          key: l.id,
+          route: ownWorkoutRouteId(l.id),
+          date: toDateString(new Date(l.completed_at)),
+          own: true,
+          with_trainer: false,
+          template_name: null,
+        })),
+      ];
+      return rows.sort((a, b) => b.date.localeCompare(a.date)).slice(0, 5);
     },
   });
 
@@ -227,6 +263,8 @@ export function ClientToday() {
   const upNext = all.filter((s) => s.id !== hero?.id && s.status !== "completed").slice(0, 4);
   const left = pkg.data ? pkg.data.total_sessions - pkg.data.used_sessions : null;
   const hasTrainer = (trainerLinks.data ?? 0) > 0;
+  // One own workout at a time: an open one resumes from the card at the top.
+  const ownOpen = openWorkout?.scheduledId.startsWith(OWN_WORKOUT_PREFIX) ?? false;
 
   // Pull down: everything on this screen, including the open-workout card.
   const refresh = usePullToRefresh([
@@ -309,6 +347,28 @@ export function ClientToday() {
         </Card>
       ) : null}
 
+      {/* 2026-11-27: training on their own, outside the trainer's plan. */}
+      {hasTrainer && !ownOpen ? (
+        <Pressable
+          accessibilityRole="button"
+          onPress={() => router.push(`/workout/${ownWorkoutRouteId(randomUUID())}`)}
+          style={({ pressed }) => ({ opacity: pressed ? 0.85 : 1 })}
+        >
+          <Card style={{ flexDirection: "row", alignItems: "center", gap: 14 }}>
+            <IconBox icon={Dumbbell} bg={colors.mist} fg={colors.ink} />
+            <View style={{ flex: 1, gap: 2 }}>
+              <AppText size={16} weight="semibold">
+                {t("today.own.title")}
+              </AppText>
+              <AppText size={14} tone="graphite">
+                {t("today.own.hint")}
+              </AppText>
+            </View>
+            <Icon icon={ChevronRight} size={20} color={colors.graphite} mirror />
+          </Card>
+        </Pressable>
+      ) : null}
+
       {upNext.length > 0 ? (
         <View style={{ gap: 10 }}>
           <View style={{ minHeight: 32, justifyContent: "center" }}>
@@ -342,14 +402,14 @@ export function ClientToday() {
           <ListCard>
             {(previous.data ?? []).map((p) => (
               <ListRow
-                key={p.id}
-                title={p.template_name ?? t("workout.freeWorkout")}
-                subtitle={`${weekdayLetter(p.scheduled_date, i18n.language)} ${shortDate(p.scheduled_date, i18n.language)} · ${
+                key={p.key}
+                title={p.own ? t("workout.own.title") : (p.template_name ?? t("workout.freeWorkout"))}
+                subtitle={`${weekdayLetter(p.date, i18n.language)} ${shortDate(p.date, i18n.language)} · ${
                   p.with_trainer ? t("today.withTrainer") : t("today.solo")
                 }`}
                 trailing={<Chip kind="done" label={t("today.done")} />}
                 chevron
-                onPress={() => router.push(`/workout/${p.id}`)}
+                onPress={() => router.push(`/workout/${p.route}`)}
               />
             ))}
           </ListCard>

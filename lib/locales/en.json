@@ -571,6 +571,31 @@
     },
     "trainerMode": {
       "appClientLogsOwn": "This client logs this workout from their own phone."
+    },
+    "own": {
+      "title": "Your own workout",
+      "discard": "Discard the workout",
+      "discardTitle": "Discard this workout?",
+      "discardBody": "Nothing was logged, so there's nothing to save."
+    },
+    "edit": {
+      "open": "Edit",
+      "title": "Edit workout",
+      "hint": "Tap a set to change it. PRs are worked out again when you save.",
+      "noSets": "No sets. Add one, or the exercise is removed when you save.",
+      "editSet": "Edit set {{number}}",
+      "addSet": "Add a set",
+      "addExercise": "Add an exercise",
+      "note": "Note",
+      "reps": "Reps",
+      "weight": "Weight",
+      "deleteSet": "Delete set",
+      "done": "Done",
+      "save": "Save changes",
+      "cancel": "Cancel",
+      "discardTitle": "Discard your changes?",
+      "keepEditing": "Keep editing",
+      "discard": "Discard"
     }
   },
   "intake": {
@@ -724,7 +749,11 @@
       "startedHours_other": "started {{count}} hours ago"
     },
     "noteFrom": "Note from {{name}}",
-    "withName": "With {{name}}"
+    "withName": "With {{name}}",
+    "own": {
+      "title": "Your own workout",
+      "hint": "Training on your own? Pick exercises as you go. Your trainer will see it."
+    }
   },
   "trainerHome": {
     "settings": "Settings and profile",
@@ -1031,7 +1060,8 @@
     "intakeTitle": "Intake",
     "phone": "Phone",
     "intakeNone": "The intake isn't filled in yet.",
-    "intakeEmpty": "Nothing shared."
+    "intakeEmpty": "Nothing shared.",
+    "ownChip": "On their own"
   },
   "whatsapp": {
     "reminder": "Hi {{name}}! Just a reminder about your \"{{template}}\" workout {{when}} with {{trainer}}. See you then!",

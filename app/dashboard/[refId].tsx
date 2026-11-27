@@ -62,6 +62,7 @@ import { ltr } from "@/lib/i18n";
 import { useRosterClients } from "@/lib/useRoster";
 import { usePullToRefresh } from "@/lib/usePullToRefresh";
 import { buildWhatsAppLink } from "@/lib/whatsapp";
+import { ownWorkoutRouteId } from "@/lib/workoutSubject";
 import { LineChart } from "@/components/LineChart";
 import { firstName, formatMoney, monthName, shortDate, weekdayLetter } from "@/components/home/format";
 import { CheckinSheet, WeighInSheet } from "@/components/ProgressEntrySheets";
@@ -115,10 +116,15 @@ type Detail = {
   status: WorkoutStatus | null;
   intake: Record<string, unknown> | null;
   upcoming: Upcoming[];
-  /** App clients: their logged workouts, newest first. */
+  /** App clients: their logged workouts, newest first — their own ones too
+   * (2026-11-27, 0047: no scheduled session, nothing to pay for). */
   logs: {
     id: string;
-    scheduledWorkoutId: string;
+    /** The scheduled workout's id, or null for an own workout. */
+    scheduledWorkoutId: string | null;
+    /** What tapping it opens (/workout/…). */
+    route: string;
+    own: boolean;
     completed_at: string;
     effort: number | null;
     note: string | null;
@@ -265,7 +271,7 @@ function ClientCardBody() {
 
       const tplIds = new Set<string>(upcomingRes.data.map((u) => u.template_id).filter(Boolean) as string[]);
       const scheduled = new Map<string, { template_id: string | null; paid: boolean }>();
-      let logRows: { id: string; scheduled_workout_id: string; completed_at: string; effort_rating: number | null; client_note: string | null }[] = [];
+      let logRows: { id: string; scheduled_workout_id: string | null; completed_at: string; effort_rating: number | null; client_note: string | null }[] = [];
       const prCount = new Map<string, number>();
       const weights: Detail["weights"] = progressRes.data.map((p) => ({ date: p.date, value: Number(p.weight) }));
       let recentRows: { id: string; scheduled_date: string; status: "scheduled" | "completed"; template_id: string | null; paid: boolean }[] = [];
@@ -299,7 +305,8 @@ function ClientCardBody() {
         logRows = logsRes.data;
 
         const logIds = logRows.map((l) => l.id);
-        const swIds = [...new Set(logRows.map((l) => l.scheduled_workout_id))];
+        // Own workouts (0047) have no scheduled session.
+        const swIds = [...new Set(logRows.flatMap((l) => (l.scheduled_workout_id ? [l.scheduled_workout_id] : [])))];
         if (logIds.length > 0) {
           const [swRes, prRes] = await Promise.all([
             supabase.from("scheduled_workouts").select("id, template_id, paid").in("id", swIds),
@@ -347,9 +354,13 @@ function ClientCardBody() {
             if (prErr) throw prErr;
             prRows.forEach((p) => prs.set(p.workout_log_id, (prs.get(p.workout_log_id) ?? 0) + 1));
           }
-          logs.forEach((l) =>
-            offlineLogs.set(l.scheduled_workout_id, { effort: l.effort_rating, note: l.client_note, prs: prs.get(l.id) ?? 0 }),
-          );
+          // Filtered by scheduled_workout_id above, so it's never null here
+          // (only an app client's own workout has none, 0047).
+          logs.forEach((l) => {
+            if (l.scheduled_workout_id) {
+              offlineLogs.set(l.scheduled_workout_id, { effort: l.effort_rating, note: l.client_note, prs: prs.get(l.id) ?? 0 });
+            }
+          });
         }
       }
 
@@ -373,16 +384,21 @@ function ClientCardBody() {
           with_trainer: u.with_trainer,
           template_name: tplName(u.template_id),
         })),
-        logs: logRows.map((l) => ({
-          id: l.id,
-          scheduledWorkoutId: l.scheduled_workout_id,
-          completed_at: l.completed_at,
-          effort: l.effort_rating,
-          note: l.client_note,
-          template_name: tplName(scheduled.get(l.scheduled_workout_id)?.template_id),
-          paid: scheduled.get(l.scheduled_workout_id)?.paid ?? false,
-          prs: prCount.get(l.id) ?? 0,
-        })),
+        logs: logRows.map((l) => {
+          const sw = l.scheduled_workout_id ? scheduled.get(l.scheduled_workout_id) : undefined;
+          return {
+            id: l.id,
+            scheduledWorkoutId: l.scheduled_workout_id,
+            route: l.scheduled_workout_id ?? ownWorkoutRouteId(l.id),
+            own: l.scheduled_workout_id == null,
+            completed_at: l.completed_at,
+            effort: l.effort_rating,
+            note: l.client_note,
+            template_name: l.scheduled_workout_id ? tplName(sw?.template_id) : t("workout.own.title"),
+            paid: sw?.paid ?? false,
+            prs: prCount.get(l.id) ?? 0,
+          };
+        }),
         markable: markableRow
           ? { id: markableRow.id, scheduled_date: markableRow.scheduled_date, template_name: tplName(markableRow.template_id) }
           : null,
@@ -1561,8 +1577,9 @@ function WorkoutsTab({
   paidPending: boolean;
   onTogglePaid: (id: string, paid: boolean) => void;
   onOpen: (id: string) => void;
-  /** A logged workout's summary (app/workout/[id].tsx, read-only once completed). */
-  onView: (scheduledWorkoutId: string) => void;
+  /** A logged workout's summary (app/workout/[id].tsx, read-only once completed):
+   * a scheduled workout's id, or an own workout's "own-<log id>". */
+  onView: (routeId: string) => void;
   onSchedule: () => void;
 }) {
   const { t, i18n } = useTranslation();
@@ -1619,7 +1636,7 @@ function WorkoutsTab({
                 <Pressable
                   key={l.id}
                   accessibilityRole="button"
-                  onPress={() => onView(l.scheduledWorkoutId)}
+                  onPress={() => onView(l.route)}
                   style={({ pressed }) => ({ paddingVertical: 12, paddingHorizontal: 14, gap: 6, opacity: pressed ? 0.7 : 1 })}
                 >
                   <View style={{ flexDirection: "row", alignItems: "center", gap: 8 }}>
@@ -1637,7 +1654,12 @@ function WorkoutsTab({
                       </AppText>
                     </View>
                     {l.prs > 0 ? <Chip kind="pr" label={t("clientCard.pr")} /> : null}
-                    <PaidChip paid={l.paid} pending={paidPending} onToggle={() => onTogglePaid(l.scheduledWorkoutId, !l.paid)} />
+                    {/* An own workout isn't a session: nothing to pay for. */}
+                    {l.scheduledWorkoutId ? (
+                      <PaidChip paid={l.paid} pending={paidPending} onToggle={() => onTogglePaid(l.scheduledWorkoutId!, !l.paid)} />
+                    ) : (
+                      <Chip kind="solo" label={t("clientCard.ownChip")} />
+                    )}
                   </View>
                   {l.note ? <AppText size={14} tone="graphite">{`"${l.note}"`}</AppText> : null}
                 </Pressable>

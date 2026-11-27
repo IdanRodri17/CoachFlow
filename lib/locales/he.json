@@ -571,6 +571,31 @@
     },
     "trainerMode": {
       "appClientLogsOwn": "את האימון הזה המתאמן רושם מהטלפון שלו."
+    },
+    "own": {
+      "title": "אימון עצמאי",
+      "discard": "ביטול האימון",
+      "discardTitle": "לבטל את האימון?",
+      "discardBody": "לא נרשם בו אף סט, אז אין מה לשמור."
+    },
+    "edit": {
+      "open": "עריכה",
+      "title": "עריכת האימון",
+      "hint": "הקשה על סט משנה אותו. השיאים מחושבים מחדש בשמירה.",
+      "noSets": "אין סטים. אפשר להוסיף סט, ואחרת התרגיל יוסר בשמירה.",
+      "editSet": "עריכת סט {{number}}",
+      "addSet": "הוספת סט",
+      "addExercise": "הוספת תרגיל",
+      "note": "הערה",
+      "reps": "חזרות",
+      "weight": "משקל",
+      "deleteSet": "מחיקת הסט",
+      "done": "סיום",
+      "save": "שמירת השינויים",
+      "cancel": "ביטול",
+      "discardTitle": "לבטל את השינויים?",
+      "keepEditing": "המשך עריכה",
+      "discard": "ביטול השינויים"
     }
   },
   "intake": {
@@ -724,7 +749,11 @@
       "startedHours_other": "התחלת לפני {{count}} שעות"
     },
     "noteFrom": "הערה מ{{name}}",
-    "withName": "עם {{name}}"
+    "withName": "עם {{name}}",
+    "own": {
+      "title": "אימון עצמאי",
+      "hint": "מתאמנים לבד? בוחרים תרגילים תוך כדי, והאימון יופיע אצל המאמן/ת."
+    }
   },
   "trainerHome": {
     "settings": "הגדרות ופרופיל",
@@ -1031,7 +1060,8 @@
     "intakeTitle": "שאלון היכרות",
     "phone": "טלפון",
     "intakeNone": "השאלון עדיין לא מולא.",
-    "intakeEmpty": "לא שותפו פרטים."
+    "intakeEmpty": "לא שותפו פרטים.",
+    "ownChip": "עצמאי"
   },
   "whatsapp": {
     "reminder": "היי {{name}}! תזכורת לאימון \"{{template}}\" {{when}} עם {{trainer}}. נתראה!",

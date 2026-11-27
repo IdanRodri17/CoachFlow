@@ -9,8 +9,10 @@
 //
 // CompletedWorkout: what "previous workouts" opens — the duration, effort,
 // both notes, every exercise's sets with PRs, and the skips and swaps.
+// Whoever logged it can fix it (2026-11-27): "עריכה" opens EditWorkout.
+// A client's own workout (no scheduled session, 0047) is read by its log id.
 
-import type { ReactNode } from "react";
+import { useState, type ReactNode } from "react";
 import { ActivityIndicator, ScrollView, View } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { StatusBar } from "expo-status-bar";
@@ -21,6 +23,7 @@ import Check from "lucide-react-native/icons/check";
 import ChevronLeft from "lucide-react-native/icons/chevron-left";
 import Clock from "lucide-react-native/icons/clock";
 import MessageSquare from "lucide-react-native/icons/message-square";
+import Pencil from "lucide-react-native/icons/pencil";
 import Repeat from "lucide-react-native/icons/repeat";
 import SkipForward from "lucide-react-native/icons/skip-forward";
 
@@ -29,11 +32,12 @@ import { supabase } from "@/lib/supabase";
 import { toDateString } from "@/lib/dates";
 import { ltr } from "@/lib/i18n";
 import { friendlyError } from "@/lib/friendlyError";
-import type { WorkoutData, WorkoutMode } from "@/lib/useWorkoutSession";
-import { formatWeight, prefill } from "@/lib/workoutSession";
+import type { WorkoutData, WorkoutMode, WorkoutSubject } from "@/lib/useWorkoutSession";
+import { DEFAULT_REPS, formatWeight, prefill } from "@/lib/workoutSession";
 import { longDate, shortDate } from "@/components/home/format";
 import {
   AppText,
+  Button,
   Card,
   Chip,
   colors,
@@ -47,11 +51,24 @@ import {
 } from "@/components/ui";
 import { InlineError } from "@/components/ui/ScreenState";
 
+import { EditWorkout } from "./EditWorkout";
+
 /** These pages draw their own top bar, like the group and share screens: the
  * stack header is hidden. Recent iOS draws that header see-through over the
  * page, and letting iOS inset the page left it opening half-scrolled, the
  * title still under the header (Idan's video, 2026-11-23). */
-function Page({ title, subtitle, children }: { title: string; subtitle: string; children: ReactNode }) {
+function Page({
+  title,
+  subtitle,
+  action,
+  children,
+}: {
+  title: string;
+  subtitle: string;
+  /** At the end of the top bar ("עריכה"). */
+  action?: ReactNode;
+  children: ReactNode;
+}) {
   const insets = useSafeAreaInsets();
   const router = useRouter();
   const { t } = useTranslation();
@@ -67,7 +84,7 @@ function Page({ title, subtitle, children }: { title: string; subtitle: string; 
     >
       <Stack.Screen options={{ headerShown: false }} />
       <StatusBar style="dark" />
-      <View style={{ height: 52, flexDirection: "row", alignItems: "center" }}>
+      <View style={{ height: 52, flexDirection: "row", alignItems: "center", justifyContent: "space-between" }}>
         <IconButton
           icon={ChevronLeft}
           mirror
@@ -75,6 +92,7 @@ function Page({ title, subtitle, children }: { title: string; subtitle: string; 
           accessibilityLabel={t("common.back")}
           onPress={() => (router.canGoBack() ? router.back() : router.replace("/"))}
         />
+        {action}
       </View>
       <View style={{ gap: 6 }}>
         <Display size={38} numberOfLines={2}>
@@ -230,24 +248,33 @@ type Adj = { action: "skipped" | "swapped"; exerciseName: string; swapName: stri
 export function CompletedWorkout({
   data,
   mode,
+  subject,
   subjectName,
+  canEdit,
 }: {
   data: WorkoutData;
   mode: WorkoutMode;
+  subject: WorkoutSubject;
   subjectName: string | null;
+  /** Whoever logged it: the client their own, the trainer an offline client's. */
+  canEdit: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const lang = i18n.language;
   const scheduledId = data.scheduledId;
   const unit = t("progress.kg");
+  const [editing, setEditing] = useState(false);
+  const summaryKey = qk.workout.summary(scheduledId);
 
   const query = useQuery({
-    queryKey: qk.workout.summary(scheduledId),
+    queryKey: summaryKey,
     queryFn: async () => {
-      const { data: log, error } = await supabase
-        .from("workout_logs")
-        .select("*")
-        .eq("scheduled_workout_id", scheduledId)
+      // An own workout has no scheduled session: its route carries the log id.
+      const base = supabase.from("workout_logs").select("*");
+      const { data: log, error } = await (data.ownLogId
+        ? base.eq("id", data.ownLogId)
+        : base.eq("scheduled_workout_id", scheduledId)
+      )
         .order("completed_at", { ascending: false })
         .limit(1)
         .maybeSingle();
@@ -324,6 +351,24 @@ export function CompletedWorkout({
   const log = query.data?.log ?? null;
   const groups = query.data?.groups ?? [];
   const adjustments = query.data?.adjustments ?? [];
+
+  if (editing && log) {
+    return (
+      <EditWorkout
+        title={title}
+        subtitle={subtitle}
+        log={{ id: log.id, completedAt: log.completed_at, effort: log.effort_rating, note: log.client_note }}
+        initialGroups={groups.map((g) => ({
+          exerciseId: g.exerciseId,
+          name: g.name,
+          sets: g.sets.map((s) => ({ weight: s.weight, reps: s.reps ?? DEFAULT_REPS })),
+        }))}
+        subject={subject}
+        summaryKey={summaryKey}
+        onDone={() => setEditing(false)}
+      />
+    );
+  }
   const facts = log
     ? [
         // A late log keeps the session's day in the subtitle; this is when it was done.
@@ -338,7 +383,15 @@ export function CompletedWorkout({
     : [];
 
   return (
-    <Page title={title} subtitle={subtitle}>
+    <Page
+      title={title}
+      subtitle={subtitle}
+      action={
+        canEdit && log ? (
+          <Button label={t("workout.edit.open")} icon={Pencil} variant="secondary" size={44} onPress={() => setEditing(true)} />
+        ) : null
+      }
+    >
       <StatusCard icon={Check} tint={colors.voltSoft} ink={colors.voltInk}>
         <AppText size={15} weight="semibold">
           {t("workout.completedTitle")}

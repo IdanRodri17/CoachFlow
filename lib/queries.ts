@@ -227,7 +227,10 @@ export function clientContextQuery(kind: "app" | "managed", refId: string) {
       if (!log) return { intake, pkg: pkgRes.data, last: null };
 
       const [swRes, setsRes, adjRes] = await Promise.all([
-        supabase.from("scheduled_workouts").select("template_id").eq("id", log.scheduled_workout_id).maybeSingle(),
+        // An own workout (0047) has no scheduled session, so no template.
+        log.scheduled_workout_id
+          ? supabase.from("scheduled_workouts").select("template_id").eq("id", log.scheduled_workout_id).maybeSingle()
+          : Promise.resolve({ data: null, error: null }),
         supabase.from("set_logs").select("exercise_id, reps, weight, is_pr").eq("workout_log_id", log.id),
         supabase
           .from("exercise_adjustments")

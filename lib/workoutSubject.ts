@@ -14,6 +14,11 @@
 //     solo one can be done any day (2026-11-26: people training on their own
 //     choose when); finished early, the save moves it to today
 //     (saveWorkout). A past one that was missed can still be logged late.
+//   * A client's own workout (2026-11-27, 0047) has no scheduled session:
+//     its route id is "own-<log id>", the id made when it starts. Before the
+//     save only that client can open it (to log it); after, it's theirs to
+//     view and edit, and their trainer views it read-only (RLS decides who
+//     can read the log at all).
 //
 // Pure, unit-tested in lib/workoutSubject.test.ts.
 
@@ -62,4 +67,37 @@ export function workoutAccess(
     return { kind: "preview", subject, mode: "trainer", reason: notYet ? "notYet" : "clientLogs" };
   }
   return { kind: "denied", reason: "notYours" };
+}
+
+// ---------------------------------------------------------------------------
+// A client's own workout (2026-11-27)
+// ---------------------------------------------------------------------------
+
+export const OWN_WORKOUT_PREFIX = "own-";
+const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+
+/** "own-<uuid>" → the log id; anything else (a scheduled workout's id) → null. */
+export function ownLogIdOf(routeId: string): string | null {
+  if (!routeId.startsWith(OWN_WORKOUT_PREFIX)) return null;
+  const id = routeId.slice(OWN_WORKOUT_PREFIX.length);
+  return UUID.test(id) ? id : null;
+}
+
+export function ownWorkoutRouteId(logId: string): string {
+  return OWN_WORKOUT_PREFIX + logId;
+}
+
+/** `log`: the saved own workout as RLS returned it, or null when there's none
+ * (not saved yet, or not this user's to read). */
+export function ownWorkoutAccess(
+  log: { client_id: string | null } | null,
+  user: { id: string; role: "trainer" | "client" },
+): WorkoutAccess {
+  if (log) {
+    if (!log.client_id) return { kind: "denied", reason: "notYours" };
+    const subject: WorkoutSubject = { kind: "app", id: log.client_id };
+    return { kind: "view", subject, mode: log.client_id === user.id ? "client" : "trainer" };
+  }
+  if (user.role !== "client") return { kind: "denied", reason: "notYours" };
+  return { kind: "log", subject: { kind: "app", id: user.id }, mode: "client" };
 }

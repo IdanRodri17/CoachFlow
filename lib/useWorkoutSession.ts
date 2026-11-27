@@ -23,6 +23,9 @@
 // Resume (D20g): the open session is saved on the phone after every change,
 // keyed `${loggedBy}:${scheduledId}` (a trainer can have several open), so
 // minimizing or an app restart loses nothing; the save clears it.
+// Own workouts (2026-11-27, 0047): a client's workout with no scheduled
+// session. Its route id is "own-<log id>" (lib/workoutSubject.ts), made when
+// it starts, so the save (log_own_workout) is safe to retry.
 
 import { useEffect, useMemo, useReducer, useRef, useState } from "react";
 import AsyncStorage from "@react-native-async-storage/async-storage";
@@ -34,6 +37,7 @@ import { supabase } from "./supabase";
 import { todayISO } from "./dates";
 import { detectPRs } from "./pr";
 import { checkAndAwardBadges } from "./badges";
+import { editRows, prFlagsAfterEdit, type EditGroup, type StoredSet } from "./workoutEdit";
 import {
   createSession,
   exerciseName,
@@ -59,8 +63,12 @@ export type WorkoutMode = "client" | "trainer";
 export type LoadedExercise = SessionExercise & { muscleGroup: string | null; videoUrl: string | null };
 
 export type WorkoutData = {
+  /** The scheduled workout's id; an own workout's route id ("own-<log id>"). */
   scheduledId: string;
-  trainerId: string;
+  /** null for an own workout: no trainer's session, no streak to move. */
+  trainerId: string | null;
+  /** An own workout's log id (0047), else null. */
+  ownLogId: string | null;
   scheduledDate: string;
   status: "scheduled" | "completed";
   note: string | null;
@@ -284,6 +292,7 @@ export async function loadWorkout(
   const base = {
     scheduledId,
     trainerId: sw.trainer_id,
+    ownLogId: null,
     scheduledDate: sw.scheduled_date,
     status: sw.status,
     note: sw.notes,
@@ -329,6 +338,15 @@ export async function loadWorkout(
   return { ...base, title: tplRes.data?.name ?? null, exercises };
 }
 
+/** An own workout (0047): nothing planned, so it starts on the picker. */
+export function ownWorkoutData(
+  routeId: string,
+  logId: string,
+  { date, status, title }: { date: string; status: "scheduled" | "completed"; title: string },
+): WorkoutData {
+  return { scheduledId: routeId, trainerId: null, ownLogId: logId, scheduledDate: date, status, note: null, title, exercises: [] };
+}
+
 /** An exercise picked from the library during the workout (2026-11-26: a
  * free workout picks as it goes), with the subject's own history so last
  * time, the prefill and live PRs work as for a planned one. */
@@ -357,7 +375,8 @@ export async function loadAddedExercise(
  * the skips and swaps, the scheduled workout marked completed — all in one
  * transaction (rpc complete_workout, 0037), safe to retry — then (client
  * mode) badges. Swaps log against the substitute. logged_by is the caller
- * (0032's default). */
+ * (0032's default). An own workout (ownLogId) has no session to complete:
+ * rpc log_own_workout (0047) writes the log under the id made at its start. */
 export async function saveWorkout(
   session: Pick<WorkoutSession, "state" | "scheduledId" | "subject" | "loggedBy" | "mode">,
   {
@@ -365,7 +384,14 @@ export async function saveWorkout(
     effort,
     note,
     scheduledDate,
-  }: { durationSeconds: number | null; effort: number | null; note: string | null; scheduledDate: string },
+    ownLogId = null,
+  }: {
+    durationSeconds: number | null;
+    effort: number | null;
+    note: string | null;
+    scheduledDate: string;
+    ownLogId?: string | null;
+  },
 ): Promise<void> {
   const { state, scheduledId, subject, loggedBy, mode } = session;
   const rows = saveRows(state);
@@ -375,7 +401,7 @@ export async function saveWorkout(
   // 0045 refuses completing anything dated after today; RLS and
   // prevent_client_reschedule let a client move their own solo session.
   const today = todayISO();
-  if (scheduledDate > today) {
+  if (!ownLogId && scheduledDate > today) {
     const { error: moveErr } = await supabase
       .from("scheduled_workouts")
       .update({ scheduled_date: today })
@@ -399,15 +425,26 @@ export async function saveWorkout(
 
   // F3 (0037): one transaction — the log, its sets with PR flags, the
   // skips and swaps, and the status. A retry after a dropped connection
-  // gets the first save back instead of a second log.
-  const { error } = await supabase.rpc("complete_workout", {
-    p_scheduled_workout_id: scheduledId,
-    p_duration_seconds: durationSeconds,
-    p_effort_rating: effort,
-    p_client_note: note,
-    p_sets: rows.sets.map((r, i) => ({ ...r, is_pr: isPr[i] })),
-    p_adjustments: rows.adjustments,
-  });
+  // gets the first save back instead of a second log. Same for an own
+  // workout (0047), keyed by the log id made at its start.
+  const sets = rows.sets.map((r, i) => ({ ...r, is_pr: isPr[i] }));
+  const { error } = ownLogId
+    ? await supabase.rpc("log_own_workout", {
+        p_log_id: ownLogId,
+        p_duration_seconds: durationSeconds,
+        p_effort_rating: effort,
+        p_client_note: note,
+        p_sets: sets,
+        p_adjustments: rows.adjustments,
+      })
+    : await supabase.rpc("complete_workout", {
+        p_scheduled_workout_id: scheduledId,
+        p_duration_seconds: durationSeconds,
+        p_effort_rating: effort,
+        p_client_note: note,
+        p_sets: sets,
+        p_adjustments: rows.adjustments,
+      });
   if (error) throw error;
 
   // Saved: nothing left to resume.
@@ -415,4 +452,75 @@ export async function saveWorkout(
 
   // Badges (V9) are the client's own — deterministic, from client_streaks.
   if (mode === "client") await checkAndAwardBadges(subject.id);
+}
+
+// ---------------------------------------------------------------------------
+// Editing a finished workout (2026-11-27; the rules: lib/workoutEdit.ts)
+// ---------------------------------------------------------------------------
+
+const PAGE = 1000;
+
+/** Every stored set of these exercises for the subject (explicitly the
+ * subject's, not left to RLS: a trainer reads every client's sets). Paged,
+ * so a long history isn't cut at the API's row limit. */
+export async function subjectSets(exerciseIds: string[], subject: WorkoutSubject): Promise<StoredSet[]> {
+  if (exerciseIds.length === 0) return [];
+  const out: StoredSet[] = [];
+  for (let from = 0; ; from += PAGE) {
+    const { data, error } = await supabase
+      .from("set_logs")
+      .select("id, exercise_id, weight, reps, set_index, is_pr, workout_log_id, workout_logs!inner(client_id, managed_client_id, completed_at)")
+      .in("exercise_id", exerciseIds)
+      .eq(subject.kind === "app" ? "workout_logs.client_id" : "workout_logs.managed_client_id", subject.id)
+      .order("id")
+      .range(from, from + PAGE - 1);
+    if (error) throw error;
+    for (const row of data) {
+      out.push({
+        id: row.id,
+        logId: row.workout_log_id,
+        exerciseId: row.exercise_id,
+        setIndex: row.set_index,
+        weight: row.weight,
+        reps: row.reps,
+        isPr: row.is_pr,
+        completedAt: (row.workout_logs as unknown as { completed_at: string }).completed_at,
+      });
+    }
+    if (data.length < PAGE) return out;
+  }
+}
+
+/** The save: the session's sets with their PR flags, the effort and the note,
+ * and the other sessions' flags the edit changed — one transaction (0046). */
+export async function saveWorkoutEdit({
+  logId,
+  completedAt,
+  subject,
+  exercisesBefore,
+  groups,
+  effort,
+  note,
+}: {
+  logId: string;
+  completedAt: string;
+  subject: WorkoutSubject;
+  /** The exercises the session had before the edit (their later flags may change too). */
+  exercisesBefore: string[];
+  groups: EditGroup[];
+  effort: number | null;
+  note: string | null;
+}): Promise<void> {
+  const rows = editRows(groups);
+  const exerciseIds = [...new Set([...exercisesBefore, ...rows.map((r) => r.exercise_id)])];
+  const stored = await subjectSets(exerciseIds, subject);
+  const { flags, updates } = prFlagsAfterEdit(stored, logId, completedAt, rows);
+  const { error } = await supabase.rpc("edit_workout_log", {
+    p_log_id: logId,
+    p_effort_rating: effort,
+    p_client_note: note,
+    p_sets: rows.map((r, i) => ({ ...r, is_pr: flags[i] })),
+    p_pr_updates: updates,
+  });
+  if (error) throw error;
 }

@@ -345,7 +345,8 @@ export type Database = {
       workout_logs: {
         Row: {
           id: string;
-          scheduled_workout_id: string;
+          // 0047: null = the client's own workout (no scheduled session behind it).
+          scheduled_workout_id: string | null;
           // V17 (0032): exactly one of client_id (app) / managed_client_id (offline).
           client_id: string | null;
           managed_client_id: string | null;
@@ -359,7 +360,7 @@ export type Database = {
         };
         Insert: {
           id?: string;
-          scheduled_workout_id: string;
+          scheduled_workout_id?: string | null;
           client_id?: string | null;
           managed_client_id?: string | null;
           completed_at?: string;
@@ -372,7 +373,7 @@ export type Database = {
         };
         Update: {
           id?: string;
-          scheduled_workout_id?: string;
+          scheduled_workout_id?: string | null;
           client_id?: string | null;
           managed_client_id?: string | null;
           completed_at?: string;
@@ -786,6 +787,32 @@ export type Database = {
       complete_workout: {
         Args: {
           p_scheduled_workout_id: string;
+          p_duration_seconds: number | null;
+          p_effort_rating: number | null;
+          p_client_note: string | null;
+          p_sets: Json;
+          p_adjustments: Json;
+        };
+        Returns: string;
+      };
+      // 0046: replaces a finished workout log's sets, effort and note (the
+      // caller's own RLS); p_pr_updates = [{ id, is_pr }] for other sets whose
+      // PR flag the edit changed. Raises workout_not_found.
+      edit_workout_log: {
+        Args: {
+          p_log_id: string;
+          p_effort_rating: number | null;
+          p_client_note: string | null;
+          p_sets: Json;
+          p_pr_updates: Json;
+        };
+        Returns: string;
+      };
+      // 0047: saves the calling client's own workout (no scheduled session)
+      // under the id the app made at its start; a retry writes nothing.
+      log_own_workout: {
+        Args: {
+          p_log_id: string;
           p_duration_seconds: number | null;
           p_effort_rating: number | null;
           p_client_note: string | null;
