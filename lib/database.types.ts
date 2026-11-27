@@ -79,6 +79,8 @@ export type Database = {
           default_sets: number | null;
           default_reps: number | null;
           created_at: string;
+          // 0051: the standard exercise this copy came from (null: the trainer's own).
+          catalog_slug: string | null;
         };
         Insert: {
           id?: string;
@@ -91,6 +93,7 @@ export type Database = {
           default_sets?: number | null;
           default_reps?: number | null;
           created_at?: string;
+          catalog_slug?: string | null;
         };
         Update: {
           id?: string;
@@ -103,7 +106,28 @@ export type Database = {
           default_sets?: number | null;
           default_reps?: number | null;
           created_at?: string;
+          catalog_slug?: string | null;
         };
+        Relationships: [];
+      };
+      // --- 0051_exercise_catalog.sql: the standard library (read-only in the app) ---
+      exercise_catalog: {
+        Row: {
+          slug: string;
+          position: number;
+          /** A chip key: legs, glutes, back, chest, shoulders, arms, core, other. */
+          muscle_group: string;
+          name_he: string;
+          name_en: string;
+          cues_he: string | null;
+          cues_en: string | null;
+          default_sets: number | null;
+          default_reps: number | null;
+          video_url: string | null;
+          created_at: string;
+        };
+        Insert: never;
+        Update: never;
         Relationships: [];
       };
       // --- V3: 0003_templates.sql ---
@@ -819,6 +843,12 @@ export type Database = {
           p_pr_updates: Json;
         };
         Returns: string;
+      };
+      // 0051: copies the standard library (all, or these slugs) into the calling
+      // trainer's exercises, skipping ones they already have. Returns how many.
+      add_catalog_exercises: {
+        Args: { p_slugs?: string[] | null };
+        Returns: number;
       };
       // U5 (0048): archive (or restore) one of the calling trainer's clients;
       // archiving also deletes their upcoming sessions. Returns how many.

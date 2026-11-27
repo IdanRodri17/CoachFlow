@@ -130,6 +130,18 @@
       "pr": "PR",
       "noHistory": "You haven't done this one yet.",
       "cuesFrom": "Cues from {{name}}"
+    },
+    "catalog": {
+      "cardTitle": "Standard library",
+      "cardHint_one": "1 standard exercise isn't in your library",
+      "cardHint_two": "2 standard exercises aren't in your library",
+      "cardHint_other": "{{count}} standard exercises aren't in your library",
+      "open": "Show",
+      "title": "Standard library",
+      "hint": "Common exercises with form cues and a demo video. Added ones are yours to edit.",
+      "addAll": "Add all ({{count}})",
+      "add": "Add",
+      "allIn": "Every standard exercise is already in your library."
     }
   },
   "templates": {

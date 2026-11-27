@@ -91,6 +91,8 @@ export const qk = {
     list: ["exercises", "list"] as const,
     one: (id: Id) => ["exercises", "one", id] as const,
     history: (exerciseId: Id, clientId: Id) => ["exercises", "history", exerciseId, clientId] as const,
+    /** The standard library (0051) — "ספרייה כללית". */
+    catalog: ["exercises", "catalog"] as const,
   },
 
   /**

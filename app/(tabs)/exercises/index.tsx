@@ -6,6 +6,10 @@
 // D29b: rebuilt to docs/design/screens/trainer-exercises.html — title, the
 // "תבניות | תרגילים" switch (trainers: this tab is the Library), search, muscle
 // filter chips and rows with a thumbnail (volt play mark when there's a video).
+//
+// 0051 (2026-11-27): every trainer starts with the standard library as their
+// own copies. When some are missing (deleted), a "ספרייה כללית" card opens
+// CatalogSheet to add them back.
 
 import { useMemo, useState } from "react";
 import { ScrollView, View } from "react-native";
@@ -14,6 +18,7 @@ import { useRouter } from "expo-router";
 import { useQuery } from "@tanstack/react-query";
 import { useTranslation } from "react-i18next";
 import type { LucideProps } from "lucide-react-native";
+import BookOpen from "lucide-react-native/icons/book-open";
 import ChevronRight from "lucide-react-native/icons/chevron-right";
 import Dumbbell from "lucide-react-native/icons/dumbbell";
 import Play from "lucide-react-native/icons/play";
@@ -27,8 +32,10 @@ import { supabase } from "@/lib/supabase";
 import { useAuth } from "@/lib/auth";
 import { ltr } from "@/lib/i18n";
 import { MUSCLE_KEYS, muscleKeyOf } from "@/components/ExerciseForm";
+import { CatalogSheet, type CatalogRow } from "@/components/CatalogSheet";
 import {
   AppText,
+  Button,
   Card,
   colors,
   Display,
@@ -49,6 +56,7 @@ export default function ExercisesListScreen() {
   const insets = useSafeAreaInsets();
   const [search, setSearch] = useState("");
   const [muscle, setMuscle] = useState<string | null>(null);
+  const [catalogOpen, setCatalogOpen] = useState(false);
 
   const { data, error, isSuccess, refetch } = useQuery({
     queryKey: qk.exercises.list,
@@ -58,6 +66,21 @@ export default function ExercisesListScreen() {
       return data;
     },
   });
+
+  // The standard library (0051): which of it isn't in this trainer's library.
+  const catalog = useQuery({
+    queryKey: qk.exercises.catalog,
+    enabled: isTrainer,
+    queryFn: async (): Promise<CatalogRow[]> => {
+      const { data: rows, error: e } = await supabase.from("exercise_catalog").select("*").order("position");
+      if (e) throw e;
+      return rows;
+    },
+  });
+  const missing = useMemo(() => {
+    const have = new Set((data ?? []).map((e) => e.catalog_slug).filter(Boolean));
+    return (catalog.data ?? []).filter((c) => !have.has(c.slug));
+  }, [catalog.data, data]);
 
   const shown = useMemo(() => {
     const q = search.trim().toLowerCase();
@@ -198,7 +221,33 @@ export default function ExercisesListScreen() {
             ) : null}
           </Card>
         ) : null}
+
+        {isTrainer && isSuccess && catalog.isSuccess && missing.length > 0 ? (
+          <Card style={{ marginTop: 14, flexDirection: "row", alignItems: "center", gap: 12 }}>
+            <View
+              style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: colors.mist, alignItems: "center", justifyContent: "center" }}
+            >
+              <Icon icon={BookOpen} size={22} color={colors.ink} />
+            </View>
+            <View style={{ flex: 1, minWidth: 0, gap: 2 }}>
+              <AppText size={16} weight="semibold">
+                {t("exercises.catalog.cardTitle")}
+              </AppText>
+              <AppText size={13} tone="graphite">
+                {t("exercises.catalog.cardHint", { count: missing.length })}
+              </AppText>
+            </View>
+            <Button label={t("exercises.catalog.open")} variant="secondary" size={44} onPress={() => setCatalogOpen(true)} />
+          </Card>
+        ) : null}
       </View>
+
+      <CatalogSheet
+        visible={catalogOpen}
+        onClose={() => setCatalogOpen(false)}
+        missing={missing}
+        loading={catalog.isLoading}
+      />
     </ScrollView>
   );
 }
