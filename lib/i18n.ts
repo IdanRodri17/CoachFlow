@@ -49,6 +49,7 @@ import * as Localization from "expo-localization";
 import i18next from "i18next";
 import { initReactI18next } from "react-i18next";
 
+import { appLanguageFor } from "./deviceLanguage";
 import en from "./locales/en.json";
 import he from "./locales/he.json";
 
@@ -70,7 +71,8 @@ function isSupportedLocale(v: string | null | undefined): v is SupportedLocale {
 }
 
 function deviceLocale(): SupportedLocale {
-  return Localization.getLocales()[0]?.languageCode === "he" ? "he" : "en";
+  // Not languageCode === "he": Android 13 and older call Hebrew "iw" (P29).
+  return appLanguageFor(Localization.getLocales()[0]);
 }
 
 const initialLocale = deviceLocale();
