@@ -640,7 +640,14 @@ const CHIP_LOOK: Record<ChipKind, { bg: string; fg: string; icon?: IconComponent
   smsOff: { bg: colors.mist, fg: colors.graphite, icon: BellOff },
 };
 
-/** Status chip: 26 tall, always an icon + a word (never color alone). */
+/** Status chip: 26 tall, always an icon + a word (never color alone).
+ *
+ * It sits where its parent puts it, like any other child: in a row that
+ * centers its children it's centered too. It used to pin itself to the
+ * start (alignSelf flex-start), which in such a row meant the top: a PR chip
+ * above the paid chip next to it, a status chip above the chevron (P28).
+ * In a column a chip would stretch to the full width, so a chip placed in
+ * a column passes style={{ alignSelf: "flex-start" }}. */
 export function Chip({
   kind,
   label,
@@ -666,7 +673,6 @@ export function Chip({
           flexDirection: "row",
           alignItems: "center",
           gap: 4,
-          alignSelf: "flex-start",
         },
         style,
       ]}

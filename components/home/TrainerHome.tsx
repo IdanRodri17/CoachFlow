@@ -238,7 +238,8 @@ export function TrainerHome() {
                               : t("trainerHome.solo")
                         }`}
                       </AppText>
-                      {offline ? <Chip kind="noApp" label={t("trainerHome.noApp")} /> : null}
+                      {/* In this column the chip would stretch; it hugs its text. */}
+                      {offline ? <Chip kind="noApp" label={t("trainerHome.noApp")} style={{ alignSelf: "flex-start" }} /> : null}
                     </Pressable>
                     {done ? (
                       <Chip kind="done" label={t("trainerHome.done")} />
